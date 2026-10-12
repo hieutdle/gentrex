@@ -6,6 +6,7 @@ import io
 import logging
 import pathlib
 import time
+from concurrent import futures
 
 import openai
 import pypdfium2
@@ -42,7 +43,9 @@ class OcrConfig:
         longest_dim: Longest image edge in pixels after downscaling; 0 keeps
             the rendered size.
         max_tokens: Cap on one page's transcription.
+        temperature: Sampling temperature.
         timeout_seconds: Time allowed for one request.
+        concurrency: OCR requests in flight at the same time.
     """
 
     model: str
@@ -50,7 +53,9 @@ class OcrConfig:
     render_dpi: int
     longest_dim: int
     max_tokens: int
+    temperature: float
     timeout_seconds: float
+    concurrency: int
 
 
 class OcrEngine:
@@ -85,6 +90,19 @@ class OcrEngine:
                 time.sleep(wait)
         return self._request(image_png)
 
+    def text_or_error(self, image_png: bytes) -> str | Exception:
+        """Returns the text on a page image, or the error that prevented it.
+
+        Raises:
+            openai.OpenAIError: The endpoint is misconfigured (FATAL_ERRORS).
+        """
+        try:
+            return self.image_to_text(image_png)
+        except FATAL_ERRORS:
+            raise
+        except Exception as exc:  # One page's failure must not cost the others.
+            return exc
+
     def _request(self, image_png: bytes) -> str:
         encoded = base64.b64encode(image_png).decode()
         content = [
@@ -97,6 +115,7 @@ class OcrEngine:
         response = self._client.chat.completions.create(
             model=self.config.model,
             max_tokens=self.config.max_tokens,
+            temperature=self.config.temperature,
             messages=[{"role": "user", "content": content}],
         )
         return (response.choices[0].message.content or "").strip()
@@ -120,29 +139,27 @@ def _render_page_png(
     return buffer.getvalue()
 
 
-def ocr_pages(
-    pdf_path: pathlib.Path, page_numbers: list[int], ocr: OcrEngine
-) -> dict[int, str | openai.OpenAIError]:
-    """Transcribes the given 1-indexed pages.
+def submit_pages(
+    pdf_path: pathlib.Path,
+    page_numbers: list[int],
+    ocr: OcrEngine,
+    pool: futures.Executor,
+) -> dict[int, futures.Future[str | Exception]]:
+    """Renders the given 1-indexed pages and queues an OCR call for each.
 
     Returns:
-        The text of each page, or the error that page hit, so one unreadable
-        page does not cost the report its other pages.
-
-    Raises:
-        openai.OpenAIError: The endpoint is misconfigured (FATAL_ERRORS).
+        The pending result of each page: its text, or the error that page hit,
+        so one unreadable page does not cost the report its other pages. A
+        misconfigured endpoint (FATAL_ERRORS) is raised by the result instead.
     """
-    results: dict[int, str | openai.OpenAIError] = {}
     doc = pypdfium2.PdfDocument(pdf_path)
     try:
-        for number in page_numbers:
-            image = _render_page_png(doc, number - 1, ocr.config)
-            try:
-                results[number] = ocr.image_to_text(image)
-            except FATAL_ERRORS:
-                raise
-            except openai.OpenAIError as exc:
-                results[number] = exc
+        # PDFium is not thread-safe: render here, send from the pool.
+        return {
+            number: pool.submit(
+                ocr.text_or_error, _render_page_png(doc, number - 1, ocr.config)
+            )
+            for number in page_numbers
+        }
     finally:
         doc.close()
-    return results

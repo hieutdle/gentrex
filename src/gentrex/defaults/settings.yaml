@@ -28,5 +28,11 @@ transcribe:
     # stuck repeating itself on a blank or noisy page. A page with more text
     # than this would be cut off.
     max_tokens: 8192
+    # Randomness of the output; 0 always picks the most likely next word.
+    # 0.2 is the value LightOn's model card uses.
+    temperature: 0.2
     # Time allowed for one OCR request before it counts as failed.
     timeout_seconds: 300
+    # OCR requests in flight at the same time, across all PDFs. A server such
+    # as vLLM processes them together, which is faster than one by one.
+    concurrency: 8
