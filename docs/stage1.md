@@ -27,6 +27,9 @@ You need:
 If all your reports are native PDFs, you do not need a model server. Skip
 step 2 and use `--no-ocr` in step 4.
 
+On Mount Sinai's Minerva cluster, follow [Running on Minerva](minerva.md)
+instead of steps 1 to 4, then come back to [Check the result](#check-the-result).
+
 ## Step 1: Install
 
 Run this once, from the repository folder:
@@ -59,7 +62,7 @@ The server must serve the OCR model under the name in the settings, which is
 vllm serve lightonai/LightOnOCR-2-1B
 ```
 
-`.env` is gitignored. Never commit real addresses or keys.
+`.env` is gitignored, so the address and key stay out of git.
 
 ## Step 3: Put your PDFs in place
 
@@ -97,7 +100,7 @@ Scanned pages are then written with empty text.
 While it runs, Gentrex prints one line per PDF. Each run replaces the output
 file, so running it again starts from the beginning.
 
-## Step 5: Check the result
+## Check the result
 
 The output has one line per page. Each line is a JSON object:
 

@@ -1,7 +1,7 @@
 # Gentrex
 
 Gentrex (Genetic Test Report eXtraction) turns clinical genetics PDF reports
-into structured data. This repository contains no patient data.
+into structured data.
 
 ## Documentation
 

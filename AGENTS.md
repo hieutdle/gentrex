@@ -29,6 +29,17 @@ source .venv/bin/activate
 - **Keep it minimal.** One behavior per test and the smallest setup that
   triggers it; if the test diff dwarfs the code change, cut scope.
 
+### Documentation
+
+- **Write about the subject, not the document.** Open with what the tool does
+  or what the reader does. Never "This guide covers...", "This section
+  explains...", or "In this document...".
+- **No unprompted disclaimers or reassurances.** Do not state what the project
+  is not or does not contain ("This repository contains no patient data").
+  Give a warning only where the reader must act on it, at the step it applies to.
+- **Plain and direct.** Short sentences, imperative for steps. No filler, no
+  restating what was just said, no sales language.
+
 ### Coding style guidelines
 
 The line length limit for Python code is 88 characters. If you are not sure, use pre-commit to check.

@@ -12,12 +12,6 @@ Check formatting and lint:
 uv run ruff check . && uv run ruff format --check .
 ```
 
-Run the tests:
-
-```bash
-uv run pytest
-```
-
 To run the lint and format checks automatically on every commit, install the
 git hook once:
 

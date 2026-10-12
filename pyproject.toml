@@ -24,7 +24,6 @@ gentrex = "gentrex.cli:main"
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.2",
-    "pytest>=8",
     "ruff>=0.6",
 ]
 
@@ -44,9 +43,6 @@ select = ["E", "F", "I", "UP", "B"]
 
 [tool.ruff.lint.isort]
 force-single-line = true
-
-[tool.pytest.ini_options]
-testpaths = ["tests"]
 
 [tool.basedpyright]
 venvPath = "."

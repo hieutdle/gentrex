@@ -1,13 +1,14 @@
 # Running on Minerva (Mount Sinai)
 
-This guide runs [stage 1](stage1.md) on Minerva, Mount Sinai's HPC cluster.
-One GPU job starts the OCR model with [vLLM](https://docs.vllm.ai) and runs
-Gentrex against it. Reports and results stay on the cluster.
+On Minerva, Mount Sinai's HPC cluster, one GPU job starts the OCR model with
+[vLLM](https://docs.vllm.ai) and runs Gentrex against it. See
+[Stage 1: PDF pages to text](stage1.md) for what the stage does, its output
+and its settings.
 
 You need a Minerva account and a project allocation (`acc_...`). Run
 `mybalance` on a login node to see your allocations.
 
-Steps 1 and 2 are done once. After that, each run is steps 3 to 5.
+Steps 1 and 2 are done once. After that, each run is steps 3 and 4.
 
 ## Step 1: Log in and get Gentrex
 
@@ -135,14 +136,14 @@ tail -f stage1.*.log      # what vLLM and Gentrex print
 
 To cancel, run `bkill <job ID>` with the ID that `bjobs` shows.
 
-## Step 5: Check the result
+## Next
 
-When the job is done, the result is in `results/pages.jsonl`. See
-[Check the result](stage1.md#step-5-check-the-result) for what it contains
-and how to find pages where OCR failed. The end of the log lists any files
-that failed.
+When the job is done, the result is in `results/pages.jsonl`, and the end of
+the log lists any files that failed. Continue in the stage 1 guide:
 
-## Patient data
+- [Check the result](stage1.md#check-the-result)
+- [When something goes wrong](stage1.md#when-something-goes-wrong)
+- [Settings](stage1.md#settings)
 
-Keep reports and results on Minerva, in a location approved for patient data.
-Do not copy them to a laptop, and never commit them.
+Keep reports and results on Minerva, in a location approved for
+[patient data](stage1.md#patient-data). Do not copy them to a laptop.
