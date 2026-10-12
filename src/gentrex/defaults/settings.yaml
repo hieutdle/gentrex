@@ -1,0 +1,32 @@
+# Gentrex settings. Endpoints and API keys come from the environment, never
+# from this file (see .env.example).
+
+# Stage 1: PDF pages to text.
+transcribe:
+  # Routing threshold. A page whose embedded text has at least this many
+  # non-whitespace characters is "native" and read directly; any other page is
+  # "scanned" and sent to OCR.
+  native_min_chars: 20
+
+  ocr:
+    # Vision model name, as the server at GENTREX_OCR_BASE_URL knows it.
+    model: lightonai/LightOnOCR-2-1B
+    # Instruction sent with every page image.
+    prompt: >-
+      Transcribe all text from this document page exactly as it appears,
+      preserving the reading order. Output only the transcribed text.
+    # The model reads images, so each scanned page is first drawn as a picture.
+    # render_dpi sets how detailed it is: at 400 dots per inch a Letter page
+    # is about 3400 x 4400 pixels.
+    render_dpi: 400
+    # The picture is then shrunk so its longer side is this many pixels (about
+    # 1190 x 1540 for a Letter page), the largest size LightOnOCR-2 is trained
+    # on. Drawing big and shrinking keeps small print smooth; drawing small
+    # directly leaves it jagged. 0 skips the shrinking.
+    longest_dim: 1540
+    # Longest answer allowed for one page, about 6000 words. Stops a model
+    # stuck repeating itself on a blank or noisy page. A page with more text
+    # than this would be cut off.
+    max_tokens: 8192
+    # Time allowed for one OCR request before it counts as failed.
+    timeout_seconds: 300

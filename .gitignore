@@ -218,3 +218,14 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# --- Gentrex ---
+# Local endpoints and keys.
+.env
+# Input reports, downloaded ontologies and pipeline outputs. Reports and
+# everything derived from them may contain patient data: never commit them.
+data/
+results/
+# OS / editor / assistant state.
+.DS_Store
+.claude/
