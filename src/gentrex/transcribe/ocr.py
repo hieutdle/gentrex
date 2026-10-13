@@ -38,7 +38,7 @@ class OcrConfig:
 
     Attributes:
         model: Vision model name on the server.
-        prompt: Instruction sent with every page image.
+        prompt: Text sent after every page image; empty sends the image alone.
         render_dpi: Resolution pages are rendered at.
         longest_dim: Longest image edge in pixels after downscaling; 0 keeps
             the rendered size.
@@ -106,12 +106,13 @@ class OcrEngine:
     def _request(self, image_png: bytes) -> str:
         encoded = base64.b64encode(image_png).decode()
         content = [
-            {"type": "text", "text": self.config.prompt},
             {
                 "type": "image_url",
                 "image_url": {"url": f"data:image/png;base64,{encoded}"},
             },
         ]
+        if self.config.prompt:
+            content.append({"type": "text", "text": self.config.prompt})
         response = self._client.chat.completions.create(
             model=self.config.model,
             max_tokens=self.config.max_tokens,

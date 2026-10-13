@@ -4,6 +4,7 @@ import collections
 import dataclasses
 import logging
 import pathlib
+import time
 from concurrent import futures
 from typing import TextIO
 
@@ -60,13 +61,17 @@ def _start_pdf(
 
 
 def _write_oldest(
-    started: collections.deque[_StartedPdf], fh: TextIO, failed: set[str]
+    started: collections.deque[_StartedPdf],
+    fh: TextIO,
+    failed: set[str],
+    written: collections.Counter[str],
 ) -> None:
     """Writes the pages of the PDF started first, waiting for its OCR calls."""
     pdf = started.popleft()
     pages = pdf.finish()
     if any(page.error for page in pages):
         failed.add(pdf.name)
+    written.update(page.source for page in pages)
     fh.write("".join(page.to_json() + "\n" for page in pages))
     fh.flush()
 
@@ -94,9 +99,11 @@ def run(
         on, in the order of `pdf_paths`. Pages of the latter are still
         written, with `error` set.
     """
+    start = time.perf_counter()
     output.parent.mkdir(parents=True, exist_ok=True)
     workers = ocr.config.concurrency if ocr else 1
     failed: set[str] = set()
+    written: collections.Counter[str] = collections.Counter()
     started: collections.deque[_StartedPdf] = collections.deque()
     pool = futures.ThreadPoolExecutor(workers)
     try:
@@ -116,10 +123,18 @@ def run(
                     not started[0].unfinished()
                     or sum(pdf.unfinished() for pdf in started) >= 2 * workers
                 ):
-                    _write_oldest(started, fh, failed)
+                    _write_oldest(started, fh, failed, written)
             while started:
-                _write_oldest(started, fh, failed)
+                _write_oldest(started, fh, failed, written)
     finally:
         # On an error or Ctrl-C, pages still waiting are not sent.
         pool.shutdown(cancel_futures=True)
+    seconds = time.perf_counter() - start
+    _logger.info(
+        "wrote %d pages (%d scanned) in %.0f s: %.1f pages per minute",
+        written.total(),
+        written["scanned"],
+        seconds,
+        written.total() / seconds * 60,
+    )
     return [path.name for path in pdf_paths if path.name in failed]

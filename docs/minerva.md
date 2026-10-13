@@ -33,21 +33,26 @@ Do this on a login node: compute nodes have no internet access.
 
 ## Step 2: Download vLLM and the OCR model
 
-Still on a login node, pick a folder with at least 20 GB free, for example
+Still on a login node, pick a folder with at least 40 GB free, for example
 in your work directory, and download both into it:
 
 ```bash
 mkdir -p /path/to/serving && cd /path/to/serving
 
 module load apptainer
+export APPTAINER_CACHEDIR=$PWD/apptainer-cache
 apptainer pull vllm.sif docker://vllm/vllm-openai:latest
+rm -rf apptainer-cache
 
-uvx --from huggingface_hub hf download lightonai/LightOnOCR-2-1B \
-  --local-dir models/LightOnOCR-2-1B
+uvx --from huggingface_hub hf download lightonai/LightOnOCR-3-4B \
+  --local-dir models/LightOnOCR-3-4B
 ```
 
-The first command saves vLLM as one file, `vllm.sif`. The second saves the
-model weights. Both are reused by every later run.
+`apptainer pull` saves vLLM as one file, `vllm.sif`. Its download cache
+takes about 16 GB and by default goes to your home folder, which has a
+30 GB quota; `APPTAINER_CACHEDIR` keeps it here until `rm` deletes it.
+`hf download` saves the model weights. Both are reused by every later
+run.
 
 ## Step 3: Write the job script
 
@@ -69,12 +74,15 @@ SERVING=/path/to/serving               # <-- the folder from step 2
 GENTREX=/path/to/gentrex               # <-- this repository
 
 module load apptainer
+mkdir -p "$SERVING/home"
 
-apptainer exec --nv --env HF_HUB_OFFLINE=1 \
+apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
   -B "$SERVING/models:/models" "$SERVING/vllm.sif" \
-  vllm serve /models/LightOnOCR-2-1B \
-    --served-model-name lightonai/LightOnOCR-2-1B \
+  vllm serve /models/LightOnOCR-3-4B \
+    --served-model-name lightonai/LightOnOCR-3-4B \
     --port 8000 \
+    --max-model-len 18000 \
+    --default-chat-template-kwargs '{"enable_thinking": false}' \
     --limit-mm-per-prompt '{"image": 1}' \
     --mm-processor-cache-gb 0 \
     --no-enable-prefix-caching &
@@ -96,15 +104,16 @@ exit $status
 What the script does:
 
 1. Asks for one GPU, 4 cores and 2 hours.
-2. Starts vLLM with the OCR model and waits until it answers.
+2. Starts vLLM with the OCR model and waits until it answers. vLLM keeps
+   its compile cache in `$SERVING/home`, outside your home folder.
 3. Runs stage 1 on `data/raw/`, writing `results/pages.jsonl`.
 4. Stops vLLM, which ends the job and frees the GPU.
 
 Because Gentrex and vLLM run in the same job, no `.env` file, token or
 network setup is needed.
 
-`select[a100]` picks the GPU type. The OCR model is small and fits on any of
-them, so change it if the job waits a long time in the queue:
+`select[a100]` picks the GPU type. The OCR model's weights take 9 GB, so any
+of them can hold it. Change it if the job waits a long time in the queue:
 
 | Value | GPU | Memory |
 | --- | --- | --- |

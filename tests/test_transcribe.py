@@ -1,4 +1,6 @@
+import dataclasses
 import json
+import logging
 import pathlib
 import struct
 import threading
@@ -58,6 +60,17 @@ def _read_pages(path: pathlib.Path) -> list[dict]:
     return [json.loads(line) for line in path.read_text().splitlines()]
 
 
+def test_empty_prompt_sends_the_page_image_alone():
+    """LightOnOCR is trained to transcribe a page from its image alone."""
+    config = dataclasses.replace(_FakeOcr(1).config, prompt="")
+    with mock.patch.object(openai, "OpenAI") as client_class:
+        ocr.OcrEngine(config, "http://unused", "EMPTY").image_to_text(b"png")
+
+    create = client_class.return_value.chat.completions.create
+    (message,) = create.call_args.kwargs["messages"]
+    assert [part["type"] for part in message["content"]] == ["image_url"]
+
+
 def test_requests_in_flight_span_pdfs(make_pdf, tmp_path):
     """The limit counts requests across PDFs, not within one PDF."""
     pdfs = [make_pdf(f"{i}.pdf", [400, 410]) for i in range(4)]
@@ -94,6 +107,19 @@ def test_each_page_keeps_its_text_in_input_order(make_pdf, tmp_path):
         ("c.pdf", 1, "430"),
         ("c.pdf", 2, "440"),
     ]
+
+
+def test_last_log_line_counts_pages_for_the_speed(make_pdf, tmp_path, caplog):
+    """The pages-per-minute figure is only right if every page is counted."""
+    pdfs = [
+        make_pdf("a.pdf", [400, 410], native_text=_NATIVE_TEXT),
+        make_pdf("b.pdf", [420]),
+    ]
+    caplog.set_level(logging.INFO, logger="gentrex")
+
+    run.run(pdfs, tmp_path / "pages.jsonl", 20, _FakeOcr(2))
+
+    assert caplog.records[-1].getMessage().startswith("wrote 4 pages (3 scanned) in")
 
 
 def test_failed_ocr_call_costs_only_that_page(make_pdf, tmp_path):

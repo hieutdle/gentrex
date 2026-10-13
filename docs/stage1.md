@@ -56,10 +56,12 @@ Then open `.env` and set the two values:
 | `GENTREX_OCR_API_KEY` | The key for that server. Leave `EMPTY` if it needs none. |
 
 The server must serve the OCR model under the name in the settings, which is
-`lightonai/LightOnOCR-2-1B` by default. With vLLM:
+`lightonai/LightOnOCR-3-4B` by default. With vLLM:
 
 ```bash
-vllm serve lightonai/LightOnOCR-2-1B
+vllm serve lightonai/LightOnOCR-3-4B \
+  --max-model-len 18000 \
+  --default-chat-template-kwargs '{"enable_thinking": false}'
 ```
 
 `.env` is gitignored, so the address and key stay out of git.
@@ -97,8 +99,15 @@ uv run gentrex stage1 --no-ocr
 
 Scanned pages are then written with empty text.
 
-While it runs, Gentrex prints one line per PDF. Each run replaces the output
-file, so running it again starts from the beginning.
+While it runs, Gentrex prints one line per PDF. The last line gives the
+speed:
+
+```text
+wrote 1450 pages (1210 scanned) in 785 s: 110.8 pages per minute
+```
+
+The time runs from reading the first PDF to writing the last page. Each run
+replaces the output file, so running it again starts from the beginning.
 
 ## Check the result
 

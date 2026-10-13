@@ -229,3 +229,7 @@ results/
 # OS / editor / assistant state.
 .DS_Store
 .claude/
+# models and images
+serving/
+# LSF jobs
+stage*.lsf

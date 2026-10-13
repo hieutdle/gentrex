@@ -10,20 +10,20 @@ transcribe:
 
   ocr:
     # Vision model name, as the server at GENTREX_OCR_BASE_URL knows it.
-    model: lightonai/LightOnOCR-2-1B
-    # Instruction sent with every page image.
-    prompt: >-
-      Transcribe all text from this document page exactly as it appears,
-      preserving the reading order. Output only the transcribed text.
+    model: lightonai/LightOnOCR-3-4B
+    # Text sent after every page image. Empty sends the image alone, which is
+    # how LightOnOCR is trained to transcribe a page; other instructions are
+    # unfamiliar to it and can make the transcription worse.
+    prompt: ""
     # The model reads images, so each scanned page is first drawn as a picture.
     # render_dpi sets how detailed it is: at 400 dots per inch a Letter page
     # is about 3400 x 4400 pixels.
     render_dpi: 400
     # The picture is then shrunk so its longer side is this many pixels (about
-    # 1190 x 1540 for a Letter page), the largest size LightOnOCR-2 is trained
-    # on. Drawing big and shrinking keeps small print smooth; drawing small
+    # 1580 x 2048 for a Letter page), the size LightOnOCR-3-4B is trained on.
+    # Drawing big and shrinking keeps small print smooth; drawing small
     # directly leaves it jagged. 0 skips the shrinking.
-    longest_dim: 1540
+    longest_dim: 2048
     # Longest answer allowed for one page, about 6000 words. Stops a model
     # stuck repeating itself on a blank or noisy page. A page with more text
     # than this would be cut off.
