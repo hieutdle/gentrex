@@ -70,8 +70,8 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main() -> None:
     """Runs the command given on the command line."""
-    logging.basicConfig(
-        level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s"
-    )
+    logging.basicConfig(format="%(asctime)s %(levelname)s %(message)s")
+    # Progress from Gentrex only: libraries log a line for every request.
+    logging.getLogger("gentrex").setLevel(logging.INFO)
     args = _build_parser().parse_args()
     sys.exit(args.func(args))
