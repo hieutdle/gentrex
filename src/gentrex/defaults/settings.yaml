@@ -66,3 +66,29 @@ pagedecide:
   # asked one after another, so the server can reuse the page it has just
   # read instead of reading it again for each question.
   concurrency: 16
+
+# Stage 3: one structured record per report, from the pages stage 2 kept.
+# The fields to extract are in schema.yaml, next to this file.
+extract:
+  # Text model name, as the server at GENTREX_LLM_BASE_URL knows it.
+  model: google/gemma-4-31B-it
+  # System message of every request. The schema follows it, as JSON.
+  instruction: >-
+    You extract structured data from one clinical genetic test report. You are
+    given selected pages of the report in page order, each after a line such
+    as "--- PAGE 2 ---"; pages in between may be missing. Return one JSON
+    object that follows the schema below and covers all the pages. Fill a
+    field only if the report states it; otherwise use null. Never guess. Copy
+    every field ending in _raw verbatim from the report. For a field with
+    allowed values, choose the closest one and keep the report's wording in
+    the paired _raw field.
+  # Longest answer allowed for one report, in tokens. Stops a model stuck
+  # repeating itself. An answer cut off here is lost and the report fails;
+  # raise it if reports with many variants are cut off, and raise
+  # timeout_seconds by the same factor.
+  max_tokens: 4096
+  # Time allowed for one request. The whole answer is written within it.
+  timeout_seconds: 300
+  # Reports in flight at the same time. A server such as vLLM processes them
+  # together, which is faster than one by one.
+  concurrency: 4

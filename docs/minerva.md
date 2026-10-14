@@ -2,8 +2,8 @@
 
 On Minerva, Mount Sinai's HPC cluster, each stage runs as one GPU job that
 starts the stage's model with [vLLM](https://docs.vllm.ai) and runs Gentrex
-against it. See [Stage 1](stage1.md) and [Stage 2](stage2.md) for what each
-stage does, its output and its settings.
+against it. See [Stage 1](stage1.md), [Stage 2](stage2.md) and
+[Stage 3](stage3.md) for what each stage does, its output and its settings.
 
 You need a Minerva account and a project allocation (`acc_...`). Run
 `mybalance` on a login node to see your allocations.
@@ -75,12 +75,13 @@ GENTREX=/path/to/gentrex               # <-- this repository
 
 module load apptainer
 mkdir -p "$SERVING/home"
+port=$((10000 + LSB_JOBID % 20000))
 
 apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
   -B "$SERVING/models:/models" "$SERVING/vllm.sif" \
   vllm serve /models/LightOnOCR-3-4B \
     --served-model-name lightonai/LightOnOCR-3-4B \
-    --port 8000 \
+    --port "$port" \
     --max-model-len 18000 \
     --default-chat-template-kwargs '{"enable_thinking": false}' \
     --limit-mm-per-prompt '{"image": 1}' \
@@ -88,13 +89,13 @@ apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
     --no-enable-prefix-caching &
 server=$!
 
-until curl -sf http://localhost:8000/v1/models > /dev/null; do
+until curl -sf "http://localhost:$port/v1/models" > /dev/null; do
   kill -0 "$server" || { echo "vLLM stopped; see the log above"; exit 1; }
   sleep 5
 done
 
 cd "$GENTREX"
-GENTREX_OCR_BASE_URL=http://localhost:8000/v1 .venv/bin/gentrex stage1
+GENTREX_OCR_BASE_URL=http://localhost:$port/v1 .venv/bin/gentrex stage1
 status=$?
 
 kill "$server"
@@ -105,7 +106,9 @@ What the script does:
 
 1. Asks for one GPU, 4 cores and 2 hours.
 2. Starts vLLM with the OCR model and waits until it answers. vLLM keeps
-   its compile cache in `$SERVING/home`, outside your home folder.
+   its compile cache in `$SERVING/home`, outside your home folder. The port
+   comes from the job ID: on the default port, 8000, Gentrex could reach the
+   vLLM of another job on the same node and send it the reports.
 3. Runs stage 1 on `data/raw/`, writing a new folder in `results/transcribe/`.
 4. Stops vLLM, which ends the job and frees the GPU.
 
@@ -200,22 +203,23 @@ GENTREX=/path/to/gentrex               # <-- this repository
 
 module load apptainer
 mkdir -p "$SERVING/home"
+port=$((10000 + LSB_JOBID % 20000))
 
 apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
   -B "$SERVING/models:/models" "$SERVING/vllm.sif" \
   vllm serve /models/gemma-4-26B-A4B-it \
     --served-model-name google/gemma-4-26B-A4B-it \
-    --port 8000 \
+    --port "$port" \
     --max-model-len 16384 &
 server=$!
 
-until curl -sf http://localhost:8000/v1/models > /dev/null; do
+until curl -sf "http://localhost:$port/v1/models" > /dev/null; do
   kill -0 "$server" || { echo "vLLM stopped; see the log above"; exit 1; }
   sleep 5
 done
 
 cd "$GENTREX"
-GENTREX_LLM_BASE_URL=http://localhost:8000/v1 .venv/bin/gentrex stage2
+GENTREX_LLM_BASE_URL=http://localhost:$port/v1 .venv/bin/gentrex stage2
 status=$?
 
 kill "$server"
@@ -246,3 +250,100 @@ end of the log lists any files that failed. Continue in the stage 2 guide:
 - [Check the result](stage2.md#check-the-result)
 - [Change the questions or the threshold](stage2.md#settings)
 - [When something goes wrong](stage2.md#when-something-goes-wrong)
+
+## Stage 3: One record per report
+
+Stage 3 is a third job, run after a stage 2 job has finished. It uses the
+`vllm.sif` from step 2 with a larger text model.
+
+### Download the model
+
+Once, on a login node, download the model into the folder from step 2:
+
+```bash
+cd /path/to/serving
+uvx --from huggingface_hub hf download google/gemma-4-31B-it \
+  --local-dir models/gemma-4-31B-it
+```
+
+The download is about 62 GB. If Hugging Face refuses it, accept Google's
+terms on the model's page and log in, as for the stage 2 model, then
+download again.
+
+### Write the job script
+
+Save this as `stage3.lsf` in the `gentrex` folder. Change the three marked
+lines.
+
+```bash
+#!/bin/bash
+#BSUB -J gentrex-stage3
+#BSUB -P acc_xxx                       # <-- your allocation
+#BSUB -q gpu
+#BSUB -n 4
+#BSUB -W 8:00
+#BSUB -gpu num=1
+#BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
+#BSUB -oo stage3.%J.log
+
+SERVING=/path/to/serving               # <-- the folder from step 2
+GENTREX=/path/to/gentrex               # <-- this repository
+
+module load apptainer
+mkdir -p "$SERVING/home"
+port=$((10000 + LSB_JOBID % 20000))
+
+apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
+  -B "$SERVING/models:/models" "$SERVING/vllm.sif" \
+  vllm serve /models/gemma-4-31B-it \
+    --served-model-name google/gemma-4-31B-it \
+    --port "$port" \
+    --max-model-len 32768 \
+    --gpu-memory-utilization 0.95 &
+server=$!
+
+until curl -sf "http://localhost:$port/v1/models" > /dev/null; do
+  kill -0 "$server" || { echo "vLLM stopped; see the log above"; exit 1; }
+  sleep 5
+done
+
+cd "$GENTREX"
+GENTREX_LLM_BASE_URL=http://localhost:$port/v1 .venv/bin/gentrex stage3
+status=$?
+
+kill "$server"
+exit $status
+```
+
+It works like the stage 2 script, and runs stage 3 on the newest finished
+stage 2 run, writing a new folder in `results/extract/`. `-W 8:00` allows
+eight hours, because the model writes a whole record for every report.
+After the first run, set it from the speed Gentrex logs when it finishes,
+in reports per minute. Do not add `--no-enable-prefix-caching` from the
+stage 1 script: every request starts with the same instruction and schema,
+which vLLM then reads once.
+
+The model's weights take about 62 GB, which leaves little of an 80 GB GPU
+for the reports vLLM works on. If vLLM stops at startup because the model
+and its memory for requests do not fit on one GPU, use two: change
+`-gpu num=1` to `-gpu num=2`, and add `--tensor-parallel-size 2` to
+`vllm serve`.
+
+`select[h100nvl]` asks for an H100; `a10080g` and `h10080g` from the table in
+step 3 also have 80 GB. Change it if the job waits a long time in the queue.
+
+### Submit the job
+
+```bash
+cd /path/to/gentrex
+bsub < stage3.lsf
+```
+
+Follow it with `bjobs` and `tail -f stage3.*.log`, as in step 4.
+
+When the job is done, the result is in `results/extract/latest/`, and the
+end of the log lists any files that failed. Continue in the stage 3 guide:
+
+- [Check the result](stage3.md#check-the-result)
+- [Change the schema](stage3.md#settings)
+- [When something goes wrong](stage3.md#when-something-goes-wrong)

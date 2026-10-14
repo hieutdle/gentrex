@@ -2,6 +2,7 @@
 
 import dataclasses
 import json
+from typing import Any
 from typing import Literal
 
 PageSource = Literal["native", "scanned"]
@@ -47,6 +48,31 @@ class PageDecision:
     page: int
     p_yes: dict[str, float | None]
     keep: bool
+    error: str | None = None
+
+    def to_json(self) -> str:
+        """Returns the record as one JSONL line, without the newline."""
+        return json.dumps(dataclasses.asdict(self), ensure_ascii=False)
+
+
+@dataclasses.dataclass
+class ReportExtraction:
+    """One report after stage 3.
+
+    With `data` set and no `error`, the record is complete; with both set,
+    pages are missing from it; with `data` None, the report failed.
+
+    Attributes:
+        file: PDF file name.
+        pages: Pages whose text was sent to the model, in page order.
+        data: The record the model returned, following the extraction schema;
+            None if there was no request or it failed.
+        error: Pages left out for a stage 1 error, and why the request failed.
+    """
+
+    file: str
+    pages: list[int]
+    data: dict[str, Any] | None
     error: str | None = None
 
     def to_json(self) -> str:

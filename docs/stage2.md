@@ -122,7 +122,8 @@ Each run folder holds four files:
 | `run.yaml` | The command, the stage 1 run that was read, and the settings. |
 | `log.txt` | What Gentrex printed during the run. |
 
-`results/pagedecide/latest` points to the newest run that finished.
+`results/pagedecide/latest` points to the newest run that finished. Stage 3
+reads that run unless you name another.
 
 `decisions.jsonl` has one line per page, in the order of the input. Each line
 is a JSON object:

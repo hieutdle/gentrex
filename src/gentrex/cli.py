@@ -9,6 +9,8 @@ import sys
 from gentrex import config
 from gentrex import llm
 from gentrex import runs
+from gentrex.extract import extractor
+from gentrex.extract import run as extract_run
 from gentrex.pagedecide import run as pagedecide_run
 from gentrex.pagedecide import score
 from gentrex.transcribe import ocr as ocr_lib
@@ -83,6 +85,36 @@ def _run_stage2(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_stage3(args: argparse.Namespace) -> int:
+    pages_path = args.input / "pages.jsonl"
+    if not pages_path.is_file():
+        _logger.error("%s not found; run stage 2 first", pages_path)
+        return 1
+    base_url = os.environ.get(_LLM_BASE_URL_ENV)
+    if not base_url:
+        _logger.error("%s is not set (see .env.example)", _LLM_BASE_URL_ENV)
+        return 2
+
+    # Added to the settings, so that run.yaml records it for every run.
+    settings = {**config.load_settings()["extract"], "schema": config.load_schema()}
+    extract_config = extractor.ExtractConfig(**settings)
+    client = llm.make_client(
+        base_url,
+        os.environ.get(_LLM_API_KEY_ENV) or "EMPTY",
+        extract_config.timeout_seconds,
+    )
+    with runs.new_run("extract", args.input, settings) as run_dir:
+        failed = extract_run.run(
+            pages_path,
+            run_dir / "extractions.jsonl",
+            extractor.ReportExtractor(extract_config, client),
+        )
+        if failed:
+            _logger.error("failed files: %s", ", ".join(failed))
+            return 1
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gentrex", description=__doc__)
     subparsers = parser.add_subparsers(required=True)
@@ -108,6 +140,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Stage 1 run folder to read.",
     )
     stage2.set_defaults(func=_run_stage2)
+
+    stage3 = subparsers.add_parser(
+        "stage3", help="Kept pages to one structured record per report."
+    )
+    stage3.add_argument(
+        "--input",
+        type=pathlib.Path,
+        default=runs.latest("pagedecide"),
+        help="Stage 2 run folder to read.",
+    )
+    stage3.set_defaults(func=_run_stage3)
     return parser
 
 

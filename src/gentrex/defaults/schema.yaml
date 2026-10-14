@@ -1,0 +1,183 @@
+# Extraction schema: the record stage 3 extracts from each report, as a JSON
+# Schema. Report-level fields are under `properties`, and the fields of each
+# variant under `variants.items.properties`.
+#
+# Every request carries the schema twice: as JSON after the instruction (the
+# `extract` settings in settings.yaml), so the model reads the descriptions,
+# and as the format the server holds the answer to. Write each description
+# for the model: what the field holds and when to fill it.
+#
+# To add a field, add one block; to remove one, delete its block. Every field
+# is made required in the answer, so there is no list to keep in step:
+#
+#   my_field:
+#     description: What it is, and when to fill it.
+#     type: [string, "null"]
+#
+# Keep "null" in every type: without it, the model must make up a value for a
+# field the report does not state. Use [boolean, "null"] or [integer, "null"]
+# for other kinds of value. For a field with allowed values, add an `enum`
+# list that ends with null, unquoted, and pair it with a <field>_raw field for
+# the report's own wording.
+
+type: object
+additionalProperties: false
+properties:
+  mrn:
+    description: >-
+      Patient's medical record number, as printed (e.g. SYN-MRN-0007).
+    type: [string, "null"]
+  submitter_patient_id:
+    description: >-
+      Patient identifier from the ordering clinic or submitter, other than the
+      MRN, as printed (e.g. SYN-SUB-0006).
+    type: [string, "null"]
+  lab_accession_number:
+    description: >-
+      The laboratory's accession or order number for this test, as printed
+      (e.g. SYN-ACC-0011).
+    type: [string, "null"]
+  date_of_birth:
+    description: >-
+      Patient's date of birth, as printed (e.g. 23-JAN-2020, 06/19/2001).
+    type: [string, "null"]
+  sex:
+    description: Patient's sex, as printed (e.g. Female, Male, M).
+    type: [string, "null"]
+  specimen_type:
+    description: Specimen tested (e.g. Blood in EDTA, Buccal swab, Saliva).
+    type: [string, "null"]
+  collection_date:
+    description: >-
+      Date the specimen was collected, as printed (e.g. 27-AUG-2026).
+    type: [string, "null"]
+  received_date:
+    description: >-
+      Date the laboratory received the specimen, as printed (e.g. 08/18/2026).
+    type: [string, "null"]
+  test_name:
+    description: >-
+      Name of the test, panel or assay (e.g. Inherited Arrhythmia Panel,
+      Proband Exome with Secondary Findings).
+    type: [string, "null"]
+  test_started_date:
+    description: >-
+      Date the laboratory started the analysis, as printed (e.g. 2026-08-27).
+    type: [string, "null"]
+  report_date:
+    description: Date the report was finalized, as printed (e.g. 18-SEP-2026).
+    type: [string, "null"]
+  overall_result_raw:
+    description: >-
+      The report's overall result, copied verbatim (e.g. "POSITIVE: A
+      pathogenic variant was identified.", "PRIMARY RESULT: NEGATIVE.
+      SECONDARY RESULT: POSITIVE.").
+    type: [string, "null"]
+  clinical_indication:
+    description: >-
+      Why the test was ordered, as printed (e.g. Diagnostic evaluation,
+      Reproductive carrier screening). The patient's own clinical features go
+      in patient_phenotype_raw, not here.
+    type: [string, "null"]
+  patient_phenotype_raw:
+    description: >-
+      The patient's own clinical features, copied verbatim (e.g. "Muscle
+      weakness; delayed ability to walk."). Null when the pages only carry
+      boilerplate about interpreting results in the context of family history,
+      or describe a relative rather than this patient.
+    type: [string, "null"]
+  lab_name:
+    description: >-
+      Name of the testing laboratory (e.g. GeneDx, Invitae, Ambry Genetics).
+    type: [string, "null"]
+  # No dbSNP or ClinVar IDs and no population frequencies: a lookup by gene
+  # and HGVS gives them for every variant.
+  variants:
+    description: >-
+      One object per variant reported in the patient, listed once even if
+      several pages mention it. Empty if the report lists none.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      properties:
+        gene_symbol:
+          description: Gene symbol (e.g. BRCA1).
+          type: [string, "null"]
+        transcript:
+          description: >-
+            Reference transcript of the HGVS change (e.g. NM_007294.4).
+          type: [string, "null"]
+        hgvs_c:
+          description: Coding DNA change, copied verbatim (e.g. c.5266dupC).
+          type: [string, "null"]
+        hgvs_p:
+          description: >-
+            Protein change, copied verbatim (e.g. p.(Gln1756Profs*74)).
+          type: [string, "null"]
+        dna_change_raw:
+          description: >-
+            The DNA change, copied verbatim, when it is not given as a
+            separate c. change (e.g. "NC_012920.1:m.3243A>G", "Deletion of
+            exons 45-50").
+          type: [string, "null"]
+        chromosomal_position:
+          description: >-
+            Genomic position or range of the variant, as printed
+            (e.g. chr17:43057062).
+          type: [string, "null"]
+        classification:
+          description: >-
+            Pathogenicity. Choose the closest allowed value; keep the report's
+            wording in classification_raw.
+          type: [string, "null"]
+          enum:
+            - pathogenic
+            - likely_pathogenic
+            - uncertain_significance
+            - likely_benign
+            - benign
+            - other
+            - null
+        classification_raw:
+          description: >-
+            Classification wording, copied verbatim (e.g. "Pathogenic
+            (Class 5)", "VUS").
+          type: [string, "null"]
+        zygosity:
+          description: >-
+            Zygosity. Choose the closest allowed value; keep the report's
+            wording in zygosity_raw.
+          type: [string, "null"]
+          enum:
+            - heterozygous
+            - homozygous
+            - hemizygous
+            - heteroplasmic
+            - homoplasmic
+            - other
+            - null
+        zygosity_raw:
+          description: >-
+            Zygosity or heteroplasmy wording, copied verbatim
+            (e.g. "Heteroplasmic (28%)").
+          type: [string, "null"]
+        associated_phenotype:
+          description: >-
+            Disease or condition the report ties to the variant (e.g. Cystic
+            fibrosis, Rett syndrome).
+          type: [string, "null"]
+        mode_of_inheritance:
+          description: Inheritance pattern (e.g. autosomal dominant).
+          type: [string, "null"]
+        is_secondary_finding:
+          description: >-
+            True if the report flags the variant as a secondary or incidental
+            finding (e.g. under "Secondary Findings"), false if it flags it as
+            a primary finding.
+          type: [boolean, "null"]
+        variant_type_raw:
+          description: >-
+            Kind of variant, as printed (e.g. Missense, Frameshift deletion,
+            Copy-number deletion).
+          type: [string, "null"]
