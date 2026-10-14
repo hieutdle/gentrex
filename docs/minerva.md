@@ -65,7 +65,7 @@ lines.
 #BSUB -P acc_xxx                       # <-- your allocation
 #BSUB -q gpu
 #BSUB -n 4
-#BSUB -W 2:00
+#BSUB -W 0:30
 #BSUB -gpu num=1
 #BSUB -R "select[a100] rusage[mem=8000] span[hosts=1]"
 #BSUB -oo stage1.%J.log
@@ -104,7 +104,9 @@ exit $status
 
 What the script does:
 
-1. Asks for one GPU, 4 cores and 2 hours.
+1. Asks for one GPU, 4 cores, 32 GB of memory and 30 minutes.
+   `rusage[mem=8000]` is in MB per core, so 4 cores get 32 GB. It is the
+   node's memory, not the GPU's; vLLM uses about 6 GB of it.
 2. Starts vLLM with the OCR model and waits until it answers. vLLM keeps
    its compile cache in `$SERVING/home`, outside your home folder. The port
    comes from the job ID: on the default port, 8000, Gentrex could reach the
@@ -114,6 +116,12 @@ What the script does:
 
 Because Gentrex and vLLM run in the same job, no `.env` file, token or
 network setup is needed.
+
+`-W 0:30` limits the job to 30 minutes, including the few minutes vLLM takes
+to start. A short limit gets the job out of the queue sooner. If the log
+shows `TERM_RUNLIMIT`, the job was stopped before it finished: raise `-W`
+and submit again. Gentrex logs its speed per minute at the end of a run;
+use it to set `-W` for the next batch.
 
 `select[a100]` picks the GPU type. The OCR model's weights take 9 GB, so any
 of them can hold it. Change it if the job waits a long time in the queue:
@@ -143,6 +151,7 @@ Follow it with:
 
 ```bash
 bjobs                     # PEND = waiting for a GPU, RUN = running
+bjobs -p3 <job ID>        # why a PEND job is waiting
 tail -f stage1.*.log      # what vLLM and Gentrex print
 ```
 
@@ -193,7 +202,7 @@ lines.
 #BSUB -P acc_xxx                       # <-- your allocation
 #BSUB -q gpu
 #BSUB -n 4
-#BSUB -W 2:00
+#BSUB -W 0:30
 #BSUB -gpu num=1
 #BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
 #BSUB -oo stage2.%J.log
@@ -281,8 +290,8 @@ lines.
 #BSUB -P acc_xxx                       # <-- your allocation
 #BSUB -q gpu
 #BSUB -n 4
-#BSUB -W 8:00
-#BSUB -gpu num=1
+#BSUB -W 0:30
+#BSUB -gpu num=2
 #BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
 #BSUB -oo stage3.%J.log
 
@@ -298,6 +307,7 @@ apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
   vllm serve /models/gemma-4-31B-it \
     --served-model-name google/gemma-4-31B-it \
     --port "$port" \
+    --tensor-parallel-size 2 \
     --max-model-len 32768 \
     --gpu-memory-utilization 0.95 &
 server=$!
@@ -316,21 +326,28 @@ exit $status
 ```
 
 It works like the stage 2 script, and runs stage 3 on the newest finished
-stage 2 run, writing a new folder in `results/extract/`. `-W 8:00` allows
-eight hours, because the model writes a whole record for every report.
-After the first run, set it from the speed Gentrex logs when it finishes,
-in reports per minute. Do not add `--no-enable-prefix-caching` from the
-stage 1 script: every request starts with the same instruction and schema,
-which vLLM then reads once.
+stage 2 run, writing a new folder in `results/extract/`. Do not add
+`--no-enable-prefix-caching` from the stage 1 script: every request starts
+with the same instruction and schema, which vLLM then reads once.
 
-The model's weights take about 62 GB, which leaves little of an 80 GB GPU
-for the reports vLLM works on. If vLLM stops at startup because the model
-and its memory for requests do not fit on one GPU, use two: change
-`-gpu num=1` to `-gpu num=2`, and add `--tensor-parallel-size 2` to
-`vllm serve`.
+Stage 3 is the slowest stage, because the model writes a whole record for
+every report. If the job reaches the 30-minute limit, raise `-W` as in
+step 3.
 
-`select[h100nvl]` asks for an H100; `a10080g` and `h10080g` from the table in
-step 3 also have 80 GB. Change it if the job waits a long time in the queue.
+The model's weights take about 62 GB. On one 80 GB GPU, that leaves too
+little memory for a 32,768-token request, and vLLM stops at startup. Use
+two H100s or one B200:
+
+- **Two H100s**, as in the script. `-gpu num=2` asks for two GPUs,
+  `span[hosts=1]` keeps them on one node, and `--tensor-parallel-size 2`
+  splits the model across them. `a10080g` and `h10080g` from the table in
+  step 3 also work in place of `h100nvl`.
+- **One B200**, with 180 GB. Change `-gpu num=2` to `-gpu num=1` and
+  `select[h100nvl]` to `select[b200]`, and remove
+  `--tensor-parallel-size 2`. The B200 nodes run jobs only for some
+  allocations. If the job stays in PEND and `bjobs -p3 <job ID>` names
+  `aims_limit`, yours is not one of them: cancel it with `bkill` and use two
+  H100s.
 
 ### Submit the job
 

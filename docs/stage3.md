@@ -54,15 +54,20 @@ Every report's text is sent to this server, so use one approved for patient
 data.
 
 The server must serve the model under the name in the settings, which is
-`google/gemma-4-31B-it` by default. Its weights take about 62 GB, so it
-needs a GPU with 80 GB. With vLLM:
+`google/gemma-4-31B-it` by default. Its weights take about 62 GB. On one
+80 GB GPU, that leaves too little memory for a 32,768-token request, so use
+two 80 GB GPUs or one with more memory, such as a B200. With vLLM on two
+GPUs:
 
 ```bash
 vllm serve google/gemma-4-31B-it \
+  --tensor-parallel-size 2 \
   --max-model-len 32768 \
   --gpu-memory-utilization 0.95
 ```
 
+- `--tensor-parallel-size 2` splits the model across two GPUs. Leave it out
+  on a single larger GPU.
 - `--max-model-len` is the longest request in tokens: the instruction, the
   schema, the report's pages and the answer together. A longer report
   fails; see [When something goes wrong](#when-something-goes-wrong).
