@@ -36,3 +36,35 @@ transcribe:
     # OCR requests in flight at the same time, across all PDFs. A server such
     # as vLLM processes them together, which is faster than one by one.
     concurrency: 8
+
+# Stage 2: yes/no questions that decide which pages later stages read.
+pagedecide:
+  # Text model name, as the server at GENTREX_LLM_BASE_URL knows it.
+  model: google/gemma-4-26B-A4B-it
+  # Text sent before every page.
+  instruction: >-
+    Below is one page of a clinical genetic test report. Its text comes from a
+    PDF and may contain OCR errors.
+  # Questions asked about every page. The name before the colon labels the
+  # answer in the output. "Answer with Yes or No." is added after each
+  # question. To ask another question, add a name and its text; each one adds
+  # a request for every page.
+  questions:
+    has_result: >-
+      Does this page report the patient's genetic test result, such as an
+      overall result or a variant found in the patient?
+    has_phenotype: >-
+      Does this page describe the patient's own symptoms, clinical features or
+      reason for testing?
+    has_patient_info: >-
+      Does this page list the patient's details, such as date of birth, sex,
+      medical record number or specimen, beyond a page header?
+  # A page is kept when, for at least one question, the probability of "yes"
+  # is at least this. Lower keeps more pages.
+  keep_threshold: 0.5
+  # Time allowed for one request before it counts as failed.
+  timeout_seconds: 60
+  # Pages in flight at the same time, across all PDFs. A page's questions are
+  # asked one after another, so the server can reuse the page it has just
+  # read instead of reading it again for each question.
+  concurrency: 16

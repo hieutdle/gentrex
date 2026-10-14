@@ -84,11 +84,12 @@ file name identifies the report in every later stage, so keep names unique.
 uv run --env-file .env gentrex stage1
 ```
 
-This reads `data/raw/` and writes `results/pages.jsonl`. To use other
-locations:
+This reads `data/raw/` and writes a new folder named after the time the run
+started, such as `results/transcribe/20261014-123000/`. To read PDFs from
+another folder:
 
 ```bash
-uv run --env-file .env gentrex stage1 --input-dir my/reports --output my/pages.jsonl
+uv run --env-file .env gentrex stage1 --input-dir my/reports
 ```
 
 To skip OCR:
@@ -106,12 +107,23 @@ speed:
 wrote 1450 pages (1210 scanned) in 785 s: 110.8 pages per minute
 ```
 
-The time runs from reading the first PDF to writing the last page. Each run
-replaces the output file, so running it again starts from the beginning.
+The time runs from reading the first PDF to writing the last page. Running it
+again starts from the beginning in a new folder; earlier runs stay.
 
 ## Check the result
 
-The output has one line per page. Each line is a JSON object:
+Each run folder holds three files:
+
+| File | Contents |
+| --- | --- |
+| `pages.jsonl` | The text of every page. |
+| `run.yaml` | The command, the input folder and the settings the run used. |
+| `log.txt` | What Gentrex printed during the run. |
+
+`results/transcribe/latest` points to the newest run that finished. Stage 2
+reads that run unless you name another.
+
+`pages.jsonl` has one line per page. Each line is a JSON object:
 
 ```json
 {"file": "report-01.pdf", "page": 1, "source": "native", "text": "Hereditary Cancer Panel ...", "error": null}
@@ -129,14 +141,26 @@ The output has one line per page. Each line is a JSON object:
 To see how many pages of each kind you got:
 
 ```bash
-grep -c '"source": "native"' results/pages.jsonl
-grep -c '"source": "scanned"' results/pages.jsonl
+grep -c '"source": "native"' results/transcribe/latest/pages.jsonl
+grep -c '"source": "scanned"' results/transcribe/latest/pages.jsonl
 ```
 
 To list pages where OCR failed:
 
 ```bash
-grep -v '"error": null' results/pages.jsonl
+grep -v '"error": null' results/transcribe/latest/pages.jsonl
+```
+
+To compare runs, give grep all of them: it prints one count per run.
+
+```bash
+grep -c '"source": "scanned"' results/transcribe/*/pages.jsonl
+```
+
+To see what changed between two runs, compare their `run.yaml`:
+
+```bash
+diff results/transcribe/20261014-123000/run.yaml results/transcribe/20261015-090000/run.yaml
 ```
 
 ## When something goes wrong
@@ -159,7 +183,8 @@ A file is listed as failed in two cases:
   the output; the file is usually damaged or not a real PDF.
 
 A wrong key or an unknown model name stops the run at once, because every
-page would fail the same way. Fix `.env` or the model name and run again.
+page would fail the same way. Fix `.env` or the model name and run again. A
+run that stops early keeps its folder, but `latest` does not move to it.
 
 ## Settings
 

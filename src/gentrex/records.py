@@ -28,3 +28,27 @@ class PageRecord:
     def to_json(self) -> str:
         """Returns the record as one JSONL line, without the newline."""
         return json.dumps(dataclasses.asdict(self), ensure_ascii=False)
+
+
+@dataclasses.dataclass
+class PageDecision:
+    """One page after stage 2.
+
+    Attributes:
+        file: PDF file name.
+        page: 1-indexed page number.
+        p_yes: Probability that the answer is yes, by question name; None for
+            a question that was not asked or failed.
+        keep: Whether later stages read the page.
+        error: Why questions failed, or the page's stage 1 error.
+    """
+
+    file: str
+    page: int
+    p_yes: dict[str, float | None]
+    keep: bool
+    error: str | None = None
+
+    def to_json(self) -> str:
+        """Returns the record as one JSONL line, without the newline."""
+        return json.dumps(dataclasses.asdict(self), ensure_ascii=False)

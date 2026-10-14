@@ -48,6 +48,7 @@ force-single-line = true
 [tool.basedpyright]
 venvPath = "."
 venv = ".venv"
+pythonVersion = "3.12"
 typeCheckingMode = "standard"
 
 [tool.pytest.ini_options]

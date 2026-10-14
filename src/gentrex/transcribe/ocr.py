@@ -3,33 +3,13 @@
 import base64
 import dataclasses
 import io
-import logging
 import pathlib
-import time
 from concurrent import futures
 
-import openai
 import pypdfium2
 from PIL import Image
 
-_logger = logging.getLogger(__name__)
-
-# A shared model server answers 502 while another model loads, which can take
-# a minute. Waits before the second, third and fourth attempt.
-_RETRY_WAITS_SECONDS = (5, 20, 60)
-
-_RETRYABLE_ERRORS = (
-    openai.APIConnectionError,
-    openai.RateLimitError,
-    openai.InternalServerError,
-)
-
-# Misconfiguration: every later call would fail the same way.
-FATAL_ERRORS = (
-    openai.AuthenticationError,
-    openai.PermissionDeniedError,
-    openai.NotFoundError,
-)
+from gentrex import llm
 
 
 @dataclasses.dataclass(frozen=True)
@@ -63,12 +43,7 @@ class OcrEngine:
 
     def __init__(self, config: OcrConfig, base_url: str, api_key: str) -> None:
         self.config = config
-        self._client = openai.OpenAI(
-            base_url=base_url,
-            api_key=api_key,
-            timeout=config.timeout_seconds,
-            max_retries=0,  # image_to_text is the only retry layer.
-        )
+        self._client = llm.make_client(base_url, api_key, config.timeout_seconds)
 
     def image_to_text(self, image_png: bytes) -> str:
         """Returns the text on a page image.
@@ -78,27 +53,17 @@ class OcrEngine:
         Raises:
             openai.OpenAIError: The request still failed, or cannot succeed.
         """
-        for wait in _RETRY_WAITS_SECONDS:
-            try:
-                return self._request(image_png)
-            except _RETRYABLE_ERRORS as exc:
-                _logger.warning(
-                    "OCR call failed (%s); retrying in %ds",
-                    type(exc).__name__,
-                    wait,
-                )
-                time.sleep(wait)
-        return self._request(image_png)
+        return llm.with_retries(lambda: self._request(image_png))
 
     def text_or_error(self, image_png: bytes) -> str | Exception:
         """Returns the text on a page image, or the error that prevented it.
 
         Raises:
-            openai.OpenAIError: The endpoint is misconfigured (FATAL_ERRORS).
+            openai.OpenAIError: The endpoint is misconfigured (llm.FATAL_ERRORS).
         """
         try:
             return self.image_to_text(image_png)
-        except FATAL_ERRORS:
+        except llm.FATAL_ERRORS:
             raise
         except Exception as exc:  # One page's failure must not cost the others.
             return exc
@@ -151,7 +116,7 @@ def submit_pages(
     Returns:
         The pending result of each page: its text, or the error that page hit,
         so one unreadable page does not cost the report its other pages. A
-        misconfigured endpoint (FATAL_ERRORS) is raised by the result instead.
+        misconfigured endpoint (llm.FATAL_ERRORS) is raised by the result instead.
     """
     doc = pypdfium2.PdfDocument(pdf_path)
     try:
