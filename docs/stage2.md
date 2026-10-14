@@ -6,23 +6,47 @@ pages.
 
 ## How it works
 
-Gentrex sends the model one page and one question at a time, and lets it
-answer with a single word. It does not use the word itself: it reads how
-likely the model found "Yes" and how likely "No", and turns the two into
-`p_yes`, the probability that the answer is yes, between 0 and 1.
+Gentrex sends the model one page and one question at a time, and asks it to
+answer Yes or No. The server returns the 20 likeliest first words with their
+probabilities, and Gentrex reads those instead of the word the model writes,
+for example:
 
-A page is kept when at least one question has a `p_yes` of 0.5 or more. Two
-kinds of page skip the model:
+| First word | Probability |
+| --- | --- |
+| `Yes` | 0.951 |
+| `No` | 0.041 |
+| ` yes` | 0.002 |
 
-- A page with no text is dropped.
-- A page that stage 1 could not transcribe is kept, so it is not lost
-  unseen.
+Gentrex adds up the spellings of each answer, such as `Yes` and ` yes` with a
+leading space: here 0.953 for yes and 0.041 for no. It turns the two into
+`p_yes`, the probability that the answer is yes: 0.953 / (0.953 + 0.041) =
+0.96.
 
-A question that fails also keeps its page, for the same reason.
+A page is kept when at least one question has a `p_yes` of 0.5 or more, or
+when Gentrex cannot tell whether it matters:
+
+- OCR failed on the page in stage 1, so there is no text to ask about. The
+  page and its error go on to the next stage, and the report is listed as
+  failed. Run stage 1 again to read the page.
+- A question got no usable answer: the server still failed after its
+  retries, rejected the page (for example because it is too long for the
+  model), or the model's first word was neither Yes nor No.
+
+A page with no text and no error is empty, and is dropped without asking the
+model. This includes scanned pages when stage 1 ran with `--no-ocr`.
 
 By default, Gentrex asks whether a page reports the patient's test result
 (`has_result`) and whether it describes the patient's symptoms or reason for
 testing (`has_phenotype`).
+
+### Why one word
+
+- Reading the page takes one pass of the model, which the GPU runs in
+  parallel. Writing takes one more pass per word, so one word costs one pass
+  where a sentence would cost many.
+- Thinking is turned off in every request. Otherwise Gemma 4 can write
+  hundreds of words of reasoning before it answers, and the first word would
+  not be Yes or No.
 
 ## Before you start
 
@@ -63,11 +87,11 @@ needs a GPU with 80 GB. With vLLM:
 vllm serve google/gemma-4-26B-A4B-it --max-model-len 16384
 ```
 
-Do not turn off prefix caching: Gentrex asks a page's questions one after
-another, and the cache lets the server read the page once for all of them. Do
-not change `--logprobs-mode` or lower `--max-logprobs` below 20: Gentrex reads
-the model's raw probabilities for the 20 likeliest first words. No reasoning
-parser is needed, because Gentrex turns thinking off in every request.
+Keep three vLLM defaults that stage 2 relies on: prefix caching on, so the
+server reads a page once for all its questions; `--logprobs-mode` returning
+raw probabilities; and `--max-logprobs` at 20 or more, so it can return the 20
+likeliest first words. No reasoning parser is needed, because Gentrex turns
+thinking off.
 
 ## Step 2: Run
 
@@ -135,8 +159,9 @@ them: it prints one count per run.
 grep -c '"keep": true' results/pagedecide/*/decisions.jsonl
 ```
 
-Before you rely on the decisions, open some dropped pages in their PDFs and
-check that none of them reports a result.
+The model is often more sure of its answer than it should be, so a dropped
+page can still matter. Before you rely on the decisions, open some dropped
+pages in their PDFs and check that none of them reports a result.
 
 ## Settings
 
