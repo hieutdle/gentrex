@@ -74,6 +74,7 @@ def _run_stage2(args: argparse.Namespace) -> int:
         failed = pagedecide_run.run(
             pages_path,
             run_dir / "decisions.jsonl",
+            run_dir / "pages.jsonl",
             score.PageScorer(decide_config, client),
         )
         if failed:

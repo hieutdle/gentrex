@@ -51,16 +51,22 @@ def _decide(page: records.PageRecord, scorer: score.PageScorer) -> records.PageD
 
 
 def run(
-    input_path: pathlib.Path, output: pathlib.Path, scorer: score.PageScorer
+    input_path: pathlib.Path,
+    decisions_path: pathlib.Path,
+    kept_path: pathlib.Path,
+    scorer: score.PageScorer,
 ) -> list[str]:
-    """Writes a keep/drop decision for each page of a stage 1 file to `output`.
+    """Decides which pages of a stage 1 file to keep.
 
     Up to the config's `concurrency` pages are scored at once, each asking
-    its questions in turn. Decisions are written in input order.
+    its questions in turn. Both outputs are written in input order; existing
+    files are replaced.
 
     Args:
         input_path: JSONL file of PageRecords, from stage 1.
-        output: JSONL file to write; an existing file is replaced.
+        decisions_path: JSONL file of PageDecisions to write, one per page.
+        kept_path: JSONL file to copy the kept PageRecords to, unchanged, so
+            the next stage reads its pages from one file.
         scorer: Asks the questions.
 
     Returns:
@@ -74,20 +80,24 @@ def run(
     start = time.perf_counter()
     with input_path.open(encoding="utf-8") as fh:
         pages = [records.PageRecord(**json.loads(line)) for line in fh]
-    output.parent.mkdir(parents=True, exist_ok=True)
     failed: list[str] = []
     kept = 0
     last_file = None
     pool = futures.ThreadPoolExecutor(scorer.config.concurrency)
     try:
-        with output.open("w", encoding="utf-8") as fh:
-            for decision in pool.map(lambda page: _decide(page, scorer), pages):
+        with (
+            decisions_path.open("w", encoding="utf-8") as decisions_fh,
+            kept_path.open("w", encoding="utf-8") as kept_fh,
+        ):
+            decisions = pool.map(lambda page: _decide(page, scorer), pages)
+            for page, decision in zip(pages, decisions, strict=True):
                 if decision.file != last_file:
                     _logger.info("deciding %s", decision.file)
                     last_file = decision.file
-                fh.write(decision.to_json() + "\n")
+                decisions_fh.write(decision.to_json() + "\n")
                 if decision.keep:
                     kept += 1
+                    kept_fh.write(page.to_json() + "\n")
                 if decision.error and decision.file not in failed:
                     failed.append(decision.file)
     finally:

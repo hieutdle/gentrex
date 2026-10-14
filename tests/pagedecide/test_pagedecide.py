@@ -65,15 +65,23 @@ def _client(
 
 
 def _run(
-    tmp_path: pathlib.Path, client: mock.Mock, page: records.PageRecord
-) -> tuple[list[str], dict]:
-    """Runs stage 2 on one page; returns the failed files and the decision."""
-    input_path = tmp_path / "pages.jsonl"
-    input_path.write_text(page.to_json() + "\n")
-    output = tmp_path / "decisions.jsonl"
-    failed = run.run(input_path, output, score.PageScorer(_CONFIG, client))
-    (line,) = output.read_text().splitlines()
-    return failed, json.loads(line)
+    tmp_path: pathlib.Path, client: mock.Mock, *pages: records.PageRecord
+) -> tuple[list[str], list[dict]]:
+    """Runs stage 2 on `pages`; returns the failed files and the decisions.
+
+    The kept pages are written to tmp_path / "kept.jsonl".
+    """
+    input_path = tmp_path / "input.jsonl"
+    input_path.write_text("".join(page.to_json() + "\n" for page in pages))
+    decisions_path = tmp_path / "decisions.jsonl"
+    failed = run.run(
+        input_path,
+        decisions_path,
+        tmp_path / "kept.jsonl",
+        score.PageScorer(_CONFIG, client),
+    )
+    lines = decisions_path.read_text().splitlines()
+    return failed, [json.loads(line) for line in lines]
 
 
 def _request(text: str, question: str) -> dict:
@@ -129,9 +137,24 @@ def test_threshold_decides_keep(tmp_path, p_yes, keep):
     client = _client(lambda prompt: _first_token({"Yes": p_yes, "No": 1 - p_yes}))
     page = records.PageRecord("a.pdf", 1, "native", "Result: negative")
 
-    _, decision = _run(tmp_path, client, page)
+    _, (decision,) = _run(tmp_path, client, page)
 
     assert decision["keep"] is keep
+
+
+def test_only_kept_pages_are_copied_for_the_next_stage(tmp_path):
+    """The next stage reads its pages from one file, as stage 1 wrote them."""
+
+    def answer(prompt: str) -> token_logprob.ChatCompletionTokenLogprob:
+        p_yes = 0.9 if "RESULT" in prompt else 0.1
+        return _first_token({"Yes": p_yes, "No": 1 - p_yes})
+
+    kept = records.PageRecord("a.pdf", 1, "native", "RESULT: positive")
+    dropped = records.PageRecord("a.pdf", 2, "native", "Methods")
+
+    _run(tmp_path, _client(answer), kept, dropped)
+
+    assert (tmp_path / "kept.jsonl").read_text() == kept.to_json() + "\n"
 
 
 @pytest.mark.parametrize(
@@ -149,7 +172,7 @@ def test_pages_without_text_skip_the_model(tmp_path, page, keep):
     """A blank page holds nothing; a page stage 1 failed on must not be lost."""
     client = _client(lambda prompt: _first_token({"Yes": 1.0}))
 
-    _, decision = _run(tmp_path, client, page)
+    _, (decision,) = _run(tmp_path, client, page)
 
     assert decision["keep"] is keep
     assert not client.chat.completions.create.called
@@ -165,7 +188,7 @@ def test_failed_question_costs_only_that_answer(tmp_path):
 
     page = records.PageRecord("a.pdf", 1, "native", "Methods")
 
-    failed, decision = _run(tmp_path, _client(answer), page)
+    failed, (decision,) = _run(tmp_path, _client(answer), page)
 
     assert failed == ["a.pdf"]
     assert decision["p_yes"] == {

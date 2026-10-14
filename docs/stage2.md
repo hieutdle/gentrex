@@ -89,10 +89,16 @@ again writes a new folder; earlier runs stay.
 
 ## Check the result
 
-Each run folder holds `decisions.jsonl`, `run.yaml` and `log.txt`, as in
-[stage 1](stage1.md#check-the-result). Its `run.yaml` names the stage 1 run
-that was read. `results/pagedecide/latest` points to the newest run that
-finished.
+Each run folder holds four files:
+
+| File | Contents |
+| --- | --- |
+| `decisions.jsonl` | The scores and the keep flag of every page. |
+| `pages.jsonl` | The kept pages, unchanged from stage 1. Later stages read this file. |
+| `run.yaml` | The command, the stage 1 run that was read, and the settings. |
+| `log.txt` | What Gentrex printed during the run. |
+
+`results/pagedecide/latest` points to the newest run that finished.
 
 `decisions.jsonl` has one line per page, in the order of the input. Each line
 is a JSON object:
