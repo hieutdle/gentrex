@@ -21,9 +21,8 @@ kinds of page skip the model:
 A question that fails also keeps its page, for the same reason.
 
 By default, Gentrex asks whether a page reports the patient's test result
-(`has_result`), describes the patient's symptoms or reason for testing
-(`has_phenotype`), and lists the patient's details beyond a page header
-(`has_patient_info`).
+(`has_result`) and whether it describes the patient's symptoms or reason for
+testing (`has_phenotype`).
 
 ## Before you start
 
@@ -99,8 +98,8 @@ finished.
 is a JSON object:
 
 ```json
-{"file": "report-01.pdf", "page": 1, "p_yes": {"has_result": 0.98, "has_phenotype": 0.93, "has_patient_info": 0.99}, "keep": true, "error": null}
-{"file": "report-01.pdf", "page": 5, "p_yes": {"has_result": 0.02, "has_phenotype": 0.01, "has_patient_info": 0.04}, "keep": false, "error": null}
+{"file": "report-01.pdf", "page": 1, "p_yes": {"has_result": 0.98, "has_phenotype": 0.93}, "keep": true, "error": null}
+{"file": "report-01.pdf", "page": 5, "p_yes": {"has_result": 0.02, "has_phenotype": 0.01}, "keep": false, "error": null}
 ```
 
 | Field | Meaning |
@@ -156,9 +155,10 @@ Phrase each question about "this page", so that Yes or No answers it. Gentrex
 adds "Answer with Yes or No." after each question. Each question adds one
 request per page.
 
-A question about the patient's details can keep most pages when every page
-header repeats the patient's name. If too many pages are kept, check which
-question is high on them and reword it.
+Do not ask about what every page shows, such as the patient's name or date of
+birth: page headers repeat them, so the answer is yes on every page and every
+page is kept. If too many pages are kept, check which question is high on
+them and reword or remove it.
 
 `keep_threshold` is 0.5 by default. Lower it to keep more pages: fewer result
 pages are missed, but later stages have more to read. Raise it to keep fewer.

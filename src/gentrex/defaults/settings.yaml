@@ -56,9 +56,6 @@ pagedecide:
     has_phenotype: >-
       Does this page describe the patient's own symptoms, clinical features or
       reason for testing?
-    has_patient_info: >-
-      Does this page list the patient's details, such as date of birth, sex,
-      medical record number or specimen, beyond a page header?
   # A page is kept when, for at least one question, the probability of "yes"
   # is at least this. Lower keeps more pages.
   keep_threshold: 0.5
