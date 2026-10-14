@@ -51,8 +51,9 @@ pagedecide:
   # a request for every page.
   questions:
     has_result: >-
-      Does this page report the patient's genetic test result, such as an
-      overall result or a variant found in the patient?
+      Does this page state the patient's test result or list the variants
+      found in the patient? Answer No if the page only explains the result,
+      recommends next steps or describes the test.
     has_phenotype: >-
       Does this page describe the patient's own symptoms, clinical features or
       reason for testing?

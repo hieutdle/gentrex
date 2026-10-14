@@ -148,8 +148,9 @@ settings. Each value is explained there.
 ```yaml
   questions:
     has_result: >-
-      Does this page report the patient's genetic test result, such as an
-      overall result or a variant found in the patient?
+      Does this page state the patient's test result or list the variants
+      found in the patient? Answer No if the page only explains the result,
+      recommends next steps or describes the test.
 ```
 
 - To reword a question, edit its text.
@@ -159,7 +160,8 @@ settings. Each value is explained there.
 
 Phrase each question about "this page", so that Yes or No answers it. Gentrex
 adds "Answer with Yes or No." after each question. Each question adds one
-request per page.
+request per page. To leave a kind of page out, name it in the question, as
+`has_result` does: "Answer No if the page only ...".
 
 Do not ask about what every page shows, such as the patient's name or date of
 birth: page headers repeat them, so the answer is yes on every page and every
