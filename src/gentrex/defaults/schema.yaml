@@ -14,11 +14,13 @@
 #     description: What it is, and when to fill it.
 #     type: [string, "null"]
 #
-# Keep "null" in every type: without it, the model must make up a value for a
-# field the report does not state. Use [boolean, "null"] or [integer, "null"]
-# for other kinds of value. For a field with allowed values, add an `enum`
-# list that ends with null, unquoted, and pair it with a <field>_raw field for
-# the report's own wording.
+# Keep "null" in the type of every field a report may not state: without it,
+# the model must make up a value for such a field. Use [boolean, "null"] or
+# [integer, "null"] for other kinds of value. For a field with allowed values,
+# add an `enum` list that ends with null, unquoted, and put a field with the
+# report's own wording, such as <field>_raw, right before it. The server makes
+# the model write the fields in schema order, so the model copies the wording
+# first and then picks the value from it.
 
 type: object
 additionalProperties: false
@@ -60,6 +62,22 @@ properties:
       Name of the test, panel or assay (e.g. Inherited Arrhythmia Panel,
       Proband Exome with Secondary Findings).
     type: [string, "null"]
+  test_type:
+    description: >-
+      Kind of test, chosen from test_name and the report's description of the
+      test (e.g. "Proband Exome with Secondary Findings" is exome, "DMD
+      Deletion and Duplication Analysis" is single_gene). genome is whole
+      genome sequencing; a test of the mitochondrial genome alone is other.
+    type: [string, "null"]
+    enum:
+      - panel
+      - exome
+      - genome
+      - single_gene
+      - targeted_variant
+      - microarray
+      - other
+      - null
   test_started_date:
     description: >-
       Date the laboratory started the analysis, as printed (e.g. 2026-08-27).
@@ -77,15 +95,30 @@ properties:
     description: >-
       Why the test was ordered, as printed (e.g. Diagnostic evaluation,
       Reproductive carrier screening). The patient's own clinical features go
-      in patient_phenotype_raw, not here.
+      in patient_phenotypes, not here.
     type: [string, "null"]
-  patient_phenotype_raw:
+  patient_phenotypes:
     description: >-
-      The patient's own clinical features, copied verbatim (e.g. "Muscle
-      weakness; delayed ability to walk."). Null when the pages only carry
-      boilerplate about interpreting results in the context of family history,
-      or describe a relative rather than this patient.
-    type: [string, "null"]
+      The patient's own clinical features, one item per feature. Empty if the
+      report gives none, including when the pages only carry boilerplate about
+      interpreting results in the context of family history, or describe a
+      relative rather than this patient.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      properties:
+        text:
+          description: >-
+            One feature, copied verbatim (e.g. "Global developmental delay",
+            "hypotonia").
+          type: string
+        present:
+          description: >-
+            False if the report says the patient does not have the feature,
+            null if the report is unsure of it (e.g. "possible seizure"),
+            otherwise true.
+          type: [boolean, "null"]
   lab_name:
     description: >-
       Name of the testing laboratory (e.g. GeneDx, Invitae, Ambry Genetics).
@@ -101,6 +134,11 @@ properties:
       type: object
       additionalProperties: false
       properties:
+        page:
+          description: >-
+            Page the variant is reported on, from the "--- PAGE n ---" line
+            before it; the first one if several pages mention it.
+          type: [integer, "null"]
         gene_symbol:
           description: Gene symbol (e.g. BRCA1).
           type: [string, "null"]
@@ -126,10 +164,13 @@ properties:
             Genomic position or range of the variant, as printed
             (e.g. chr17:43057062).
           type: [string, "null"]
-        classification:
+        classification_raw:
           description: >-
-            Pathogenicity. Choose the closest allowed value; keep the report's
-            wording in classification_raw.
+            Classification wording, copied verbatim (e.g. "Pathogenic
+            (Class 5)", "VUS").
+          type: [string, "null"]
+        classification:
+          description: Closest allowed value for classification_raw.
           type: [string, "null"]
           enum:
             - pathogenic
@@ -139,15 +180,13 @@ properties:
             - benign
             - other
             - null
-        classification_raw:
+        zygosity_raw:
           description: >-
-            Classification wording, copied verbatim (e.g. "Pathogenic
-            (Class 5)", "VUS").
+            Zygosity or heteroplasmy wording, copied verbatim
+            (e.g. "Heteroplasmic (28%)").
           type: [string, "null"]
         zygosity:
-          description: >-
-            Zygosity. Choose the closest allowed value; keep the report's
-            wording in zygosity_raw.
+          description: Closest allowed value for zygosity_raw.
           type: [string, "null"]
           enum:
             - heterozygous
@@ -157,19 +196,46 @@ properties:
             - homoplasmic
             - other
             - null
-        zygosity_raw:
+        parental_origin_raw:
           description: >-
-            Zygosity or heteroplasmy wording, copied verbatim
-            (e.g. "Heteroplasmic (28%)").
+            Where the patient's variant came from, as printed (e.g. "De novo",
+            "Maternally inherited"). Null if the report does not state it.
           type: [string, "null"]
+        parental_origin:
+          description: Closest allowed value for parental_origin_raw.
+          type: [string, "null"]
+          enum:
+            - de_novo
+            - maternal
+            - paternal
+            - both_parents
+            - other
+            - null
         associated_phenotype:
           description: >-
             Disease or condition the report ties to the variant (e.g. Cystic
             fibrosis, Rett syndrome).
           type: [string, "null"]
-        mode_of_inheritance:
-          description: Inheritance pattern (e.g. autosomal dominant).
+        mode_of_inheritance_raw:
+          description: >-
+            How the condition is inherited, as printed (e.g. "Autosomal
+            recessive", "Mitochondrial inheritance"). This is the condition's
+            pattern, not where the patient's variant came from.
           type: [string, "null"]
+        mode_of_inheritance:
+          description: >-
+            Closest allowed value for mode_of_inheritance_raw; x_linked for
+            X-linked inheritance not stated as dominant or recessive.
+          type: [string, "null"]
+          enum:
+            - autosomal_dominant
+            - autosomal_recessive
+            - x_linked_dominant
+            - x_linked_recessive
+            - x_linked
+            - mitochondrial
+            - other
+            - null
         is_secondary_finding:
           description: >-
             True if the report flags the variant as a secondary or incidental

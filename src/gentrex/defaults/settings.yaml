@@ -79,9 +79,9 @@ extract:
     as "--- PAGE 2 ---"; pages in between may be missing. Return one JSON
     object that follows the schema below and covers all the pages. Fill a
     field only if the report states it; otherwise use null. Never guess. Copy
-    every field ending in _raw verbatim from the report. For a field with
-    allowed values, choose the closest one and keep the report's wording in
-    the paired _raw field.
+    every field ending in _raw verbatim from the report. A field with allowed
+    values follows the field holding the report's wording; choose the value
+    closest to that wording.
   # Longest answer allowed for one report, in tokens. Stops a model stuck
   # repeating itself. An answer cut off here is lost and the report fails;
   # raise it if reports with many variants are cut off, and raise

@@ -18,9 +18,14 @@ carries it twice:
   that follows the schema and has every field.
 
 A field the report does not state comes back `null`, and a report without
-variants gets an empty `variants` list. For `classification` and `zygosity`,
-the model picks one of the allowed values, such as `likely_pathogenic`, and
-copies the report's own wording into `classification_raw` or `zygosity_raw`.
+variants gets an empty `variants` list.
+
+For `classification`, `zygosity`, `parental_origin` and
+`mode_of_inheritance`, the model picks one of the allowed values, such as
+`likely_pathogenic`. Each comes right after its `_raw` field, such as
+`classification_raw`, and the model writes the fields in order: it copies
+the report's own wording first, then picks the value closest to it.
+`test_type`, such as `exome`, follows `test_name` in the same way.
 
 Thinking is turned off, as in stage 2, so the answer starts with the record.
 
@@ -111,7 +116,7 @@ Each run folder holds three files:
 line is a JSON object, shown here with most of `data` left out:
 
 ```json
-{"file": "report-01.pdf", "pages": [1, 2], "data": {"mrn": "SYN-MRN-0001", "test_name": "Developmental Disorders Panel", "variants": [{"gene_symbol": "SCN2A", "hgvs_c": "c.2815G>A", "classification": "uncertain_significance", "classification_raw": "VUS"}]}, "error": null}
+{"file": "report-01.pdf", "pages": [1, 2], "data": {"mrn": "SYN-MRN-0001", "test_name": "Developmental Disorders Panel", "variants": [{"page": 1, "gene_symbol": "SCN2A", "hgvs_c": "c.2815G>A", "classification_raw": "VUS", "classification": "uncertain_significance"}]}, "error": null}
 {"file": "report-02.pdf", "pages": [1, 3], "data": {"mrn": null, "test_name": "Inherited Arrhythmia Panel", "variants": []}, "error": "page 2: stage 1: APITimeoutError: Request timed out."}
 ```
 
@@ -174,14 +179,14 @@ fields are under `properties`, and the fields of each variant under
 ```
 
 - To add a field, add a block. To remove one, delete its block.
-- Keep `"null"` in every `type`. Without it, the model must make up a value
-  for a field the report does not state.
+- Keep `"null"` in the `type` of every field a report may not state.
+  Without it, the model must make up a value when the report states none.
 - Write the description for the model, which reads it: say what the field
   holds and when to fill it. An example value shows the format, but the
   model may copy it into a record whose report does not state the field.
 - For a field with a fixed list of values, add an `enum` that ends with
-  `null`, and a `_raw` field for the report's own wording, as
-  `classification` and `classification_raw` do.
+  `null`, and put a `_raw` field for the report's own wording right before
+  it, as `classification_raw` and `classification` do.
 
 `run.yaml` records the instruction and the schema of every run. To see what
 changed between two runs:
