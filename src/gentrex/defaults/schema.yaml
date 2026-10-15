@@ -1,26 +1,32 @@
-# Extraction schema: the record stage 3 extracts from each report, as a JSON
-# Schema. Report-level fields are under `properties`, and the fields of each
-# variant under `variants.items.properties`.
+# Extraction schema. It describes the record that stage 3 extracts from each
+# report, as a JSON Schema. Report-level fields are under `properties`, and
+# the fields of each variant are under `variants.items.properties`.
 #
-# Every request carries the schema twice: as JSON after the instruction (the
-# `extract` settings in settings.yaml), so the model reads the descriptions,
-# and as the format the server holds the answer to. Write each description
-# for the model: what the field holds and when to fill it.
+# Gentrex uses the schema in two ways. It sends the schema as JSON after the
+# instruction (`extract.instruction` in settings.yaml), so the model reads
+# what each field means. The server also enforces the schema as the answer
+# format (structured output), so the answer is JSON that follows it. Write
+# each description for the model. Say what the field holds and when to fill
+# it.
 #
-# To add a field, add one block; to remove one, delete its block. Every field
-# is made required in the answer, so there is no list to keep in step:
+# To add a field, add one block. To remove a field, delete its block. Gentrex
+# makes every field required in the answer, so there is no separate list of
+# required fields to update:
 #
 #   my_field:
 #     description: What it is, and when to fill it.
 #     type: [string, "null"]
 #
-# Keep "null" in the type of every field a report may not state: without it,
-# the model must make up a value for such a field. Use [boolean, "null"] or
-# [integer, "null"] for other kinds of value. For a field with allowed values,
-# add an `enum` list that ends with null, unquoted, and put a field with the
-# report's own wording, such as <field>_raw, right before it. The server makes
-# the model write the fields in schema order, so the model copies the wording
-# first and then picks the value from it.
+# Keep "null" in the type of every field a report may not state, quoted as
+# above. Without it, the model must make up a value when the report states
+# none. Use [boolean, "null"] or [integer, "null"] for other kinds of value.
+#
+# For a field with a fixed list of allowed values, add an `enum` list that
+# ends with null, unquoted, so that the allowed value is null itself and not
+# the text "null". Put a field with the report's own wording, such as
+# <field>_raw, right before it. The server makes the model write the fields
+# in schema order, so the model copies the wording first and then picks the
+# closest allowed value.
 
 type: object
 additionalProperties: false
@@ -123,8 +129,8 @@ properties:
     description: >-
       Name of the testing laboratory (e.g. GeneDx, Invitae, Ambry Genetics).
     type: [string, "null"]
-  # No dbSNP or ClinVar IDs and no population frequencies: a lookup by gene
-  # and HGVS gives them for every variant.
+  # No dbSNP or ClinVar IDs and no population frequencies, because a lookup
+  # by gene and HGVS gives them for every variant.
   variants:
     description: >-
       One object per variant reported in the patient, listed once even if

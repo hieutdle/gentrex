@@ -31,14 +31,75 @@ source .venv/bin/activate
 
 ### Documentation
 
-- **Write about the subject, not the document.** Open with what the tool does
-  or what the reader does. Never "This guide covers...", "This section
-  explains...", or "In this document...".
-- **No unprompted disclaimers or reassurances.** Do not state what the project
-  is not or does not contain ("This repository contains no patient data").
-  Give a warning only where the reader must act on it, at the step it applies to.
-- **Plain and direct.** Short sentences, imperative for steps. No filler, no
-  restating what was just said, no sales language.
+Readers are bioinformaticians and clinical researchers. They know genetics, a
+shell and some Python or R. Most have never run a model server or sized GPU
+memory. Write so they can run Gentrex and read its output without asking
+anyone.
+
+Good docs = what the reader needs for the task − what they already know.
+
+#### Know the Reader
+
+**Explain what they don't know. Skip what they do.**
+
+- Define each computing term the first time a page uses it, in a few plain
+  words, and link to the Terms section of README.md for more.
+- Use the standard term, then explain it. Never replace it with a made-up
+  everyday phrase, such as "first words" for tokens. Readers can't search for
+  the phrase or match it to an error message.
+- Don't explain genetics. HGVS, VUS, zygosity and ACMG classes need no
+  definition.
+- Name things exactly: the file and key (`extract.max_tokens` in
+  settings.yaml), not "the settings". Use one name per thing. A stage's title,
+  results folder and settings key share a word.
+
+#### Big Picture First
+
+**What it does and why, before how it works.**
+
+- Open each page with what goes in, what comes out, and why to run it.
+- Order a stage page: before you start, steps, check the result, how it
+  works, settings, when something goes wrong. Internals (token probabilities,
+  schema order, GPU memory) go in "How it works", after the steps.
+- Title pages and sections by what the reader does or gets, verb first
+  ("Extract report data"), not with a slogan ("One record per report").
+- Describe behavior shared by all stages once, in README.md, and link to it.
+
+#### Explain, Don't Compress
+
+**Full sentences, with the connecting words left in.**
+
+- Short sentences are good. Clipped ones are not. Keep the subject and the
+  "because", "so" and "then" that link one fact to the next.
+- Don't join two statements with a colon, semicolon or dash. Use "because" or
+  start a new sentence.
+- One idea per sentence. If a sentence needs a second read, split it.
+- For every flag, setting and number you show, say what it does and why it
+  has this value.
+- Give a concrete example (a command, an output line, a number) before the
+  general rule.
+
+#### Cut AI Tells
+
+**Write about the subject, plainly.**
+
+- No "This guide covers...", "In this section..." or recap of what was just
+  said.
+- No disclaimers, reassurances or sales words ("robust", "seamless"). Warn
+  only where the reader must act, at the step it applies to.
+- No warnings against things the reader had no reason to do, and no "not X
+  but Y" against a claim nobody made.
+- Group items in threes only when there are three. Bold only what readers
+  scan for, and don't use emoji.
+
+#### Check Before You Finish
+
+**Check only what you changed.**
+
+- Check each command, flag, path and default you added or changed against the
+  code.
+- Examples use synthetic values (`SYN-MRN-0001`), never text from real reports.
+- After renaming a heading, update the links to its anchor.
 
 ### Coding style guidelines
 

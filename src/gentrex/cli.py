@@ -119,7 +119,7 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gentrex", description=__doc__)
     subparsers = parser.add_subparsers(required=True)
 
-    stage1 = subparsers.add_parser("stage1", help="PDFs to per-page text.")
+    stage1 = subparsers.add_parser("stage1", help="Transcribe PDF pages.")
     stage1.add_argument(
         "--input-dir", type=pathlib.Path, default=pathlib.Path("data/raw")
     )
@@ -130,9 +130,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     stage1.set_defaults(func=_run_stage1)
 
-    stage2 = subparsers.add_parser(
-        "stage2", help="Per-page text to keep/drop decisions."
-    )
+    stage2 = subparsers.add_parser("stage2", help="Decide which pages to keep.")
     stage2.add_argument(
         "--input",
         type=pathlib.Path,
@@ -141,9 +139,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     stage2.set_defaults(func=_run_stage2)
 
-    stage3 = subparsers.add_parser(
-        "stage3", help="Kept pages to one structured record per report."
-    )
+    stage3 = subparsers.add_parser("stage3", help="Extract report data.")
     stage3.add_argument(
         "--input",
         type=pathlib.Path,

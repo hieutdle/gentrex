@@ -1,45 +1,46 @@
 # Gentrex settings. Endpoints and API keys come from the environment, never
 # from this file (see .env.example).
 
-# Stage 1: PDF pages to text.
+# Stage 1: Transcribe PDF pages.
 transcribe:
-  # Routing threshold. A page whose embedded text has at least this many
-  # non-whitespace characters is "native" and read directly; any other page is
-  # "scanned" and sent to OCR.
+  # A page whose embedded text has at least this many non-whitespace
+  # characters is "native" and read directly. Any other page is "scanned"
+  # and sent to OCR.
   native_min_chars: 20
 
   ocr:
-    # Vision model name, as the server at GENTREX_OCR_BASE_URL knows it.
+    # Name of the vision model, as listed at GENTREX_OCR_BASE_URL/models.
     model: lightonai/LightOnOCR-3-4B
     # Text sent after every page image. Empty sends the image alone, which is
-    # how LightOnOCR is trained to transcribe a page; other instructions are
+    # how LightOnOCR is trained to transcribe a page. Other instructions are
     # unfamiliar to it and can make the transcription worse.
     prompt: ""
     # The model reads images, so each scanned page is first drawn as a picture.
-    # render_dpi sets how detailed it is: at 400 dots per inch a Letter page
+    # render_dpi sets how detailed it is. At 400 dots per inch, a Letter page
     # is about 3400 x 4400 pixels.
     render_dpi: 400
     # The picture is then shrunk so its longer side is this many pixels (about
     # 1580 x 2048 for a Letter page), the size LightOnOCR-3-4B is trained on.
-    # Drawing big and shrinking keeps small print smooth; drawing small
+    # Drawing big and shrinking keeps small print smooth, while drawing small
     # directly leaves it jagged. 0 skips the shrinking.
     longest_dim: 2048
-    # Longest answer allowed for one page, about 6000 words. Stops a model
-    # stuck repeating itself on a blank or noisy page. A page with more text
-    # than this would be cut off.
+    # Longest answer allowed for one page, in tokens (8192 tokens are about
+    # 6000 words). It stops a model stuck repeating itself on a blank or
+    # noisy page. A page with more text than this would be cut off.
     max_tokens: 8192
-    # Randomness of the output; 0 always picks the most likely next word.
-    # 0.2 is the value LightOn's model card uses.
+    # Randomness of the output. At 0, the model always picks the most likely
+    # next token. 0.2 is the value LightOn's model card uses.
     temperature: 0.2
     # Time allowed for one OCR request before it counts as failed.
     timeout_seconds: 300
-    # OCR requests in flight at the same time, across all PDFs. A server such
-    # as vLLM processes them together, which is faster than one by one.
+    # How many OCR requests Gentrex sends at the same time, across all PDFs.
+    # A server such as vLLM processes them together, which is faster than one
+    # by one.
     concurrency: 8
 
-# Stage 2: yes/no questions that decide which pages later stages read.
+# Stage 2: Decide which pages to keep, from yes/no questions about each page.
 pagedecide:
-  # Text model name, as the server at GENTREX_LLM_BASE_URL knows it.
+  # Name of the text model, as listed at GENTREX_LLM_BASE_URL/models.
   model: google/gemma-4-26B-A4B-it
   # Text sent before every page.
   instruction: >-
@@ -47,8 +48,8 @@ pagedecide:
     PDF and may contain OCR errors.
   # Questions asked about every page. The name before the colon labels the
   # answer in the output. "Answer with Yes or No." is added after each
-  # question. To ask another question, add a name and its text; each one adds
-  # a request for every page.
+  # question. To ask another question, add a name and its text. Each
+  # question adds one request for every page.
   questions:
     has_result: >-
       Does this page state the patient's test result or list the variants
@@ -62,15 +63,16 @@ pagedecide:
   keep_threshold: 0.5
   # Time allowed for one request before it counts as failed.
   timeout_seconds: 60
-  # Pages in flight at the same time, across all PDFs. A page's questions are
-  # asked one after another, so the server can reuse the page it has just
-  # read instead of reading it again for each question.
+  # How many pages Gentrex works on at the same time, across all PDFs. A
+  # page's questions are asked one after another, so the server can reuse
+  # the page it has just read instead of reading it again for each question.
   concurrency: 16
 
-# Stage 3: one structured record per report, from the pages stage 2 kept.
-# The fields to extract are in schema.yaml, next to this file.
+# Stage 3: Extract report data. Gentrex writes one record per report, from
+# the pages stage 2 kept. The fields to extract are in schema.yaml, next to
+# this file.
 extract:
-  # Text model name, as the server at GENTREX_LLM_BASE_URL knows it.
+  # Name of the text model, as listed at GENTREX_LLM_BASE_URL/models.
   model: google/gemma-4-31B-it
   # System message of every request. The schema follows it, as JSON.
   instruction: >-
@@ -82,13 +84,13 @@ extract:
     every field ending in _raw verbatim from the report. A field with allowed
     values follows the field holding the report's wording; choose the value
     closest to that wording.
-  # Longest answer allowed for one report, in tokens. Stops a model stuck
-  # repeating itself. An answer cut off here is lost and the report fails;
-  # raise it if reports with many variants are cut off, and raise
+  # Longest answer allowed for one report, in tokens. It stops a model stuck
+  # repeating itself. An answer cut off here is lost and the report fails.
+  # Raise it if reports with many variants are cut off, and raise
   # timeout_seconds by the same factor.
   max_tokens: 4096
   # Time allowed for one request. The whole answer is written within it.
   timeout_seconds: 300
-  # Reports in flight at the same time. A server such as vLLM processes them
-  # together, which is faster than one by one.
+  # How many reports Gentrex sends at the same time. A server such as vLLM
+  # processes them together, which is faster than one by one.
   concurrency: 4

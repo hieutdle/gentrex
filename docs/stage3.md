@@ -1,41 +1,14 @@
-# Stage 3: One record per report
+# Stage 3: Extract report data
 
-Stage 3 sends the pages that stage 2 kept to a text model, one report per
-request, and writes one structured record per report: the patient, the
-specimen, the test, the result and every variant reported.
+Stage 3 turns each report into one record: the patient's identifiers, the
+specimen, the test, the overall result, the patient's clinical features and
+every variant reported. It sends the pages that stage 2 kept for a report to a
+language model in one request, and the model answers with the record as JSON.
+These records are Gentrex's final output.
 
-## How it works
-
-Gentrex sends all kept pages of a report in one request, in page order. Each
-page starts with a line such as `--- PAGE 2 ---`. The model answers with one
-JSON object for the whole report.
-
-The extraction schema lists the fields of that object. Every request
-carries it twice:
-
-- After the instruction, as JSON, so the model reads what each field means.
-- As the format of the answer. The server lets the model write only JSON
-  that follows the schema and has every field.
-
-A field the report does not state comes back `null`, and a report without
-variants gets an empty `variants` list.
-
-For `classification`, `zygosity`, `parental_origin` and
-`mode_of_inheritance`, the model picks one of the allowed values, such as
-`likely_pathogenic`. Each comes right after its `_raw` field, such as
-`classification_raw`, and the model writes the fields in order: it copies
-the report's own wording first, then picks the value closest to it.
-`test_type`, such as `exome`, follows `test_name` in the same way.
-
-Thinking is turned off, as in stage 2, so the answer starts with the record.
-
-Not every report can be read in full:
-
-- A page with a stage 1 error has no text. It is left out of the request,
-  and the record's `error` names it.
-- A report whose pages all have stage 1 errors gets no request and no data.
-- Stage 2 passes on only the pages it keeps, so a report with no kept page
-  gets no record.
+Stage 3 reads `pages.jsonl` from a stage 2 run and writes `extractions.jsonl`,
+with one line per report, to `results/extract/`. The model, Gemma 4 31B, runs
+on two GPUs with 80 GB each, or on one GPU with more memory, such as a B200.
 
 ## Before you start
 
@@ -43,26 +16,24 @@ You need:
 
 - Gentrex installed, as in [stage 1, step 1](stage1.md#step-1-install).
 - A finished stage 2 run, in `results/pagedecide/`.
-- A server that hosts the text model and speaks the OpenAI API, such as
-  [vLLM](https://docs.vllm.ai) 0.25 or newer.
+- Two NVIDIA GPUs with 80 GB each, or one B200, and
+  [vLLM](https://docs.vllm.ai) 0.19.1 or newer.
+- A [Hugging Face](https://huggingface.co) account, if the model download asks
+  you to log in.
 
 On Mount Sinai's Minerva cluster, follow
-[Running on Minerva](minerva.md#stage-3-one-record-per-report) instead of
-steps 1 and 2, then come back to [Check the result](#check-the-result).
+[Stage 3 on Minerva](minerva.md#stage-3-extract-report-data) instead of the
+steps below. Then come back to [Check the result](#check-the-result).
 
-## Step 1: Point Gentrex at the model server
+## Step 1: Start the model server
 
-Stage 3 reads the same two values in `.env` as stage 2,
-`GENTREX_LLM_BASE_URL` and `GENTREX_LLM_API_KEY`. If they are not set yet,
-do [stage 2, step 1](stage2.md#step-1-point-gentrex-at-the-model-server).
-Every report's text is sent to this server, so use one approved for patient
-data.
+If the stage 2 server is still running, stop it with Ctrl-C in its terminal.
+Every stage's server uses port 8000, and this model needs the GPUs' memory.
 
-The server must serve the model under the name in the settings, which is
-`google/gemma-4-31B-it` by default. Its weights take about 62 GB. On one
-80 GB GPU, that leaves too little memory for a 32,768-token request, so use
-two 80 GB GPUs or one with more memory, such as a B200. With vLLM on two
-GPUs:
+If vLLM isn't installed yet, install it as its
+[installation guide](https://docs.vllm.ai/en/latest/getting_started/installation/)
+describes. Then start it in a second terminal, and leave it running while
+Gentrex works. On two GPUs:
 
 ```bash
 vllm serve google/gemma-4-31B-it \
@@ -71,25 +42,57 @@ vllm serve google/gemma-4-31B-it \
   --gpu-memory-utilization 0.95
 ```
 
-- `--tensor-parallel-size 2` splits the model across two GPUs. Leave it out
-  on a single larger GPU.
-- `--max-model-len` is the longest request in tokens: the instruction, the
-  schema, the report's pages and the answer together. A longer report
-  fails; see [When something goes wrong](#when-something-goes-wrong).
-- `--gpu-memory-utilization 0.95` lets vLLM use 95% of the GPU's memory.
-  What the weights leave holds the reports vLLM is working on.
+- `google/gemma-4-31B-it` is the model's name on Hugging Face, and the name
+  Gentrex asks for (`extract.model` in settings.yaml). The first start
+  downloads the model's [weights](../README.md#terms), about 62 GB, into
+  `~/.cache/huggingface/`.
+- `--tensor-parallel-size 2` splits the model across two GPUs
+  ([tensor parallelism](../README.md#terms)), so each GPU holds half of the
+  weights. Leave it out on a single B200.
+- `--max-model-len 32768` sets the [context length](../README.md#terms), the
+  most tokens one request can hold. Tokens are words or pieces of words. The
+  instruction and the schema take about 2,000 tokens, and the answer up to
+  4,096 (`extract.max_tokens` in settings.yaml). That leaves about 26,000
+  tokens for the report's pages. A longer report fails, as
+  [When something goes wrong](#when-something-goes-wrong) describes.
+- `--gpu-memory-utilization 0.95` lets vLLM use 95% of each GPU's memory. The
+  model's weights take 62 GB. The rest becomes the
+  [KV cache](../README.md#terms), the memory that holds the reports vLLM is
+  processing. On one 80 GB GPU, too little is left for a 32,768-token request,
+  so vLLM stops at startup.
 
-Start vLLM without `--reasoning-parser`: thinking is off, so there is no
-reasoning to parse.
+vLLM's [Gemma 4 guide](https://recipes.vllm.ai/Google/gemma-4-31B-it) adds
+`--reasoning-parser gemma4` to some of its commands. Leave it out. A reasoning
+parser separates the model's reasoning from its answer, and Gentrex turns
+[thinking](../README.md#terms) off, so there is no reasoning to separate.
+With thinking off, the parser can also stop vLLM from enforcing the schema
+([vLLM issue 39130](https://github.com/vllm-project/vllm/issues/39130)).
 
-## Step 2: Run
+If the download stops with an error that access to the model is restricted,
+accept Google's terms on the
+[model's page](https://huggingface.co/google/gemma-4-31B-it) and log in, as
+for the [stage 2 model](stage2.md#step-1-start-the-model-server). Then start
+vLLM again.
+
+vLLM is ready when `curl http://localhost:8000/v1/models` lists
+`google/gemma-4-31B-it`. Gentrex sends the text of every report to this
+server, so run it on a machine approved for patient data.
+
+## Step 2: Point Gentrex at the model server
+
+Stage 3 reads the same two values in `.env` as stage 2,
+`GENTREX_LLM_BASE_URL` and `GENTREX_LLM_API_KEY`. If you set them for stage 2,
+there is nothing to change. Otherwise, do
+[stage 2, step 2](stage2.md#step-2-point-gentrex-at-the-model-server).
+
+## Step 3: Run
 
 ```bash
 uv run --env-file .env gentrex stage3
 ```
 
-This reads the newest finished stage 2 run, `results/pagedecide/latest`, and
-writes a new folder named after the time the run started, such as
+Gentrex reads the newest finished stage 2 run, `results/pagedecide/latest`,
+and writes a new folder named after the time the run started, such as
 `results/extract/20261014-150000/`. To read another stage 2 run:
 
 ```bash
@@ -97,12 +100,11 @@ uv run --env-file .env gentrex stage3 --input results/pagedecide/20261014-131500
 ```
 
 While it runs, Gentrex prints one line per report. The last line counts the
-reports written and failed, and gives the speed in reports per minute.
-Running it again writes a new folder; earlier runs stay.
+reports and the failed reports, and gives the speed in reports per minute.
 
 ## Check the result
 
-Each run folder holds three files:
+The run folder holds three files:
 
 | File | Contents |
 | --- | --- |
@@ -110,7 +112,9 @@ Each run folder holds three files:
 | `run.yaml` | The command, the stage 2 run that was read, and the settings, including the instruction and the schema. |
 | `log.txt` | What Gentrex printed during the run. |
 
-`results/extract/latest` points to the newest run that finished.
+`results/extract/latest` points to the newest finished run.
+[Runs and results](../README.md#runs-and-results) explains run folders and
+`latest`.
 
 `extractions.jsonl` has one line per report, in the order of the input. Each
 line is a JSON object, shown here with most of `data` left out:
@@ -125,15 +129,24 @@ line is a JSON object, shown here with most of `data` left out:
 | `file` | Name of the PDF. |
 | `pages` | The pages sent to the model. |
 | `data` | The record, with one entry per field of the schema. `null` if the report got no answer. |
-| `error` | The pages left out because of a stage 1 error, and why the request failed; `null` when nothing went wrong. |
+| `error` | The pages left out because of a stage 1 error, and why the request failed. `null` when nothing went wrong. |
 
 `data` and `error` together tell you how complete a record is:
 
 | `data` | `error` | Meaning |
 | --- | --- | --- |
-| set | `null` | Complete: the model read every kept page. |
-| set | set | Pages are missing: what is stated only on them is not in the record. |
+| set | `null` | Complete. The model read every kept page. |
+| set | set | Pages are missing. What is stated only on them is not in the record. |
 | `null` | set | Nothing was extracted. |
+
+A record can miss pages, or be missing altogether, for three reasons:
+
+- A page with a stage 1 error has no text. Gentrex leaves it out of the
+  request, and the record's `error` names it.
+- A report whose kept pages all have stage 1 errors gets no request, so its
+  `data` is `null`.
+- Stage 2 passes on only the pages it keeps, so a report with no kept page gets
+  no record at all.
 
 To read one record with one field per line:
 
@@ -153,21 +166,71 @@ To list the records with an error:
 grep -v '"error": null' results/extract/latest/extractions.jsonl
 ```
 
-The model can fill a field from its own knowledge or from an example in the
-schema, where the report does not state it. Before you rely on the records,
-compare some of them with their PDFs, field by field, including the fields
-that came back `null`.
+To load the records in Python with pandas, with one row per variant:
+
+```python
+import pandas as pd
+
+records = pd.read_json("results/extract/latest/extractions.jsonl", lines=True)
+variants = pd.json_normalize(
+    records.dropna(subset=["data"]).to_dict("records"),
+    record_path=["data", "variants"],
+    meta=["file"],
+)
+```
+
+In R, `jsonlite` reads the file into a data frame with one row per report:
+
+```r
+records <- jsonlite::stream_in(file("results/extract/latest/extractions.jsonl"))
+```
+
+The model can fill in a value that the report doesn't state. It may take the
+value from its own knowledge of a gene or variant, or copy the example from a
+field's description in the schema. Before you rely on the records, compare
+some of them with their PDFs, field by field, including the fields that came
+back `null`.
+
+## How it works
+
+Gentrex sends all kept pages of a report in one request, in page order. Each
+page starts with a line such as `--- PAGE 2 ---`, so the model can tell which
+page a variant is on. The model answers with one JSON object for the whole
+report.
+
+The fields of that object are defined in the extraction schema,
+[`schema.yaml`](../src/gentrex/defaults/schema.yaml). Gentrex uses the schema
+in two ways. The model reads it to learn what each field means, because
+Gentrex sends it as JSON after the instruction (`extract.instruction` in
+settings.yaml). And vLLM enforces it as the answer format, which is called
+[structured output](../README.md#terms). The model can then write only JSON
+that follows the schema and has every field.
+
+A field the report doesn't state comes back `null`, and a report without
+variants gets an empty `variants` list.
+
+Four fields take one value from a fixed list: `classification`, `zygosity`,
+`parental_origin` and `mode_of_inheritance`. Each comes right after a `_raw`
+field that holds the report's own wording. The model writes the fields in
+schema order, so it first copies the wording and then picks the closest
+allowed value. A report that says "Pathogenic (Class 5)" gets
+`"classification_raw": "Pathogenic (Class 5)"` and then
+`"classification": "pathogenic"`. `test_type`, such as `exome`, follows
+`test_name` in the same way.
+
+Gemma 4 has a thinking mode, in which it writes out its reasoning before the
+answer. Gentrex turns it off, so the answer is the record and nothing else.
 
 ## Settings
 
 The fields to extract are in
 [`src/gentrex/defaults/schema.yaml`](../src/gentrex/defaults/schema.yaml).
-The instruction, the model and the other stage 3 settings are in
-[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml),
-under `extract`. Each value is explained there.
+The instruction, the model and the other stage 3 settings are under `extract`
+in [`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml).
+A comment above each value explains it.
 
 The schema is a [JSON Schema](https://json-schema.org/). The report-level
-fields are under `properties`, and the fields of each variant under
+fields are under `properties`, and the fields of each variant are under
 `variants.items.properties`. Each field is one block:
 
 ```yaml
@@ -179,14 +242,17 @@ fields are under `properties`, and the fields of each variant under
 ```
 
 - To add a field, add a block. To remove one, delete its block.
-- Keep `"null"` in the `type` of every field a report may not state.
-  Without it, the model must make up a value when the report states none.
-- Write the description for the model, which reads it: say what the field
-  holds and when to fill it. An example value shows the format, but the
-  model may copy it into a record whose report does not state the field.
-- For a field with a fixed list of values, add an `enum` that ends with
-  `null`, and put a `_raw` field for the report's own wording right before
-  it, as `classification_raw` and `classification` do.
+- Keep `"null"` in the `type` of every field a report may not state, with the
+  quotes. Without quotes, YAML reads `null` as "no value" instead of the JSON
+  Schema type named "null". Without the type, the model must make up a value
+  when the report states none.
+- Write the description for the model, which reads it. Say what the field
+  holds and when to fill it. An example value shows the format, but the model
+  may copy it into a record whose report doesn't state the field.
+- For a field with a fixed list of values, add an `enum` that ends with `null`
+  without quotes, so that the allowed value is null itself and not the text
+  "null". Put a `_raw` field for the report's own wording right before it, as
+  `classification_raw` and `classification` do.
 
 `run.yaml` records the instruction and the schema of every run. To see what
 changed between two runs:
@@ -197,46 +263,44 @@ diff results/extract/20261014-150000/run.yaml results/extract/20261015-090000/ru
 
 ## When something goes wrong
 
-Gentrex ends with an exit code that tells you what happened:
-
 | Exit code | Meaning | What to do |
 | --- | --- | --- |
 | 0 | Every report has a complete record. | Nothing. |
-| 1 | No finished stage 2 run was found, or some reports have an error. The failed files are listed at the end of the output. | See below. |
-| 2 | `GENTREX_LLM_BASE_URL` is not set. | Do step 1. |
+| 1 | No finished stage 2 run was found (`pages.jsonl not found; run stage 2 first`), some reports have an error, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
+| 2 | `GENTREX_LLM_BASE_URL` is not set. | Do step 2. |
 
 A report is listed as failed in two cases:
 
 - **One of its pages has a stage 1 error.** The record is written from the
-  other pages, and `error` starts with `page N: stage 1:`. Run stage 1
-  again, then stages 2 and 3.
-- **The request failed.** `data` is `null`, and `error` says why. Gentrex
-  already retried a server that was busy or unreachable three times (after
-  5, 20 and 60 seconds) before giving up. Check that the server is running,
-  then run the command again.
+  other pages, and `error` starts with `page N: stage 1:`. Run stage 1 again,
+  then stages 2 and 3.
+- **The request failed.** `data` is `null`, and `error` says why. If the error
+  is a connection error, the server was down or busy, even after Gentrex's
+  [retries](../README.md#runs-and-results). Check that the server is running,
+  then run stage 3 again.
 
 Three errors come from the report rather than the server:
 
-- `ValueError: answer cut off at max_tokens (4096)`: the record did not fit
-  in `max_tokens`. Raise `max_tokens` in the settings, raise
-  `timeout_seconds` by the same factor, and run again. If the report lists
-  few variants, the model was more likely stuck repeating itself, for
-  example writing spaces without end. Then also start vLLM with
+- `ValueError: answer cut off at max_tokens (4096)` means that the record was
+  longer than `extract.max_tokens` allows. Raise `max_tokens` in
+  settings.yaml, and raise `timeout_seconds` by the same factor, because a
+  longer answer takes longer to write. Then run again. If the report lists
+  few variants, the model was more likely stuck repeating itself, for example
+  writing spaces without end. Then also start vLLM with
   `--structured-outputs-config '{"disable_any_whitespace": true}'`, which
   leaves no room for spaces between the parts of the JSON.
-- `APITimeoutError: Request timed out.`: the answer took longer than
-  `timeout_seconds` to write, on all four attempts. Raise `timeout_seconds`
-  in the settings and run again.
-- `BadRequestError: Error code: 400`, with a message about the maximum
-  context length: the report is longer than `--max-model-len` allows. Start
-  vLLM with a higher `--max-model-len`, if the GPU has the memory, and run
-  again.
+- `APITimeoutError: Request timed out.` means that the answer took longer
+  than `extract.timeout_seconds` to write, on all four tries. Raise
+  `timeout_seconds` in settings.yaml and run again.
+- `BadRequestError: Error code: 400`, with a message about the maximum context
+  length, means that the report is longer than `--max-model-len` allows.
+  Start vLLM with a higher `--max-model-len` and run again. vLLM refuses to
+  start if the GPUs lack the memory for it.
 
-If every report fails with the same error, the server is the problem, not
-the reports. Check that it runs the model named in the settings, with that
-model's own chat template, and that it supports `response_format` with a
-JSON schema, as vLLM does.
+If every report fails with the same error, the cause is the server. Check that
+it runs `google/gemma-4-31B-it` with the model's own chat template, and that it
+supports structured output with a JSON schema (`response_format`), as vLLM
+does.
 
-A wrong key or an unknown model name stops the run at once, because every
-report would fail the same way. Fix `.env` or the model name and run again.
-A run that stops early keeps its folder, but `latest` does not move to it.
+A traceback means the run stopped early.
+[Runs and results](../README.md#runs-and-results) explains the common causes.

@@ -1,1 +1,1 @@
-"""Stage 3: one structured record per report."""
+"""Stage 3: Extract report data, one structured record per report."""

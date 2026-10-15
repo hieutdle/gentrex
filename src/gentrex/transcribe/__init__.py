@@ -1,1 +1,1 @@
-"""Stage 1: PDF pages to text, by OCR where a page has no embedded text."""
+"""Stage 1: Transcribe PDF pages, with OCR for pages without embedded text."""
