@@ -78,3 +78,27 @@ class ReportExtraction:
     def to_json(self) -> str:
         """Returns the record as one JSONL line, without the newline."""
         return json.dumps(dataclasses.asdict(self), ensure_ascii=False)
+
+
+@dataclasses.dataclass
+class NormalizedReport:
+    """One report after stage 4.
+
+    Attributes:
+        file: PDF file name.
+        pages: Pages whose text stage 3 sent to the model, in page order.
+        data: The record stage 3 extracted, unchanged; None if it failed.
+        normalized: Standard values derived from `data`; None if there is no
+            data or normalizing it failed.
+        error: The stage 3 error, and why normalizing failed.
+    """
+
+    file: str
+    pages: list[int]
+    data: dict[str, Any] | None
+    normalized: dict[str, Any] | None
+    error: str | None = None
+
+    def to_json(self) -> str:
+        """Returns the record as one JSONL line, without the newline."""
+        return json.dumps(dataclasses.asdict(self), ensure_ascii=False)

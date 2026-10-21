@@ -8,6 +8,7 @@ license-files = ["LICENSE"]
 authors = [{ name = "Hieu Le" }]
 requires-python = ">=3.12"
 dependencies = [
+    "numpy>=2.5.4",
     "openai>=1.40",
     "pdfplumber>=0.11.10",
     "pillow>=12.3.0",
@@ -21,12 +22,34 @@ Repository = "https://github.com/hieutdle/gentrex"
 [project.scripts]
 gentrex = "gentrex.cli:main"
 
+[project.optional-dependencies]
+hpo = [
+    "sentence-transformers>=6.1.0",
+    "torch>=2.14.1",
+    "torchvision>=0.29.1",
+]
+
 [dependency-groups]
 dev = [
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "ruff>=0.6",
 ]
+evaluation = [
+    "scipy>=1.18.1",
+]
+
+# Stage 4 embeds on the CPU. On Linux, torch from PyPI brings several GB of
+# CUDA libraries, so torch and torchvision come from PyTorch's CPU-only index
+# instead.
+[tool.uv.sources]
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 [build-system]
 requires = ["hatchling"]

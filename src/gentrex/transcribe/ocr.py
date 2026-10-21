@@ -7,6 +7,7 @@ import pathlib
 from concurrent import futures
 
 import pypdfium2
+from openai.types import chat
 from PIL import Image
 
 from gentrex import llm
@@ -70,7 +71,7 @@ class OcrEngine:
 
     def _request(self, image_png: bytes) -> str:
         encoded = base64.b64encode(image_png).decode()
-        content = [
+        content: list[chat.ChatCompletionContentPartParam] = [
             {
                 "type": "image_url",
                 "image_url": {"url": f"data:image/png;base64,{encoded}"},

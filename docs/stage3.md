@@ -4,7 +4,7 @@ Stage 3 turns each report into one record: the patient's identifiers, the
 specimen, the test, the overall result, the patient's clinical features and
 every variant reported. It sends the pages that stage 2 kept for a report to a
 language model in one request, and the model answers with the record as JSON.
-These records are Gentrex's final output.
+[Stage 4](stage4.md) then adds standard values to these records.
 
 Stage 3 reads `pages.jsonl` from a stage 2 run and writes `extractions.jsonl`,
 with one line per report, to `results/extract/`. The model, Gemma 4 31B, runs

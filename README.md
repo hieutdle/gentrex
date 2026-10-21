@@ -6,14 +6,15 @@ record per report. The record holds the patient's identifiers, the specimen,
 the test, the overall result, the patient's clinical features and every
 variant reported, with its gene, HGVS changes, classification and zygosity.
 
-Gentrex is a command-line program. The models it uses run in a separate
-model server, [vLLM](https://docs.vllm.ai), on GPUs that you control.
-Gentrex sends each page or report to that server and writes what comes
-back.
+Gentrex is a command-line program. The models of stages 1 to 3 run in a
+separate model server, [vLLM](https://docs.vllm.ai), on GPUs that you
+control. Gentrex sends each page or report to that server and writes what
+comes back. Stage 4 needs no server, because its models run inside Gentrex
+on the CPU.
 
 ## How it works
 
-Gentrex works in three stages. You run them in order, and each stage reads
+Gentrex works in four stages. You run them in order, and each stage reads
 the output of the stage before it.
 
 | Stage | What it does | Writes to | Model and GPU |
@@ -21,6 +22,7 @@ the output of the stage before it.
 | [1. Transcribe PDF pages](docs/stage1.md) | Reads the text of every page. Scanned pages go to an OCR model, which reads the text off the image. | `results/transcribe/` | LightOnOCR-3-4B on one GPU, only for scanned pages |
 | [2. Decide which pages to keep](docs/stage2.md) | Asks a language model yes/no questions about every page, and keeps the pages with the result or the patient's symptoms. | `results/pagedecide/` | Gemma 4 26B-A4B on one GPU with 80 GB |
 | [3. Extract report data](docs/stage3.md) | Sends the kept pages of each report to a language model, which returns one record per report. | `results/extract/` | Gemma 4 31B on two GPUs with 80 GB, or one B200 |
+| [4. Normalize report data](docs/stage4.md) | Adds standard values to each record: ISO dates, categories for the specimen and the result, HGNC IDs for the genes and HPO terms for the clinical features. | `results/normalize/` | SapBERT and EmbeddingGemma 2 on the CPU, no GPU |
 
 Many pages of a report only describe the test. Stage 2 drops them, so stage 3
 has less to read.
@@ -61,7 +63,8 @@ several lines, a record looks like this:
 All the fields, with what each one holds, are in
 [`schema.yaml`](src/gentrex/defaults/schema.yaml).
 [Stage 3](docs/stage3.md#check-the-result) explains how to read and load the
-records.
+records. [Stage 4](docs/stage4.md#check-the-result) adds the standard values
+next to them, in a field named `normalized`.
 
 ## What you need
 
@@ -73,6 +76,9 @@ records.
   you to log in.
 - About 120 GB of disk for the models: 9 GB for stage 1, 50 GB for stage 2
   and 62 GB for stage 3.
+- About 3 GB of disk for stage 4: 300 MB for the HGNC complete set, the HPO
+  release and the HPO index, and 2.8 GB for sentence-transformers, PyTorch
+  and the two embedding models, which stage 4 uses to find HPO terms.
 - Storage approved for patient data, for the reports and everything Gentrex
   writes from them.
 
@@ -85,9 +91,12 @@ server before the next stage starts its own.
 1. [Stage 1: Transcribe PDF pages](docs/stage1.md)
 2. [Stage 2: Decide which pages to keep](docs/stage2.md)
 3. [Stage 3: Extract report data](docs/stage3.md)
+4. [Stage 4: Normalize report data](docs/stage4.md)
 
-On Mount Sinai's Minerva cluster, each stage runs as a batch job. Follow
-[Running on Minerva](docs/minerva.md).
+Stage 4 needs no model server.
+
+On Mount Sinai's Minerva cluster, stages 1 to 3 run as batch jobs, and stage
+4 runs in an interactive session. Follow [Running on Minerva](docs/minerva.md).
 
 ## Runs and results
 
@@ -153,12 +162,16 @@ Reports, and everything Gentrex writes from them, may contain patient data.
 | Thinking | A mode in which the model writes out its reasoning before the answer. Every stage runs its model with thinking off, so vLLM needs no `--reasoning-parser`. | `enable_thinking` |
 | Structured output | vLLM lets the model write only text that follows a given format. Stage 3 gives the format as a [JSON Schema](https://json-schema.org/), a standard way to describe the fields of a JSON object. | `schema.yaml`, `response_format` |
 | Tensor parallelism | Splitting a model across several GPUs, so that a model too large for one GPU runs on two. | `--tensor-parallel-size` |
-| JSONL | JSON Lines, a text file with one JSON object per line. | `pages.jsonl`, `decisions.jsonl`, `extractions.jsonl` |
+| JSONL | JSON Lines, a text file with one JSON object per line. | `pages.jsonl`, `decisions.jsonl`, `extractions.jsonl`, `normalized.jsonl` |
+| Embedding | A list of numbers that a model computes for a text, so that texts with similar meanings get similar lists. | The HPO index of stage 4 |
+| Cosine similarity | A measure of how alike two embeddings are. It is 1.0 for embeddings that point the same way and lower the more they differ. | `similarity` in `normalized.jsonl` |
 
 ## Documentation
 
 - [Stage 1: Transcribe PDF pages](docs/stage1.md)
 - [Stage 2: Decide which pages to keep](docs/stage2.md)
 - [Stage 3: Extract report data](docs/stage3.md)
+- [Stage 4: Normalize report data](docs/stage4.md)
 - [Running on Minerva (Mount Sinai)](docs/minerva.md)
 - [Development](docs/development.md)
+- [Evaluate HPO matching](evaluation/README.md)

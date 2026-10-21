@@ -1,10 +1,11 @@
 # Running on Minerva (Mount Sinai)
 
-On Minerva, Mount Sinai's high-performance computing cluster, each stage of
-Gentrex runs as one batch job on a GPU node. The job starts the stage's model
-with [vLLM](https://docs.vllm.ai), runs Gentrex against it, and stops vLLM when
-Gentrex is done. The stage pages explain what each stage does, what it writes
-and how to change its settings.
+On Minerva, Mount Sinai's high-performance computing cluster, stages 1 to 3
+of Gentrex each run as one batch job on a GPU node. The job starts the stage's
+model with [vLLM](https://docs.vllm.ai), runs Gentrex against it, and stops
+vLLM when Gentrex is done. Stage 4 needs no GPU, so you run it yourself in an
+interactive session. The stage pages explain what each stage does, what it
+writes and how to change its settings.
 
 Minerva schedules jobs with LSF. You describe a job in a script, submit the
 script with `bsub`, and LSF runs the job when a node with the GPUs you asked
@@ -453,3 +454,40 @@ log lists any files that failed. Continue on the stage 3 page:
 - [Check the result](stage3.md#check-the-result)
 - [Change the schema](stage3.md#settings)
 - [When something goes wrong](stage3.md#when-something-goes-wrong)
+
+## Stage 4: Normalize report data
+
+Run stage 4 after a stage 3 job has finished. Stage 4 needs no GPU and no
+model server, so you run it yourself in an interactive session. Unlike batch
+jobs, interactive sessions can reach the internet, which the downloads of
+stage 4 need.
+
+Start the session on a login node:
+
+```bash
+bsub -P acc_xxx -q interactive -n 4 -W 1:00 -R "rusage[mem=4000]" -Is /bin/bash
+```
+
+- `-P acc_xxx` names your allocation.
+- `-q interactive` puts the session in the interactive queue, whose nodes can
+  reach the internet.
+- `-n 4` asks for 4 CPU cores. `rusage[mem=4000]` asks for 4,000 MB of memory
+  per core, so 16 GB in all, which is enough to embed the HPO names.
+- `-W 1:00` ends the session after one hour. Building the HPO index takes
+  several minutes, because it embeds every HPO name with two models. Stage 4
+  itself takes a minute or two.
+- `-Is /bin/bash` opens a shell on the node as soon as the session starts.
+
+In the session, go to the `gentrex` folder and follow steps 1 to 3 of
+[stage 4](stage4.md#step-1-download-the-hgnc-complete-set). The first
+`uv run --extra hpo` installs sentence-transformers and PyTorch, the Python
+packages that stage 4 uses to find HPO terms. They take about 1 GB in the
+`.venv` folder of `gentrex`, and about as much in uv's cache in your home
+folder. The two embedding models, about 1.8 GB, go to Hugging Face's cache in
+your home folder, `~/.cache/huggingface/`. When stage 4 has finished, type
+`exit` to end the session.
+
+The result is in `results/normalize/latest/`. Continue on the stage 4 page:
+
+- [Check the result](stage4.md#check-the-result)
+- [When something goes wrong](stage4.md#when-something-goes-wrong)

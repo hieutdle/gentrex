@@ -94,3 +94,33 @@ extract:
   # How many reports Gentrex sends at the same time. A server such as vLLM
   # processes them together, which is faster than one by one.
   concurrency: 4
+
+# Stage 4: Normalize report data. Gentrex turns the dates, specimen, result,
+# gene symbols and clinical features of each stage 3 record into standard
+# values.
+normalize:
+  # The HGNC complete set, a tab-separated file from genenames.org. Gentrex
+  # looks up each gene symbol in it to find the approved symbol and HGNC ID.
+  hgnc_path: data/ontology/hgnc_complete_set_2026-10-06.txt
+  hpo:
+    # The sentence-transformers models that embed the HPO names and the
+    # clinical features, as named on Hugging Face. Each model scores the HPO
+    # terms, and stage 4 combines the scores. After changing a model or a
+    # prompt, build the index again (docs/stage4.md, step 2). Stage 4 stops
+    # if the index was built with other models or prompts, because
+    # embeddings from different models can't be compared.
+    models:
+      # A biomedical model, trained to link different names of a concept.
+      - name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
+      # A general model. It is trained with task prompts, and this prompt
+      # asks for the similarity of two texts.
+      - name: google/embeddinggemma-2
+        prompt: SentenceSimilarity
+    # The HPO index that scripts/build_hpo_index.py writes. It holds all HPO
+    # labels and synonyms, their embeddings from each model, and the models'
+    # names and prompts.
+    path: data/ontology/hpo-v2026-09-01.npz
+    # HPO terms kept per clinical feature, closest first. The first one is the
+    # match. The other four are alternatives for when you check it, because
+    # the right term is sometimes a close second.
+    top_k: 5

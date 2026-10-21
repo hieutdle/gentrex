@@ -11,6 +11,9 @@ from gentrex import llm
 from gentrex import runs
 from gentrex.extract import extractor
 from gentrex.extract import run as extract_run
+from gentrex.normalize import genes
+from gentrex.normalize import phenotypes
+from gentrex.normalize import run as normalize_run
 from gentrex.pagedecide import run as pagedecide_run
 from gentrex.pagedecide import score
 from gentrex.transcribe import ocr as ocr_lib
@@ -115,6 +118,54 @@ def _run_stage3(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_stage4(args: argparse.Namespace) -> int:
+    extractions_path = args.input / "extractions.jsonl"
+    if not extractions_path.is_file():
+        _logger.error("%s not found; run stage 3 first", extractions_path)
+        return 1
+
+    settings = config.load_settings()["normalize"]
+    hgnc_path = pathlib.Path(settings["hgnc_path"])
+    if not hgnc_path.is_file():
+        _logger.error("%s not found; download it as docs/stage4.md shows", hgnc_path)
+        return 1
+    try:
+        hgnc = genes.HgncIndex.from_tsv(hgnc_path)
+    except ValueError as exc:
+        _logger.error("%s; download it again as docs/stage4.md shows", exc)
+        return 1
+    hpo = None
+    if not args.no_hpo:
+        hpo_path = pathlib.Path(settings["hpo"]["path"])
+        if not hpo_path.is_file():
+            _logger.error(
+                "%s not found; build it as docs/stage4.md shows, or use --no-hpo",
+                hpo_path,
+            )
+            return 1
+        try:
+            hpo = phenotypes.HpoIndex(
+                hpo_path, settings["hpo"]["models"], settings["hpo"]["top_k"]
+            )
+        except ValueError as exc:
+            _logger.error("%s; build it again as docs/stage4.md shows", exc)
+            return 1
+        except ImportError as exc:
+            _logger.error("%s; run stage 4 with uv run --extra hpo", exc)
+            return 1
+
+    # Added to the settings, so that run.yaml records the HGNC version used.
+    record = {**settings, "hgnc_sha256": hgnc.sha256}
+    with runs.new_run("normalize", args.input, record) as run_dir:
+        failed = normalize_run.run(
+            extractions_path, run_dir / "normalized.jsonl", hgnc, hpo
+        )
+        if failed:
+            _logger.error("failed files: %s", ", ".join(failed))
+            return 1
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gentrex", description=__doc__)
     subparsers = parser.add_subparsers(required=True)
@@ -147,6 +198,20 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Stage 2 run folder to read.",
     )
     stage3.set_defaults(func=_run_stage3)
+
+    stage4 = subparsers.add_parser("stage4", help="Normalize report data.")
+    stage4.add_argument(
+        "--input",
+        type=pathlib.Path,
+        default=runs.latest("extract"),
+        help="Stage 3 run folder to read.",
+    )
+    stage4.add_argument(
+        "--no-hpo",
+        action="store_true",
+        help="Leave the clinical features without HPO terms.",
+    )
+    stage4.set_defaults(func=_run_stage4)
     return parser
 
 
