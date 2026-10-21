@@ -6,7 +6,7 @@ import os
 import pathlib
 import sys
 
-import psycopg
+import sqlalchemy as sa
 
 from gentrex import config
 from gentrex import llm
@@ -186,14 +186,22 @@ def _run_stage5(args: argparse.Namespace) -> int:
     if not release.is_file():
         _logger.error("%s not found; download it as docs/stage4.md shows", release)
         return 1
-    tree = hpo_lib.HpoTree.from_release(release)
     try:
-        conn = psycopg.connect(database_url, autocommit=True)
-    except psycopg.Error as exc:
-        _logger.error("can't connect to the database: %s", exc)
+        engine = load_run.make_engine(database_url)
+        with engine.connect():
+            pass
+    except ValueError as exc:
+        _logger.error("%s: %s (see docs/stage5.md)", _DATABASE_URL_ENV, exc)
         return 1
-    with conn, runs.new_run("load", args.input, settings):
-        failed = load_run.run(normalized_path, conn, tree)
+    except sa.exc.OperationalError as exc:
+        _logger.error("can't connect to the database: %s", exc.orig)
+        return 1
+    tree = hpo_lib.HpoTree.from_release(release)
+
+    # Added to the settings, so that run.yaml records the HPO release used.
+    record = {**settings, "hpo_sha256": tree.sha256}
+    with runs.new_run("load", args.input, record):
+        failed = load_run.run(normalized_path, engine, tree)
         if failed:
             _logger.error("failed files: %s", ", ".join(failed))
             return 1
@@ -247,7 +255,7 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     stage4.set_defaults(func=_run_stage4)
 
-    stage5 = subparsers.add_parser("stage5", help="Load report data into PostgreSQL.")
+    stage5 = subparsers.add_parser("stage5", help="Load report data into a database.")
     stage5.add_argument(
         "--input",
         type=pathlib.Path,

@@ -3,10 +3,9 @@
 On Minerva, Mount Sinai's high-performance computing cluster, stages 1 to 3
 of Gentrex each run as one batch job on a GPU node. The job starts the stage's
 model with [vLLM](https://docs.vllm.ai), runs Gentrex against it, and stops
-vLLM when Gentrex is done. Stage 4 needs no GPU, so you run it yourself in an
-interactive session. Stage 5 needs a PostgreSQL server, so it runs on a
-workstation instead. The stage pages explain what each stage does, what it
-writes and how to change its settings.
+vLLM when Gentrex is done. Stages 4 and 5 need no GPU, so you run them
+yourself in an interactive session. The stage pages explain what each stage
+does, what it writes and how to change its settings.
 
 Minerva schedules jobs with LSF. You describe a job in a script, submit the
 script with `bsub`, and LSF runs the job when a node with the GPUs you asked
@@ -493,13 +492,27 @@ The result is in `results/normalize/latest/`. Continue on the stage 4 page:
 - [Check the result](stage4.md#check-the-result)
 - [When something goes wrong](stage4.md#when-something-goes-wrong)
 
-## Stage 5: Load report data into PostgreSQL
+## Stage 5: Load report data into a database
 
-Stage 5 loads the records into a PostgreSQL server. Minerva's
+Run stage 5 in the interactive session of stage 4, after stage 4 has
+finished. With SQLite, the database is one file in `results/load/`, so stage
+5 needs no server and the records stay on Minerva:
+
+```bash
+GENTREX_DATABASE_URL=sqlite:///results/load/gentrex.db uv run gentrex stage5
+```
+
+The first run takes a few seconds, because it loads the HPO terms. Continue
+on the stage 5 page:
+
+- [Check the result](stage5.md#check-the-result)
+- [When something goes wrong](stage5.md#when-something-goes-wrong)
+
+To load into a PostgreSQL or MySQL server instead, you need a workstation
+with Docker, because Minerva's
 [database service](https://labs.icahn.mssm.edu/minervalab/documentation/services/)
-runs MariaDB instead, so stage 5 runs on a workstation with Docker.
-
-Install Gentrex on a workstation approved for patient data, as in
+runs MariaDB, which stage 5 is not tested with. Install Gentrex on a
+workstation approved for patient data, as in
 [stage 1, step 1](stage1.md#step-1-install). Copy two things from Minerva into
 the same places of its Gentrex folder:
 

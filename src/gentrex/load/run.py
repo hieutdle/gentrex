@@ -1,6 +1,7 @@
-"""Stage 5 orchestration: NormalizedReports to rows of the PostgreSQL tables."""
+"""Stage 5 orchestration: NormalizedReports to rows of the database tables."""
 
 import dataclasses
+import datetime
 import json
 import logging
 import pathlib
@@ -8,14 +9,16 @@ import re
 import time
 from typing import Any
 
-import psycopg
-from psycopg import sql
-from psycopg.types import json as pg_json
+import sqlalchemy as sa
 
 from gentrex import records
 from gentrex.load import hpo
+from gentrex.load import tables
 
-_TABLES_SQL = pathlib.Path(__file__).with_name("tables.sql")
+# The databases that stage 5 is tested on, with the driver that Gentrex picks
+# for a URL that names none, such as postgresql://. Every driver but SQLite's
+# comes from the extra of the database's name in pyproject.toml.
+DRIVERS = {"sqlite": "pysqlite", "postgresql": "psycopg", "mysql": "pymysql"}
 
 _HALF_SURROGATE = re.compile("[\ud800-\udfff]")
 
@@ -33,14 +36,14 @@ _REPORT_FIELDS = (
 )
 # Fields of `data` that stage 4 finds a standard value for. The standard value
 # goes to the column of the field's name, and the printed one to <name>_raw.
-_STANDARDIZED_FIELDS = (
+_DATE_FIELDS = (
     "date_of_birth",
-    "specimen_type",
     "collection_date",
     "received_date",
     "test_started_date",
     "report_date",
 )
+_STANDARDIZED_FIELDS = ("specimen_type", *_DATE_FIELDS)
 _RESULT_FIELDS = ("overall_result", "overall_result_basis", "overall_result_conflict")
 # Fields of each variant in `data`, besides gene_symbol.
 _VARIANT_FIELDS = (
@@ -66,6 +69,45 @@ _VARIANT_FIELDS = (
 _logger = logging.getLogger(__name__)
 
 
+def make_engine(url: str) -> sa.Engine:
+    """Returns an engine for `url`, a database URL as SQLAlchemy reads them.
+
+    A server's URL has the form database://user:password@host:port/name. A
+    SQLite file's is sqlite:///path, and its folder is created if needed.
+
+    Raises:
+        ValueError: The URL is malformed, names a database that stage 5
+            doesn't support, or needs a driver that isn't installed.
+    """
+    try:
+        parsed = sa.engine.make_url(url)
+    except sa.exc.ArgumentError as exc:
+        raise ValueError(f"not a database URL: {exc}") from exc
+    backend = parsed.get_backend_name()
+    if backend not in DRIVERS:
+        raise ValueError(
+            f"{backend} is not a supported database ({', '.join(DRIVERS)})"
+        )
+    if "+" not in parsed.drivername:
+        parsed = parsed.set(drivername=f"{backend}+{DRIVERS[backend]}")
+    if backend == "sqlite" and parsed.database:
+        pathlib.Path(parsed.database).parent.mkdir(parents=True, exist_ok=True)
+    try:
+        engine = sa.create_engine(parsed)
+    except ModuleNotFoundError as exc:
+        raise ValueError(
+            f"{exc}; its driver comes with uv run --extra {backend}"
+        ) from exc
+    if backend == "sqlite":
+        # SQLite ignores ON DELETE CASCADE unless each connection asks for it.
+        sa.event.listen(
+            engine,
+            "connect",
+            lambda dbapi_conn, _: dbapi_conn.execute("PRAGMA foreign_keys = ON"),
+        )
+    return engine
+
+
 def patient_key(file: str, data: dict[str, Any]) -> str:
     """Returns the key that links the reports of one patient.
 
@@ -81,16 +123,20 @@ def patient_key(file: str, data: dict[str, Any]) -> str:
 def _read(line: str) -> records.NormalizedReport:
     """Parses one line of normalized.jsonl.
 
-    PostgreSQL can't store half of a surrogate pair, which stage 3 data may
+    Databases can't store half of a surrogate pair, which stage 3 data may
     hold, so it becomes U+FFFD, the replacement character.
     """
     text = json.dumps(json.loads(line), ensure_ascii=False)
-    return records.NormalizedReport(**json.loads(_HALF_SURROGATE.sub("\ufffd", text)))
+    return records.NormalizedReport(**json.loads(_HALF_SURROGATE.sub("�", text)))
+
+
+def _date(value: str | None) -> datetime.date | None:
+    return datetime.date.fromisoformat(value) if value else None
 
 
 def _rows(
     report: records.NormalizedReport, source: str
-) -> dict[str, list[dict[str, Any]]]:
+) -> list[tuple[sa.Table, list[dict[str, Any]]]]:
     """Returns the rows of one report, by table, in the order to insert them."""
     data = report.data or {}
     normalized = report.normalized or {}
@@ -98,40 +144,36 @@ def _rows(
     genes = normalized.get("variants") or [{}] * len(variants)
     features = data.get("patient_phenotypes") or []
     matches = normalized.get("patient_phenotypes") or [{}] * len(features)
-    rows: dict[str, list[dict[str, Any]]] = {
-        "reports": [
-            {
-                "file": report.file,
-                "patient_key": patient_key(report.file, data),
-                "pages": report.pages,
-                "error": report.error,
-                **{field: data.get(field) for field in _REPORT_FIELDS},
-                **{field: normalized.get(field) for field in _STANDARDIZED_FIELDS},
-                **{f"{field}_raw": data.get(field) for field in _STANDARDIZED_FIELDS},
-                **{field: normalized.get(field) for field in _RESULT_FIELDS},
-                "record": pg_json.Jsonb(dataclasses.asdict(report)),
-                "normalize_run": source,
-            }
-        ],
-        "variants": [
-            {
-                "file": report.file,
-                "variant_number": number,
-                "gene_symbol": gene.get("gene_symbol"),
-                "gene_symbol_raw": variant.get("gene_symbol"),
-                "hgnc_id": gene.get("hgnc_id"),
-                "gene_status": gene.get("gene_status"),
-                **{field: variant.get(field) for field in _VARIANT_FIELDS},
-            }
-            for number, (variant, gene) in enumerate(
-                zip(variants, genes, strict=True), 1
-            )
-        ],
-        "patient_phenotypes": [],
-        "phenotype_candidates": [],
+    report_row = {
+        "file": report.file,
+        "patient_key": patient_key(report.file, data),
+        "pages": report.pages,
+        "error": report.error,
+        **{field: data.get(field) for field in _REPORT_FIELDS},
+        "specimen_type": normalized.get("specimen_type"),
+        **{field: _date(normalized.get(field)) for field in _DATE_FIELDS},
+        **{f"{field}_raw": data.get(field) for field in _STANDARDIZED_FIELDS},
+        **{field: normalized.get(field) for field in _RESULT_FIELDS},
+        "record": dataclasses.asdict(report),
+        "normalize_run": source,
+        "loaded_at": datetime.datetime.now(datetime.UTC),
     }
+    variant_rows = [
+        {
+            "file": report.file,
+            "variant_number": number,
+            "gene_symbol": gene.get("gene_symbol"),
+            "gene_symbol_raw": variant.get("gene_symbol"),
+            "hgnc_id": gene.get("hgnc_id"),
+            "gene_status": gene.get("gene_status"),
+            **{field: variant.get(field) for field in _VARIANT_FIELDS},
+        }
+        for number, (variant, gene) in enumerate(zip(variants, genes, strict=True), 1)
+    ]
+    phenotype_rows = []
+    candidate_rows = []
     for number, (feature, match) in enumerate(zip(features, matches, strict=True), 1):
-        rows["patient_phenotypes"].append(
+        phenotype_rows.append(
             {
                 "file": report.file,
                 "phenotype_number": number,
@@ -142,71 +184,84 @@ def _rows(
                 "models_agree": match.get("models_agree"),
             }
         )
-        rows["phenotype_candidates"] += [
+        candidate_rows += [
             {
                 "file": report.file,
                 "phenotype_number": number,
                 "rank": rank,
                 "hpo_id": candidate["hpo_id"],
                 "hpo_label": candidate["label"],
-                "models": pg_json.Jsonb(candidate["models"]),
+                "models": candidate["models"],
             }
             for rank, candidate in enumerate(match.get("candidates") or [], 1)
         ]
-    return rows
+    return [
+        (tables.reports, [report_row]),
+        (tables.variants, variant_rows),
+        (tables.patient_phenotypes, phenotype_rows),
+        (tables.phenotype_candidates, candidate_rows),
+    ]
 
 
-def _insert(conn: psycopg.Connection, table: str, rows: list[dict[str, Any]]) -> None:
-    """Inserts rows into `table`; the keys of each row name its columns."""
-    if not rows:
-        return
-    query = sql.SQL("INSERT INTO {} ({}) VALUES ({})").format(
-        sql.Identifier(table),
-        sql.SQL(", ").join(map(sql.Identifier, rows[0])),
-        sql.SQL(", ").join(map(sql.Placeholder, rows[0])),
+def _insert(conn: sa.Connection, table: sa.Table, rows: list[dict[str, Any]]) -> None:
+    if rows:
+        conn.execute(table.insert(), rows)
+
+
+def _load_tree(conn: sa.Connection, tree: hpo.HpoTree) -> bool:
+    """Replaces the HPO terms and ancestors, unless they are from `tree`'s release.
+
+    Returns:
+        Whether the terms were loaded.
+    """
+    loaded = conn.execute(sa.select(tables.hpo_release.c.sha256)).scalars().all()
+    if loaded == [tree.sha256]:
+        return False
+    for table in (tables.hpo_release, tables.hpo_ancestors, tables.hpo_terms):
+        conn.execute(table.delete())
+    _insert(
+        conn,
+        tables.hpo_terms,
+        [{"hpo_id": term, "hpo_label": label} for term, label in tree.labels.items()],
     )
-    with conn.cursor() as cursor:
-        cursor.executemany(query, rows)
-
-
-def _load_tree(conn: psycopg.Connection, tree: hpo.HpoTree) -> None:
-    """Replaces the HPO terms and their ancestors, in one transaction."""
-    with conn.transaction(), conn.cursor() as cursor:
-        cursor.execute("TRUNCATE hpo_terms, hpo_ancestors")
-        with cursor.copy("COPY hpo_terms (hpo_id, hpo_label) FROM STDIN") as copy:
-            for term in tree.labels.items():
-                copy.write_row(term)
-        with cursor.copy("COPY hpo_ancestors (hpo_id, ancestor_id) FROM STDIN") as copy:
-            for term, ancestors in tree.ancestors.items():
-                for ancestor in ancestors:
-                    copy.write_row((term, ancestor))
+    _insert(
+        conn,
+        tables.hpo_ancestors,
+        [
+            {"hpo_id": term, "ancestor_id": ancestor}
+            for term, ancestors in tree.ancestors.items()
+            for ancestor in ancestors
+        ],
+    )
+    conn.execute(
+        tables.hpo_release.insert(),
+        {"sha256": tree.sha256, "loaded_at": datetime.datetime.now(datetime.UTC)},
+    )
+    return True
 
 
 def _load_report(
-    conn: psycopg.Connection, report: records.NormalizedReport, source: str
+    conn: sa.Connection, report: records.NormalizedReport, source: str
 ) -> None:
-    """Replaces the rows of the report's file, in one transaction."""
+    """Replaces the rows of the report's file."""
     rows = _rows(report, source)
-    with conn.transaction():
-        conn.execute("DELETE FROM reports WHERE file = %s", (report.file,))
-        for table, table_rows in rows.items():
-            _insert(conn, table, table_rows)
+    conn.execute(tables.reports.delete().where(tables.reports.c.file == report.file))
+    for table, table_rows in rows:
+        _insert(conn, table, table_rows)
 
 
-def run(
-    input_path: pathlib.Path, conn: psycopg.Connection, tree: hpo.HpoTree
-) -> list[str]:
+def run(input_path: pathlib.Path, engine: sa.Engine, tree: hpo.HpoTree) -> list[str]:
     """Loads every report of a stage 4 run into the database, in input order.
 
-    Creates the tables that don't exist yet and replaces the HPO terms. Each
-    report replaces the rows of its file in one transaction, so that a report
-    that fails to load keeps the rows of an earlier run. Reports of other files
+    Creates the tables that don't exist yet, and loads the HPO terms unless
+    the database holds them from the same release already. Each report
+    replaces the rows of its file in one transaction, so that a report that
+    fails to load keeps the rows of an earlier run. Reports of other files
     stay.
 
     Args:
         input_path: JSONL file of NormalizedReports, from stage 4.
-        conn: Connection in autocommit mode, so that each report is committed
-            on its own.
+        engine: The database, from make_engine.
         tree: The HPO terms to load.
 
     Returns:
@@ -218,14 +273,17 @@ def run(
     with input_path.open(encoding="utf-8") as fh:
         reports = [_read(line) for line in fh]
     source = str(input_path.parent.resolve())
-    _logger.info(
-        "loading into database %s on %s:%s",
-        conn.info.dbname,
-        conn.info.host,
-        conn.info.port,
-    )
-    conn.execute(_TABLES_SQL.read_bytes())
-    _load_tree(conn, tree)
+    _logger.info("loading into %s", engine.url.render_as_string(hide_password=True))
+    tables.metadata.create_all(engine)
+    with engine.begin() as conn:
+        if _load_tree(conn, tree):
+            _logger.info(
+                "loaded %d HPO terms with %d ancestor rows",
+                len(tree.labels),
+                sum(len(ancestors) for ancestors in tree.ancestors.values()),
+            )
+        else:
+            _logger.info("kept the HPO terms, which are from the same release")
     failed: list[str] = []
     loaded = 0
     for report in reports:
@@ -236,7 +294,8 @@ def run(
             failed.append(report.file)
             continue
         try:
-            _load_report(conn, report, source)
+            with engine.begin() as conn:
+                _load_report(conn, report, source)
         except Exception as exc:  # One report's failure must not cost the others.
             _logger.error("failed %s: %s: %s", report.file, type(exc).__name__, exc)
             failed.append(report.file)

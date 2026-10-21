@@ -8,7 +8,8 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    # The stage 5 tests need a PostgreSQL server, and are skipped without one.
+    # The stage 5 tests run on SQLite, and on each server listed in
+    # GENTREX_TEST_DATABASE_URLS.
     services:
       postgres:
         image: postgres:18
@@ -22,13 +23,26 @@ jobs:
           --health-interval 2s
           --health-timeout 5s
           --health-retries 30
+      mysql:
+        image: mysql:8.4
+        env:
+          MYSQL_ROOT_PASSWORD: gentrex
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1 -uroot -pgentrex"
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 30
     env:
-      GENTREX_TEST_DATABASE_URL: postgresql://gentrex:gentrex@127.0.0.1:5432/gentrex
+      GENTREX_TEST_DATABASE_URLS: >-
+        postgresql://gentrex:gentrex@127.0.0.1:5432/gentrex
+        mysql://root:gentrex@127.0.0.1:3306/mysql
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: "3.12"
-      - run: uv sync
+      - run: uv sync --extra postgresql --extra mysql
       - run: uv run ruff check .
       - run: uv run pytest

@@ -4,9 +4,8 @@ import pathlib
 import uuid
 from typing import Any
 
-import psycopg
 import pytest
-from psycopg import sql
+import sqlalchemy as sa
 
 from gentrex import records
 from gentrex.load import hpo
@@ -14,25 +13,44 @@ from gentrex.load import run
 
 _OBO = "http://purl.obolibrary.org/obo/"
 
-_NO_TERMS = hpo.HpoTree({}, {})
+_NO_TERMS = hpo.HpoTree({}, {}, sha256="0" * 64)
+
+# Database servers to test on besides SQLite, which needs none.
+_SERVER_URLS = os.environ.get("GENTREX_TEST_DATABASE_URLS", "").split()
 
 
-@pytest.fixture
-def conn():
-    """A connection whose tables go to a new schema, dropped afterwards."""
-    url = os.environ.get("GENTREX_TEST_DATABASE_URL")
-    if not url:
-        pytest.skip("set GENTREX_TEST_DATABASE_URL to run the database tests")
-    schema = sql.Identifier(f"test_{uuid.uuid4().hex}")
-    with psycopg.connect(url, autocommit=True) as conn:
-        conn.execute(sql.SQL("CREATE SCHEMA {}").format(schema))
-        conn.execute(sql.SQL("SET search_path TO {}").format(schema))
-        yield conn
-        conn.execute(sql.SQL("DROP SCHEMA {} CASCADE").format(schema))
+def _backend(url: str) -> str:
+    return sa.engine.make_url(url).get_backend_name()
+
+
+@pytest.fixture(params=["sqlite://", *_SERVER_URLS], ids=_backend)
+def engine(request, tmp_path):
+    """An engine on a database of its own, which is dropped afterwards."""
+    if request.param == "sqlite://":
+        yield run.make_engine(f"sqlite:///{tmp_path / 'gentrex.db'}")
+        return
+    admin = run.make_engine(request.param)
+    name = f"test_{uuid.uuid4().hex}"
+    with admin.connect() as conn:
+        conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(sa.text(f"CREATE DATABASE {name}"))
+    url = admin.url.set(database=name).render_as_string(hide_password=False)
+    engine = run.make_engine(url)
+    yield engine
+    engine.dispose()
+    with admin.connect() as conn:
+        conn.execution_options(isolation_level="AUTOCOMMIT")
+        conn.execute(sa.text(f"DROP DATABASE {name}"))
+    admin.dispose()
+
+
+def _select(engine: sa.Engine, query: str) -> list[tuple[Any, ...]]:
+    with engine.connect() as conn:
+        return [tuple(row) for row in conn.execute(sa.text(query))]
 
 
 def _load(
-    conn: psycopg.Connection,
+    engine: sa.Engine,
     tmp_path: pathlib.Path,
     reports: list[records.NormalizedReport],
     tree: hpo.HpoTree = _NO_TERMS,
@@ -41,7 +59,7 @@ def _load(
     path = tmp_path / "normalized.jsonl"
     with path.open("w", encoding="utf-8", errors="backslashreplace") as fh:
         fh.writelines(report.to_json() + "\n" for report in reports)
-    return run.run(path, conn, tree)
+    return run.run(path, engine, tree)
 
 
 def _match(hpo_id: str, label: str) -> dict[str, Any]:
@@ -49,6 +67,13 @@ def _match(hpo_id: str, label: str) -> dict[str, Any]:
     models = {"words": {"name": label, "similarity": 1.0}}
     candidate = {"hpo_id": hpo_id, "label": label, "models": models}
     return {**candidate, "models_agree": None, "candidates": [candidate]}
+
+
+def _tree(sha256: str, **labels: str) -> hpo.HpoTree:
+    """Returns a tree of unrelated terms, each its own only ancestor."""
+    return hpo.HpoTree(
+        labels, {term: frozenset({term}) for term in labels}, sha256=sha256
+    )
 
 
 def test_ancestors_are_the_term_and_every_term_above_it(tmp_path):
@@ -106,7 +131,13 @@ def test_patient_key_is_the_mrn_else_the_submitter_id_else_the_file(data, key):
     assert run.patient_key("report-04.pdf", data) == key
 
 
-def test_loading_a_file_again_replaces_its_rows(conn, tmp_path):
+def test_a_database_that_is_not_supported_is_refused():
+    """The URL must fail at once, not after the HPO release was read."""
+    with pytest.raises(ValueError, match="oracle is not a supported database"):
+        run.make_engine("oracle://scott:tiger@127.0.0.1/orcl")
+
+
+def test_loading_a_file_again_replaces_its_rows(engine, tmp_path):
     """A rerun must not keep the variants or features of the earlier load."""
     first = records.NormalizedReport(
         "a.pdf",
@@ -120,48 +151,54 @@ def test_loading_a_file_again_replaces_its_rows(conn, tmp_path):
     other = records.NormalizedReport(
         "b.pdf", [1], {"variants": [{"gene_symbol": "CFTR"}]}, None
     )
-    _load(conn, tmp_path, [first, other])
+    _load(engine, tmp_path, [first, other])
     second = records.NormalizedReport(
         "a.pdf", [1], {"variants": [{"gene_symbol": "MECP2"}]}, None
     )
 
-    _load(conn, tmp_path, [second])
+    _load(engine, tmp_path, [second])
 
-    assert conn.execute(
-        "SELECT file, gene_symbol_raw FROM variants ORDER BY file"
-    ).fetchall() == [("a.pdf", "MECP2"), ("b.pdf", "CFTR")]
-    assert conn.execute("SELECT count(*) FROM patient_phenotypes").fetchone() == (0,)
+    assert _select(
+        engine, "SELECT file, gene_symbol_raw FROM variants ORDER BY file"
+    ) == [("a.pdf", "MECP2"), ("b.pdf", "CFTR")]
+    assert _select(engine, "SELECT count(*) FROM patient_phenotypes") == [(0,)]
 
 
-def test_a_report_that_fails_to_load_keeps_its_earlier_rows(conn, tmp_path):
+def test_a_report_that_fails_to_load_keeps_its_earlier_rows(engine, tmp_path):
     """Each report is one transaction, so its failure costs no rows of others."""
     earlier = records.NormalizedReport("a.pdf", [1], {"variants": [{"page": 1}]}, None)
-    _load(conn, tmp_path, [earlier])
+    _load(engine, tmp_path, [earlier])
     broken = records.NormalizedReport(
-        "a.pdf", [1], {"variants": [{"page": "one"}]}, None
+        "a.pdf",
+        [1],
+        {
+            "variants": [{"page": 2}],
+            "patient_phenotypes": [{"text": None, "present": True}],
+        },
+        None,
     )
     no_data = records.NormalizedReport("b.pdf", [1], None, None, error="TimeoutError")
     complete = records.NormalizedReport("c.pdf", [1], {"variants": []}, None)
 
-    failed = _load(conn, tmp_path, [broken, no_data, complete])
+    failed = _load(engine, tmp_path, [broken, no_data, complete])
 
     assert failed == ["a.pdf", "b.pdf"]
-    assert conn.execute("SELECT file FROM reports ORDER BY file").fetchall() == [
+    assert _select(engine, "SELECT file FROM reports ORDER BY file") == [
         ("a.pdf",),
         ("c.pdf",),
     ]
-    assert conn.execute("SELECT page FROM variants").fetchall() == [(1,)]
+    assert _select(engine, "SELECT page FROM variants") == [(1,)]
 
 
-def test_half_a_surrogate_pair_is_loaded_as_a_replacement_character(conn, tmp_path):
-    """Stage 3 keeps it as a JSON escape, but PostgreSQL text can't hold it."""
+def test_half_a_surrogate_pair_is_loaded_as_a_replacement_character(engine, tmp_path):
+    """Stage 3 keeps it as a JSON escape, but no database can store it."""
     report = records.NormalizedReport("a.pdf", [1], {"test_name": "Panel \ud835"}, None)
 
-    assert _load(conn, tmp_path, [report]) == []
-    assert conn.execute("SELECT test_name FROM reports").fetchone() == ("Panel \ufffd",)
+    assert _load(engine, tmp_path, [report]) == []
+    assert _select(engine, "SELECT test_name FROM reports") == [("Panel �",)]
 
 
-def test_a_feature_is_found_under_every_term_above_its_match(conn, tmp_path):
+def test_a_feature_is_found_under_every_term_above_its_match(engine, tmp_path):
     """A query on a broad term must find the features matched to narrower ones."""
     tree = hpo.HpoTree(
         {
@@ -172,6 +209,7 @@ def test_a_feature_is_found_under_every_term_above_its_match(conn, tmp_path):
             "HP:0001249": frozenset({"HP:0001249"}),
             "HP:0001256": frozenset({"HP:0001256", "HP:0001249"}),
         },
+        sha256="1" * 64,
     )
     report = records.NormalizedReport(
         "a.pdf",
@@ -179,12 +217,28 @@ def test_a_feature_is_found_under_every_term_above_its_match(conn, tmp_path):
         {"patient_phenotypes": [{"text": "mild ID", "present": True}]},
         {"patient_phenotypes": [_match("HP:0001256", "Mild intellectual disability")]},
     )
-    _load(conn, tmp_path, [report], tree)
+    _load(engine, tmp_path, [report], tree)
 
-    found = conn.execute(
+    found = _select(
+        engine,
         "SELECT p.file FROM patient_phenotypes p"
         " JOIN hpo_ancestors a ON a.hpo_id = p.hpo_id"
-        " WHERE a.ancestor_id = 'HP:0001249'"
-    ).fetchall()
+        " WHERE a.ancestor_id = 'HP:0001249'",
+    )
 
     assert found == [("a.pdf",)]
+
+
+def test_hpo_terms_are_loaded_again_only_when_the_release_changes(engine, tmp_path):
+    """Loading 223,079 ancestor rows on every run would be the slowest step."""
+    first = _tree("a" * 64, **{"HP:0000001": "All"})
+    _load(engine, tmp_path, [], first)
+    with engine.begin() as conn:
+        conn.execute(sa.text("DELETE FROM hpo_terms"))
+
+    _load(engine, tmp_path, [], first)
+    assert _select(engine, "SELECT count(*) FROM hpo_terms") == [(0,)]
+
+    second = _tree("b" * 64, **{"HP:0000118": "Phenotypic abnormality"})
+    _load(engine, tmp_path, [], second)
+    assert _select(engine, "SELECT hpo_id FROM hpo_terms") == [("HP:0000118",)]

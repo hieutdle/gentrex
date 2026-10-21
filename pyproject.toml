@@ -12,9 +12,9 @@ dependencies = [
     "openai>=1.40",
     "pdfplumber>=0.11.10",
     "pillow>=12.3.0",
-    "psycopg[binary]>=3.3.6",
     "pypdfium2>=5.12.1",
     "pyyaml>=6.0",
+    "sqlalchemy>=2.0",
 ]
 
 [project.urls]
@@ -28,6 +28,13 @@ hpo = [
     "sentence-transformers>=6.1.0",
     "torch>=2.14.1",
     "torchvision>=0.29.1",
+]
+# Drivers for the database servers that stage 5 supports. SQLite needs none.
+mysql = [
+    "pymysql[rsa]>=1.1",
+]
+postgresql = [
+    "psycopg[binary]>=3.3.6",
 ]
 
 [dependency-groups]

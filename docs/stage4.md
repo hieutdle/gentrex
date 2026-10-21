@@ -7,7 +7,7 @@ laboratories. A date printed as `29-JUN-1984` becomes `1984-06-29`. The result
 category `positive`. Each variant's gene gets its approved HGNC symbol and ID,
 and each of the patient's clinical features gets the closest term of the Human
 Phenotype Ontology (HPO), which two embedding models find together.
-[Stage 5](stage5.md) then loads the records into a PostgreSQL database.
+[Stage 5](stage5.md) then loads the records into a database.
 
 Stage 4 reads `extractions.jsonl` from a stage 3 run and writes
 `normalized.jsonl`, with one line per report, to `results/normalize/`. Each

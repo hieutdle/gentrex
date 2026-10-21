@@ -125,7 +125,7 @@ normalize:
     # the right term is sometimes a close second.
     top_k: 5
 
-# Stage 5: Load report data into PostgreSQL. Gentrex writes the records of a
+# Stage 5: Load report data into a database. Gentrex writes the records of a
 # stage 4 run into tables of the database that GENTREX_DATABASE_URL names
 # (see .env.example).
 load:
