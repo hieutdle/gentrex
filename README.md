@@ -5,16 +5,19 @@ into data you can analyze. It reads a folder of PDF reports and writes one JSON
 record per report. The record holds the patient's identifiers, the specimen,
 the test, the overall result, the patient's clinical features and every
 variant reported, with its gene, HGVS changes, classification and zygosity.
+Gentrex then loads the records into a PostgreSQL database, so that you can
+count and compare reports with SQL.
 
 Gentrex is a command-line program. The models of stages 1 to 3 run in a
 separate model server, [vLLM](https://docs.vllm.ai), on GPUs that you
 control. Gentrex sends each page or report to that server and writes what
 comes back. Stage 4 needs no server, because its models run inside Gentrex
-on the CPU.
+on the CPU. Stage 5 loads the records into a PostgreSQL server, which runs
+in Docker on your workstation.
 
 ## How it works
 
-Gentrex works in four stages. You run them in order, and each stage reads
+Gentrex works in five stages. You run them in order, and each stage reads
 the output of the stage before it.
 
 | Stage | What it does | Writes to | Model and GPU |
@@ -23,6 +26,7 @@ the output of the stage before it.
 | [2. Decide which pages to keep](docs/stage2.md) | Asks a language model yes/no questions about every page, and keeps the pages with the result or the patient's symptoms. | `results/pagedecide/` | Gemma 4 26B-A4B on one GPU with 80 GB |
 | [3. Extract report data](docs/stage3.md) | Sends the kept pages of each report to a language model, which returns one record per report. | `results/extract/` | Gemma 4 31B on two GPUs with 80 GB, or one B200 |
 | [4. Normalize report data](docs/stage4.md) | Adds standard values to each record: ISO dates, categories for the specimen and the result, HGNC IDs for the genes and HPO terms for the clinical features. | `results/normalize/` | SapBERT and EmbeddingGemma 2 on the CPU, no GPU |
+| [5. Load report data into PostgreSQL](docs/stage5.md) | Loads the records into tables of a PostgreSQL database, with the HPO terms and their hierarchy, so that you can query them with SQL. | A PostgreSQL database, and `results/load/` | No model and no GPU. PostgreSQL runs in Docker |
 
 Many pages of a report only describe the test. Stage 2 drops them, so stage 3
 has less to read.
@@ -65,6 +69,8 @@ All the fields, with what each one holds, are in
 [Stage 3](docs/stage3.md#check-the-result) explains how to read and load the
 records. [Stage 4](docs/stage4.md#check-the-result) adds the standard values
 next to them, in a field named `normalized`.
+[Stage 5](docs/stage5.md#check-the-result) loads both into tables of a
+PostgreSQL database.
 
 ## What you need
 
@@ -79,6 +85,9 @@ next to them, in a field named `normalized`.
 - About 3 GB of disk for stage 4: 300 MB for the HGNC complete set, the HPO
   release and the HPO index, and 2.8 GB for sentence-transformers, PyTorch
   and the two embedding models, which stage 4 uses to find HPO terms.
+- [Docker](https://docs.docker.com/get-started/get-docker/), which runs the
+  PostgreSQL server of stage 5 in a container, and about 1 GB of disk for
+  PostgreSQL and the database.
 - Storage approved for patient data, for the reports and everything Gentrex
   writes from them.
 
@@ -92,11 +101,13 @@ server before the next stage starts its own.
 2. [Stage 2: Decide which pages to keep](docs/stage2.md)
 3. [Stage 3: Extract report data](docs/stage3.md)
 4. [Stage 4: Normalize report data](docs/stage4.md)
+5. [Stage 5: Load report data into PostgreSQL](docs/stage5.md)
 
-Stage 4 needs no model server.
+Stages 4 and 5 need no model server.
 
 On Mount Sinai's Minerva cluster, stages 1 to 3 run as batch jobs, and stage
 4 runs in an interactive session. Follow [Running on Minerva](docs/minerva.md).
+Stage 5 runs on a workstation with Docker.
 
 ## Runs and results
 
@@ -133,8 +144,8 @@ model than settings.yaml names, or the address in `.env` doesn't end in
 Gentrex ends with an exit code, which `echo $?` shows right after a run. 0
 means every file went through. 1 means that some files failed, the input was
 missing or the run stopped with an error. The end of the output says which. 2
-means the model server's address is not set. Each stage page says what to do
-for each code.
+means the model server's address is not set, or in stage 5 the database's
+address. Each stage page says what to do for each code.
 
 ## Patient data
 
@@ -145,6 +156,8 @@ Reports, and everything Gentrex writes from them, may contain patient data.
   ignores both folders, and reports and results must never be committed.
 - Gentrex sends page images and page text to the model servers set in `.env`.
   Run those servers on machines approved for patient data.
+- Stage 5 writes the records into the database set in `.env`. Run the
+  database server on a machine approved for patient data.
 
 ## Terms
 
@@ -165,6 +178,10 @@ Reports, and everything Gentrex writes from them, may contain patient data.
 | JSONL | JSON Lines, a text file with one JSON object per line. | `pages.jsonl`, `decisions.jsonl`, `extractions.jsonl`, `normalized.jsonl` |
 | Embedding | A list of numbers that a model computes for a text, so that texts with similar meanings get similar lists. | The HPO index of stage 4 |
 | Cosine similarity | A measure of how alike two embeddings are. It is 1.0 for embeddings that point the same way and lower the more they differ. | `similarity` in `normalized.jsonl` |
+| PostgreSQL | A database server, a program that keeps data in tables and answers queries about it. Stage 5 loads the records into it. | `GENTREX_DATABASE_URL`, `psql` |
+| SQL | The language of queries to databases such as PostgreSQL. | The queries in [stage 5](docs/stage5.md#query-the-tables) |
+| Container | A program packaged with everything it needs, so that it runs the same on any machine. Docker runs containers from images, the files that hold these packages. | `docker run`, `postgres:18` in stage 5 |
+| Transaction | A group of changes to a database that it makes all together or not at all. Stage 5 loads each report in one transaction. | [Load a run again](docs/stage5.md#load-a-run-again) in stage 5 |
 
 ## Documentation
 
@@ -172,6 +189,7 @@ Reports, and everything Gentrex writes from them, may contain patient data.
 - [Stage 2: Decide which pages to keep](docs/stage2.md)
 - [Stage 3: Extract report data](docs/stage3.md)
 - [Stage 4: Normalize report data](docs/stage4.md)
+- [Stage 5: Load report data into PostgreSQL](docs/stage5.md)
 - [Running on Minerva (Mount Sinai)](docs/minerva.md)
 - [Development](docs/development.md)
 - [Evaluate HPO matching](evaluation/README.md)

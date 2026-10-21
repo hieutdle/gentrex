@@ -4,7 +4,8 @@ On Minerva, Mount Sinai's high-performance computing cluster, stages 1 to 3
 of Gentrex each run as one batch job on a GPU node. The job starts the stage's
 model with [vLLM](https://docs.vllm.ai), runs Gentrex against it, and stops
 vLLM when Gentrex is done. Stage 4 needs no GPU, so you run it yourself in an
-interactive session. The stage pages explain what each stage does, what it
+interactive session. Stage 5 needs a PostgreSQL server, so it runs on a
+workstation instead. The stage pages explain what each stage does, what it
 writes and how to change its settings.
 
 Minerva schedules jobs with LSF. You describe a job in a script, submit the
@@ -491,3 +492,21 @@ The result is in `results/normalize/latest/`. Continue on the stage 4 page:
 
 - [Check the result](stage4.md#check-the-result)
 - [When something goes wrong](stage4.md#when-something-goes-wrong)
+
+## Stage 5: Load report data into PostgreSQL
+
+Stage 5 loads the records into a PostgreSQL server. Minerva's
+[database service](https://labs.icahn.mssm.edu/minervalab/documentation/services/)
+runs MariaDB instead, so stage 5 runs on a workstation with Docker.
+
+Install Gentrex on a workstation approved for patient data, as in
+[stage 1, step 1](stage1.md#step-1-install). Copy two things from Minerva into
+the same places of its Gentrex folder:
+
+- The stage 4 run folder, such as `results/normalize/20261019-030000/`. Copy
+  the folder that `results/normalize/latest` points to, because the link
+  itself would point to nothing on the workstation.
+- `data/ontology/hp-base.json`, the HPO release that built the HPO index.
+
+Then follow [stage 5](stage5.md), and name the copied run with `--input`, as in
+`--input results/normalize/20261019-030000`.

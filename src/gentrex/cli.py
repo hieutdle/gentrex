@@ -6,11 +6,15 @@ import os
 import pathlib
 import sys
 
+import psycopg
+
 from gentrex import config
 from gentrex import llm
 from gentrex import runs
 from gentrex.extract import extractor
 from gentrex.extract import run as extract_run
+from gentrex.load import hpo as hpo_lib
+from gentrex.load import run as load_run
 from gentrex.normalize import genes
 from gentrex.normalize import phenotypes
 from gentrex.normalize import run as normalize_run
@@ -25,6 +29,7 @@ _OCR_BASE_URL_ENV = "GENTREX_OCR_BASE_URL"
 _OCR_API_KEY_ENV = "GENTREX_OCR_API_KEY"
 _LLM_BASE_URL_ENV = "GENTREX_LLM_BASE_URL"
 _LLM_API_KEY_ENV = "GENTREX_LLM_API_KEY"
+_DATABASE_URL_ENV = "GENTREX_DATABASE_URL"
 
 
 def _run_stage1(args: argparse.Namespace) -> int:
@@ -166,6 +171,35 @@ def _run_stage4(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_stage5(args: argparse.Namespace) -> int:
+    normalized_path = args.input / "normalized.jsonl"
+    if not normalized_path.is_file():
+        _logger.error("%s not found; run stage 4 first", normalized_path)
+        return 1
+    database_url = os.environ.get(_DATABASE_URL_ENV)
+    if not database_url:
+        _logger.error("%s is not set (see .env.example)", _DATABASE_URL_ENV)
+        return 2
+
+    settings = config.load_settings()["load"]
+    release = pathlib.Path(settings["hpo_release"])
+    if not release.is_file():
+        _logger.error("%s not found; download it as docs/stage4.md shows", release)
+        return 1
+    tree = hpo_lib.HpoTree.from_release(release)
+    try:
+        conn = psycopg.connect(database_url, autocommit=True)
+    except psycopg.Error as exc:
+        _logger.error("can't connect to the database: %s", exc)
+        return 1
+    with conn, runs.new_run("load", args.input, settings):
+        failed = load_run.run(normalized_path, conn, tree)
+        if failed:
+            _logger.error("failed files: %s", ", ".join(failed))
+            return 1
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gentrex", description=__doc__)
     subparsers = parser.add_subparsers(required=True)
@@ -212,6 +246,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Leave the clinical features without HPO terms.",
     )
     stage4.set_defaults(func=_run_stage4)
+
+    stage5 = subparsers.add_parser("stage5", help="Load report data into PostgreSQL.")
+    stage5.add_argument(
+        "--input",
+        type=pathlib.Path,
+        default=runs.latest("normalize"),
+        help="Stage 4 run folder to read.",
+    )
+    stage5.set_defaults(func=_run_stage5)
     return parser
 
 

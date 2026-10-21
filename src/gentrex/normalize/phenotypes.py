@@ -8,6 +8,7 @@ z-scores.
 import json
 import pathlib
 import re
+from collections.abc import Iterator
 from typing import Any
 
 import numpy as np
@@ -89,6 +90,22 @@ def fuse(scores: list[np.ndarray]) -> np.ndarray:
     return np.sum(z_scores, axis=0)
 
 
+def current_terms(graph: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]:
+    """Yields the HPO ID and node of each current term of an HPO release.
+
+    A current term is an HPO class that has a label and is not deprecated.
+
+    Args:
+        graph: The graph of an HPO release in obographs JSON.
+    """
+    for node in graph["nodes"]:
+        match = _HPO_CLASS.fullmatch(node["id"])
+        if node.get("type") != "CLASS" or not match or not node.get("lbl"):
+            continue
+        if not node.get("meta", {}).get("deprecated"):
+            yield f"HP:{match[1]}", node
+
+
 def build_index(
     release: pathlib.Path, output: pathlib.Path, models: list[dict[str, str]]
 ) -> int:
@@ -108,19 +125,14 @@ def build_index(
     """
     graph = json.loads(release.read_text(encoding="utf-8"))["graphs"][0]
     rows: list[tuple[str, str, str]] = []
-    for node in graph["nodes"]:
+    for hpo_id, node in current_terms(graph):
         meta = node.get("meta", {})
-        match = _HPO_CLASS.fullmatch(node["id"])
-        if node.get("type") != "CLASS" or not match or not node.get("lbl"):
-            continue
-        if meta.get("deprecated"):
-            continue
         spellings = [
             node["lbl"],
             *(synonym["val"] for synonym in meta.get("synonyms", [])),
         ]
         for name in dict.fromkeys(spellings):
-            rows.append((f"HP:{match[1]}", node["lbl"], name))
+            rows.append((hpo_id, node["lbl"], name))
     hpo_ids, labels, names = zip(*rows, strict=True)
     arrays: dict[str, Any] = {
         "models": [model["name"] for model in models],

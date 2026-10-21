@@ -124,3 +124,13 @@ normalize:
     # match. The other four are alternatives for when you check it, because
     # the right term is sometimes a close second.
     top_k: 5
+
+# Stage 5: Load report data into PostgreSQL. Gentrex writes the records of a
+# stage 4 run into tables of the database that GENTREX_DATABASE_URL names
+# (see .env.example).
+load:
+  # The HPO release that stage 5 takes the HPO terms and their hierarchy
+  # from, so that a query can find a term together with the terms under it.
+  # Use the release that built the HPO index (docs/stage4.md, step 2), so
+  # that every matched term is in it.
+  hpo_release: data/ontology/hp-base.json
