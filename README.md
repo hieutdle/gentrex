@@ -12,9 +12,9 @@ Gentrex is a command-line program. The models of stages 1 to 3 run in a
 separate model server, [vLLM](https://docs.vllm.ai), on GPUs that you
 control. Gentrex sends each page or report to that server and writes what
 comes back. Stage 4 needs no server, because its models run inside Gentrex
-on the CPU. Stage 5 loads the records into a database. A SQLite file needs
-no server, and a PostgreSQL or MySQL server runs in Docker on your
-workstation.
+on the CPU. Stage 5 loads the records into one of three databases. A SQLite
+file needs no server, and PostgreSQL and MySQL run as servers in Docker on
+your workstation.
 
 ## How it works
 
@@ -86,6 +86,11 @@ database.
 - About 3 GB of disk for stage 4: 300 MB for the HGNC complete set, the HPO
   release and the HPO index, and 2.8 GB for sentence-transformers, PyTorch
   and the two embedding models, which stage 4 uses to find HPO terms.
+- A database for stage 5. SQLite needs nothing more, because it comes with
+  Python. PostgreSQL 18 and MySQL 8.4 are the servers that stage 5 is tested
+  with, and it refuses the address of any other database.
+  [Supported databases](docs/stage5.md#supported-databases) says what the
+  tests check and how to add a database.
 - [Docker](https://docs.docker.com/get-started/get-docker/), if you choose
   PostgreSQL or MySQL for stage 5. It runs the server in a container, which
   takes 1 to 2 GB of disk with the database. SQLite needs neither.
