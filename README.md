@@ -198,6 +198,7 @@ Reports, and everything Gentrex writes from them, may contain patient data.
 - [Stage 3: Extract report data](docs/stage3.md)
 - [Stage 4: Normalize report data](docs/stage4.md)
 - [Stage 5: Load report data into a database](docs/stage5.md)
+  - [Stage 5 tables](docs/stage5-tables.md)
 - [Running on Minerva (Mount Sinai)](docs/minerva.md)
 - [Development](docs/development.md)
 - [Evaluate HPO matching](evaluation/README.md)

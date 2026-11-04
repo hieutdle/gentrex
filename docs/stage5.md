@@ -262,10 +262,9 @@ inside the container.
 | `hpo_ancestors` | HPO term and one of its ancestors. |
 | `hpo_release` | The HPO release that `hpo_terms` and `hpo_ancestors` were loaded from. It has one row. |
 
+[Stage 5 tables](stage5-tables.md) lists every column, with its type and
+what it holds.
 [`tables.py`](../src/gentrex/load/tables.py) defines the tables.
-[`schema.yaml`](../src/gentrex/defaults/schema.yaml) says what each field of
-stage 3 holds, and [stage 4](stage4.md#check-the-result) explains the standard
-values.
 
 Most columns have the name of a field of the stage 4 record. Where stage 4
 found a standard value for a field, the column of the field's name holds the
@@ -281,32 +280,6 @@ The same goes for `collection_date`, `received_date`, `test_started_date`,
 `report_date`, `specimen_type` and the `gene_symbol` of each variant. The
 other `_raw` columns, such as `classification_raw`, keep their names from
 stage 3, because the field without `_raw` is already the category.
-
-`reports` has these columns besides the fields of the record:
-
-| Column | Meaning |
-| --- | --- |
-| `file` | Name of the PDF. It identifies the report in every table. |
-| `patient_key` | The key that links the reports of one patient, such as `mrn:SYN-MRN-0001`. [Link reports to patients](#link-reports-to-patients) explains it. |
-| `pages` | The pages that stage 3 sent to the model, as a JSON list such as `[1, 2]`. |
-| `error` | The error from stage 3 or 4, or null. [Stage 4](stage4.md#when-something-goes-wrong) explains the errors. |
-| `record` | The whole line of `normalized.jsonl`, as JSON. It also holds the fields that have no column, such as a field you added to `schema.yaml`. |
-| `normalize_run` | The stage 4 run folder that the report was loaded from. |
-| `loaded_at` | When stage 5 loaded the report, in UTC. |
-
-The other tables have these columns:
-
-| Table | Column | Meaning |
-| --- | --- | --- |
-| `variants` | `variant_number` | The variant's place in the report's list of variants, from 1. |
-| `variants` | `gene_symbol`, `hgnc_id`, `gene_status` | The approved HGNC symbol, the HGNC ID and how the symbol matched, from stage 4. `gene_symbol_raw` holds the symbol as printed. |
-| `patient_phenotypes` | `phenotype_number` | The feature's place in the report's list of features, from 1. |
-| `patient_phenotypes` | `text`, `present` | The feature, and whether the patient has it, from stage 3. `present` is false when the report says the patient doesn't have the feature, and null when the report is unsure. |
-| `patient_phenotypes` | `hpo_id`, `hpo_label`, `models_agree` | The matched HPO term, and whether the models agree, from stage 4. They are null if stage 4 ran with `--no-hpo`. |
-| `phenotype_candidates` | `rank` | 1 for the match, then 2 to 5 for the alternatives. |
-| `phenotype_candidates` | `models` | For each model, the label or synonym of the term that came closest (`name`) and its cosine similarity, as JSON. |
-| `hpo_ancestors` | `hpo_id`, `ancestor_id` | A term, and the term itself or a term above it. [Find a term together with the terms under it](#find-a-term-together-with-the-terms-under-it) explains them. |
-| `hpo_release` | `sha256` | The checksum of the release file, the same as `hpo_sha256` in `run.yaml`. |
 
 A feature that the patient doesn't have has a row too, with `present` false.
 When you count the patients with a feature, add `p.present` to the `WHERE`

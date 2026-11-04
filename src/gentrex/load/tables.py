@@ -2,7 +2,7 @@
 
 A column whose name ends in _raw holds the report's wording, and the column of
 the same name without _raw holds the standard value that stage 4 found for it.
-docs/stage5.md describes the columns.
+docs/stage5-tables.md describes the columns.
 """
 
 import sqlalchemy as sa
