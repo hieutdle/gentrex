@@ -1,6 +1,6 @@
 # Stage 5 tables
 
-Stage 5 loads each stage 4 run into seven tables. They are the same in
+Stage 5 loads each stage 4 run into eight tables. They are the same in
 SQLite, PostgreSQL and MySQL, and [`tables.py`](../src/gentrex/load/tables.py)
 defines them. To open the database, see
 [Stage 5](stage5.md#check-the-result).
@@ -16,6 +16,7 @@ reports                       file
 hpo_terms                     hpo_id
 hpo_ancestors                 hpo_id, ancestor_id
 hpo_release                   sha256
+schema_version                version
 ```
 
 Each table is shown with its primary key. An indented table belongs to the
@@ -23,7 +24,7 @@ table above it and repeats its key, so every variant row has the `file` of
 its report. When stage 5 loads a report again, it deletes the old report, and
 the database deletes its variants, features and candidates with it.
 
-The HPO tables are not linked to the others. Queries join them on `hpo_id`,
+The HPO tables and `schema_version` are not linked to the others. Queries join them on `hpo_id`,
 as in
 [Find a term together with the terms under it](stage5.md#find-a-term-together-with-the-terms-under-it).
 A feature matched to a term that is missing from the HPO release still loads,
@@ -134,6 +135,9 @@ One row per reported variant. The key is `file` and `variant_number`.
 | `parental_origin` | text | yes | Origin of the variant, one of `de_novo`, `maternal`, `paternal`, `both_parents` or `other`. |
 | `parental_origin_raw` | text | yes | Origin as printed, such as `Maternally inherited`. |
 | `associated_phenotype` | text | yes | Disease or condition that the report links to the variant, such as `Cystic fibrosis`. |
+| `disease_id` | text | yes | MONDO ID of that disease, from stage 4, such as `MONDO:0009061`. It is null when the name matches no MONDO disease, or several. |
+| `disease_label` | text | yes | MONDO label of the disease, such as `cystic fibrosis`. |
+| `disease_status` | text | yes | How the name matched, one of `label`, `synonym`, `ambiguous`, `unmapped` or `missing`. [Stage 4](stage4.md#check-the-result) explains the values. |
 | `mode_of_inheritance` | text | yes | Inheritance pattern of the condition, one of `autosomal_dominant`, `autosomal_recessive`, `x_linked_dominant`, `x_linked_recessive`, `x_linked`, `mitochondrial` or `other`. `x_linked` means X-linked without dominant or recessive. |
 | `mode_of_inheritance_raw` | text | yes | Inheritance pattern as printed, such as `Autosomal recessive`. |
 | `is_secondary_finding` | boolean | yes | True for a secondary or incidental finding, false for a primary finding, and null when the report doesn't say. |
@@ -210,10 +214,23 @@ a different release replaces all three tables. The key is `sha256`.
 | `sha256` | text, up to 64 characters | no | Checksum of the release file, also recorded as `hpo_sha256` in the run's `run.yaml`. |
 | `loaded_at` | timestamp | no | When the release was loaded, in UTC. |
 
+### schema_version
+
+A single row with the version of the tables. A new version of Gentrex raises
+it when a column changes. Stage 5 never changes a table that exists, so it
+stops on a database with tables of another version, and
+[Load a run again](stage5.md#load-a-run-again) says what to do. A database
+from before `schema_version` existed counts as version 1. The key is
+`version`.
+
+| Column | Type | Null | Holds |
+| --- | --- | --- | --- |
+| `version` | integer | no | The version of the tables, which is 2 for this Gentrex. |
+
 ## SQL that creates the tables
 
-Stage 5 creates any missing tables at the start of each run, and never
-changes tables that exist. To print the `CREATE TABLE` statements for one
+Stage 5 creates the tables of a new database at the start of a run, and
+never changes tables that exist. To print the `CREATE TABLE` statements for one
 database, without connecting to it:
 
 ```bash

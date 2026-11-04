@@ -5,9 +5,11 @@ values, so that you can compare and count reports from different
 laboratories. A date printed as `29-JUN-1984` becomes `1984-06-29`. The result
 "POSITIVE: One pathogenic variant and one VUS were identified." becomes the
 category `positive`. Each variant's gene gets its approved HGNC symbol and ID,
-and each of the patient's clinical features gets the closest term of the Human
-Phenotype Ontology (HPO), which two embedding models find together.
-[Stage 5](stage5.md) then loads the records into a database.
+and the disease that the report ties to the variant gets its ID in the Mondo
+Disease Ontology (MONDO). Each of the patient's clinical features gets the
+closest term of the Human Phenotype Ontology (HPO), which two embedding models
+find together. [Stage 5](stage5.md) then loads the records into a database,
+and [stage 6](stage6.md) exports them as Phenopackets.
 
 Stage 4 reads `extractions.jsonl` from a stage 3 run and writes
 `normalized.jsonl`, with one line per report, to `results/normalize/`. Each
@@ -21,8 +23,8 @@ You need:
 
 - Gentrex installed, as in [stage 1, step 1](stage1.md#step-1-install).
 - A finished stage 3 run, in `results/extract/`.
-- About 300 MB of free disk in `data/ontology/`, for the HGNC complete set,
-  the HPO release and the HPO index.
+- About 400 MB of free disk in `data/ontology/`, for the HGNC complete set,
+  the HPO and MONDO releases and the HPO index.
 - About 3 GB of free disk for sentence-transformers, PyTorch and the two
   embedding models. sentence-transformers and PyTorch are the Python packages
   that stage 4 uses to find HPO terms. Step 2 installs them.
@@ -93,7 +95,8 @@ settings.yaml names. The script works like this:
   and "ataxia" as different text. Stage 4 lowercases the clinical features
   in the same way.
 - It saves the names, the embeddings from each model, and the models' names
-  and prompts in one NumPy file. Stage 4 embeds each clinical feature with
+  and prompts in one NumPy file, with the HPO release, which stage 6 names in
+  each Phenopacket. Stage 4 embeds each clinical feature with
   the same models and prompts, so that the feature's embeddings can be
   compared with the names' embeddings. If the index was built with other
   models or prompts, stage 4 stops with a message like
@@ -105,16 +108,33 @@ settings.yaml names. The script works like this:
   so Gentrex lists them in pyproject.toml as an optional extra named `hpo`.
   uv installs an extra only for a command that names it. uv.lock fixes the
   versions of these packages, so the embeddings don't change when a new
-  version comes out. Stage 4's command in step 3 has the same option.
+  version comes out. Stage 4's command in step 4 has the same option.
 
 Running the script again replaces the index. To try other
 sentence-transformers models, change `normalize.hpo.models` in settings.yaml
 and build the index again.
 
 To normalize without HPO terms, skip this step and run stage 4 with
-`--no-hpo` in step 3.
+`--no-hpo` in step 4.
 
-## Step 3: Run
+## Step 3: Download the MONDO release
+
+Stage 4 looks up the disease that each variant's `associated_phenotype`
+names, such as `Dravet syndrome`, in the Mondo Disease Ontology (MONDO). MONDO
+merges the disease lists of OMIM, Orphanet and other sources, and gives each
+disease one ID, such as MONDO:0100135. Download the release of 3 November
+2026:
+
+```bash
+curl -f -L -o data/ontology/mondo-base.json \
+  https://github.com/monarch-initiative/mondo/releases/download/v2026-11-03/mondo-base.json
+```
+
+`-L`, `-f` and `-o` work as in step 2. The file is about 95 MB.
+`normalize.mondo_path` in settings.yaml names it. To use a newer release,
+download it in its place. `run.yaml` records the release that each run used.
+
+## Step 4: Run
 
 ```bash
 uv run --extra hpo gentrex stage4
@@ -148,7 +168,7 @@ Each run folder holds three files:
 | File | Contents |
 | --- | --- |
 | `normalized.jsonl` | One record per report. |
-| `run.yaml` | The command, the stage 3 run that was read and the settings, including the embedding models. It also records the checksum of the HGNC complete set (`hgnc_sha256`), so you can tell which version of it a run used. |
+| `run.yaml` | The command, the stage 3 run that was read and the settings, including the embedding models. It also records the checksum of the HGNC complete set (`hgnc_sha256`) and the MONDO and HPO releases (`mondo_version`, `hpo_version`), so you can tell which versions a run used. |
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/normalize/latest` points to the newest finished run.
@@ -170,8 +190,8 @@ looks like this:
     "overall_result_raw": "POSITIVE: One pathogenic variant and one VUS were identified.",
     "patient_phenotypes": [{"text": "Breast carcinoma", "present": true}],
     "variants": [
-      {"gene_symbol": "BRCA2", "classification": "pathogenic"},
-      {"gene_symbol": "ATM", "classification": "uncertain_significance"}
+      {"gene_symbol": "BRCA2", "classification": "pathogenic", "associated_phenotype": "Hereditary breast and ovarian cancer syndrome"},
+      {"gene_symbol": "ATM", "classification": "uncertain_significance", "associated_phenotype": "Ataxia-telangiectasia"}
     ]
   },
   "normalized": {
@@ -206,8 +226,14 @@ looks like this:
       }
     ],
     "variants": [
-      {"gene_symbol": "BRCA2", "hgnc_id": "HGNC:1101", "gene_status": "approved"},
-      {"gene_symbol": "ATM", "hgnc_id": "HGNC:795", "gene_status": "approved"}
+      {
+        "gene_symbol": "BRCA2", "hgnc_id": "HGNC:1101", "gene_status": "approved",
+        "disease_id": "MONDO:0003582", "disease_label": "hereditary breast ovarian cancer syndrome", "disease_status": "synonym"
+      },
+      {
+        "gene_symbol": "ATM", "hgnc_id": "HGNC:795", "gene_status": "approved",
+        "disease_id": "MONDO:0008840", "disease_label": "ataxia telangiectasia", "disease_status": "label"
+      }
     ]
   },
   "error": null
@@ -228,7 +254,7 @@ to `data.variants[0]`.
 | `overall_result_basis` | `wording` if the category comes from the result statement, `overall_result_raw`. `variants` if it comes from the variants' classifications. `null` if `overall_result` is `null`. |
 | `overall_result_conflict` | `true` if the result statement and the classifications give different categories. Check these reports against their PDFs. |
 | `patient_phenotypes` | One HPO match per clinical feature, or `null` when stage 4 ran with `--no-hpo`. |
-| `variants` | One entry per variant, with the approved symbol, the HGNC ID and `gene_status`. |
+| `variants` | One entry per variant. It holds the approved symbol, the HGNC ID and `gene_status`, and the MONDO ID, label and `disease_status` of the disease in `associated_phenotype`. |
 
 Each HPO match has these fields:
 
@@ -266,6 +292,22 @@ was right for 78.5% of the mentions, and where they disagreed, for 36.1%.
 | `ambiguous` | The symbol is an alias or previous symbol of several genes. Gentrex can't tell which one the report meant, so it gives none. |
 | `unmapped` | The symbol is not in the HGNC complete set. |
 | `missing` | The variant has no gene symbol. |
+
+`disease_status` says how the disease name matched:
+
+| `disease_status` | Meaning |
+| --- | --- |
+| `label` | The name is the disease's label in MONDO, apart from case and punctuation. `Ataxia-telangiectasia` matches the label `ataxia telangiectasia`. |
+| `synonym` | The name is an exact synonym of exactly one disease. |
+| `ambiguous` | The name is a label or exact synonym of several diseases. Gentrex can't tell which one the report meant, so it gives none. |
+| `unmapped` | No disease has this name. [Diseases](#diseases) says which names end up here. |
+| `missing` | The variant has no `associated_phenotype`. |
+
+To count the variants per `disease_status`:
+
+```bash
+grep -o '"disease_status": "[a-z]*"' results/normalize/latest/normalized.jsonl | sort | uniq -c
+```
 
 To count the reports per result category:
 
@@ -339,6 +381,25 @@ Stage 4 looks up each symbol among the approved symbols of the HGNC complete
 set first, and then among the aliases and previous symbols. Upper and lower case
 don't matter.
 
+### Diseases
+
+Stage 4 looks up each `associated_phenotype` among the labels of the current
+MONDO diseases first, and then among their exact synonyms. Case and
+punctuation don't matter. If the name as printed matches nothing, stage 4
+tries it again without the text in parentheses, so
+`Hereditary breast and ovarian cancer syndrome (HBOC)` matches too.
+
+Related, broader and narrower synonyms don't count, because they can name a
+different disease from the one the report means. Abbreviations don't count
+either, because one
+abbreviation often stands for several diseases. In MONDO, `RTS` is an
+abbreviation of Rett syndrome, but laboratories also write it for
+Rubinstein-Taybi syndrome. So `MELAS` alone stays unmapped, while
+`Mitochondrial encephalomyopathy, lactic acidosis, and stroke-like episodes`
+matches. A name that ties the disease to a gene, such as
+`SCN1A-related disorders`, is not a MONDO disease and stays unmapped too, so
+that stage 4 never guesses a diagnosis.
+
 ### HPO terms
 
 Stage 4 lowercases each clinical feature and embeds it with each model in
@@ -377,6 +438,7 @@ under `normalize`:
 | Setting | Default | What it does |
 | --- | --- | --- |
 | `hgnc_path` | `data/ontology/hgnc_complete_set_2026-10-06.txt` | The HGNC complete set from step 1. |
+| `mondo_path` | `data/ontology/mondo-base.json` | The MONDO release from step 3. |
 | `hpo.models` | SapBERT, and EmbeddingGemma 2 with the prompt `SentenceSimilarity` | The sentence-transformers models that embed the HPO names and the clinical features, each with its `name` on Hugging Face and an optional `prompt`. After changing them, build the index again as in step 2. |
 | `hpo.path` | `data/ontology/hpo-v2026-09-01.npz` | The HPO index from step 2. The HPO release in its name ends up in `run.yaml`, with the other settings. |
 | `hpo.top_k` | `5` | The number of terms kept in `candidates` for each feature. The four after the match are alternatives for when you check it, because the right term is sometimes a close second. |
@@ -396,8 +458,9 @@ before it writes anything:
 | `results/extract/latest/extractions.jsonl not found` | Run stage 3 first, or name a stage 3 run with `--input`. |
 | `data/ontology/hgnc_complete_set_2026-10-06.txt not found` | Do step 1. |
 | `lacks columns: alias_symbol, hgnc_id, prev_symbol, symbol` | The file that `normalize.hgnc_path` names is not the HGNC complete set, for example a web page saved in its place. Download it again as in step 1. |
+| `data/ontology/mondo-base.json not found` | Do step 3. |
 | `data/ontology/hpo-v2026-09-01.npz not found` | Do step 2, or run with `--no-hpo`. |
-| `No module named 'sentence_transformers'` or `requires the Torchvision library` | Run stage 4 with `uv run --extra hpo`, as in step 3. |
+| `No module named 'sentence_transformers'` or `requires the Torchvision library` | Run stage 4 with `uv run --extra hpo`, as in step 4. |
 | `the index ... was built with ..., but settings.yaml names ...` | `normalize.hpo.models` changed after the index was built, or an older version of Gentrex built the index. Build the index again as in step 2. |
 
 A report with an error still gets a record. Its `error` field says what went

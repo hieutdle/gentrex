@@ -10,10 +10,10 @@ def test_run_records_the_input_run_it_read(tmp_path, monkeypatch):
     with runs.new_run("transcribe", tmp_path, {}) as transcribe_dir:
         pass
 
-    with runs.new_run("pagedecide", runs.latest("transcribe"), {}) as decide_dir:
+    with runs.new_run("select", runs.latest("transcribe"), {}) as select_dir:
         pass
 
-    record = yaml.safe_load((decide_dir / "run.yaml").read_text())
+    record = yaml.safe_load((select_dir / "run.yaml").read_text())
     assert record["input"] == str(transcribe_dir.resolve())
 
 

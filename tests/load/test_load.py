@@ -242,3 +242,16 @@ def test_hpo_terms_are_loaded_again_only_when_the_release_changes(engine, tmp_pa
     second = _tree("b" * 64, **{"HP:0000118": "Phenotypic abnormality"})
     _load(engine, tmp_path, [], second)
     assert _select(engine, "SELECT hpo_id FROM hpo_terms") == [("HP:0000118",)]
+
+
+@pytest.mark.parametrize("stored", [1, None], ids=["version-1", "no-version"])
+def test_a_database_with_older_tables_is_refused(engine, tmp_path, stored):
+    """Stage 5 never changes a table, so loading into old tables would fail."""
+    _load(engine, tmp_path, [])
+    with engine.begin() as conn:
+        conn.execute(sa.text("DELETE FROM schema_version"))
+        if stored is not None:
+            conn.execute(sa.text(f"INSERT INTO schema_version VALUES ({stored})"))
+
+    with pytest.raises(run.TableVersionError, match="holds version 1 of the"):
+        _load(engine, tmp_path, [])

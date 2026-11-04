@@ -69,6 +69,10 @@ _VARIANT_FIELDS = (
 _logger = logging.getLogger(__name__)
 
 
+class TableVersionError(Exception):
+    """The database holds the tables of another version of stage 5."""
+
+
 def make_engine(url: str) -> sa.Engine:
     """Returns an engine for `url`, a database URL as SQLAlchemy reads them.
 
@@ -120,11 +124,11 @@ def patient_key(file: str, data: dict[str, Any]) -> str:
     return f"file:{file}"
 
 
-def _read(line: str) -> records.NormalizedReport:
+def read_report(line: str) -> records.NormalizedReport:
     """Parses one line of normalized.jsonl.
 
-    Databases can't store half of a surrogate pair, which stage 3 data may
-    hold, so it becomes U+FFFD, the replacement character.
+    Databases and Phenopackets can't hold half of a surrogate pair, which
+    stage 3 data may hold, so it becomes U+FFFD, the replacement character.
     """
     text = json.dumps(json.loads(line), ensure_ascii=False)
     return records.NormalizedReport(**json.loads(_HALF_SURROGATE.sub("�", text)))
@@ -166,6 +170,9 @@ def _rows(
             "gene_symbol_raw": variant.get("gene_symbol"),
             "hgnc_id": gene.get("hgnc_id"),
             "gene_status": gene.get("gene_status"),
+            "disease_id": gene.get("disease_id"),
+            "disease_label": gene.get("disease_label"),
+            "disease_status": gene.get("disease_status"),
             **{field: variant.get(field) for field in _VARIANT_FIELDS},
         }
         for number, (variant, gene) in enumerate(zip(variants, genes, strict=True), 1)
@@ -250,10 +257,36 @@ def _load_report(
         _insert(conn, table, table_rows)
 
 
+def prepare_tables(engine: sa.Engine) -> None:
+    """Creates the tables of a new database, or checks their version in an old one.
+
+    A database from before schema_version existed counts as version 1.
+
+    Raises:
+        TableVersionError: The database holds the tables of another version.
+    """
+    with engine.begin() as conn:
+        existed = sa.inspect(conn).has_table(tables.reports.name)
+        tables.metadata.create_all(conn)
+        stored = conn.execute(sa.select(tables.schema_version.c.version)).scalar()
+        if stored is None and not existed:
+            conn.execute(
+                tables.schema_version.insert(), {"version": tables.SCHEMA_VERSION}
+            )
+            return
+    found = stored or 1
+    if found != tables.SCHEMA_VERSION:
+        raise TableVersionError(
+            f"the database holds version {found} of the Gentrex tables, but this"
+            f" Gentrex writes version {tables.SCHEMA_VERSION}; delete the database"
+            " and load the records again, as docs/load.md shows"
+        )
+
+
 def run(input_path: pathlib.Path, engine: sa.Engine, tree: hpo.HpoTree) -> list[str]:
     """Loads every report of a stage 4 run into the database, in input order.
 
-    Creates the tables that don't exist yet, and loads the HPO terms unless
+    Creates the tables of a new database, and loads the HPO terms unless
     the database holds them from the same release already. Each report
     replaces the rows of its file in one transaction, so that a report that
     fails to load keeps the rows of an earlier run. Reports of other files
@@ -268,13 +301,16 @@ def run(input_path: pathlib.Path, engine: sa.Engine, tree: hpo.HpoTree) -> list[
         Names of the files that have no data, failed to load or have an error
         from stage 3 or 4, in input order. Reports with an error and data are
         still loaded.
+
+    Raises:
+        TableVersionError: The database holds the tables of another version.
     """
     start = time.perf_counter()
     with input_path.open(encoding="utf-8") as fh:
-        reports = [_read(line) for line in fh]
+        reports = [read_report(line) for line in fh]
     source = str(input_path.parent.resolve())
     _logger.info("loading into %s", engine.url.render_as_string(hide_password=True))
-    tables.metadata.create_all(engine)
+    prepare_tables(engine)
     with engine.begin() as conn:
         if _load_tree(conn, tree):
             _logger.info(

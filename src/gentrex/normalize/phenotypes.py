@@ -106,13 +106,26 @@ def current_terms(graph: dict[str, Any]) -> Iterator[tuple[str, dict[str, Any]]]
             yield f"HP:{match[1]}", node
 
 
+def release_version(graph: dict[str, Any]) -> str | None:
+    """Returns the release of an ontology in obographs JSON, such as 2026-09-01.
+
+    Args:
+        graph: The ontology's graph, whose version IRI names the release.
+    """
+    iri = graph.get("meta", {}).get("version")
+    if not iri:
+        return None
+    match = re.search(r"/releases/([^/]+)/", iri)
+    return match[1] if match else iri
+
+
 def build_index(
     release: pathlib.Path, output: pathlib.Path, models: list[dict[str, str]]
 ) -> int:
     """Embeds the labels and synonyms of the current terms of an HPO release.
 
     The index records each model's name and prompt, so that HpoIndex can check
-    that it embeds phenotypes the same way.
+    that it embeds phenotypes the same way. It also records the HPO release.
 
     Args:
         release: HPO release in obographs JSON, such as hp-base.json.
@@ -135,6 +148,7 @@ def build_index(
             rows.append((hpo_id, node["lbl"], name))
     hpo_ids, labels, names = zip(*rows, strict=True)
     arrays: dict[str, Any] = {
+        "version": release_version(graph) or "unknown",
         "models": [model["name"] for model in models],
         "prompts": [model.get("prompt") or "" for model in models],
         "hpo_id": hpo_ids,
@@ -155,7 +169,12 @@ def _describe(models: list[tuple[str, str]]) -> str:
 
 
 class HpoIndex:
-    """The labels and synonyms of the HPO terms, with each model's embeddings."""
+    """The labels and synonyms of the HPO terms, with each model's embeddings.
+
+    Attributes:
+        version: The HPO release that the index was built from, such as
+            2026-09-01, or "unknown" for an index built before it was recorded.
+    """
 
     def __init__(
         self, path: pathlib.Path, models: list[dict[str, str]], top_k: int
@@ -188,6 +207,9 @@ class HpoIndex:
                     f"the index {path} was built with {_describe(built)}, but"
                     f" settings.yaml names {_describe(wanted)}"
                 )
+            self.version = (
+                index["version"].item() if "version" in index.files else "unknown"
+            )
             hpo_ids = index["hpo_id"].tolist()
             labels = index["label"].tolist()
             self._names = index["name"].tolist()

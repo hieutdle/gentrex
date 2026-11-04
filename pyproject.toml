@@ -39,6 +39,7 @@ postgresql = [
 
 [dependency-groups]
 dev = [
+    "phenopackets>=2.0.2",
     "pre-commit>=4.6.2",
     "pytest>=9.1.1",
     "ruff>=0.6",

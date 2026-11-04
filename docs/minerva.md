@@ -6,7 +6,7 @@ model with [vLLM](https://docs.vllm.ai), runs Gentrex against it, and stops
 vLLM when Gentrex is done. Stage 3 can instead use Minerva's AI service,
 which runs the model for you, as
 [Use Minerva's AI service instead of a job](#use-minervas-ai-service-instead-of-a-job)
-explains. Stages 4 and 5 need no GPU, so you run them yourself in an
+explains. Stages 4 to 6 need no GPU, so you run them yourself in an
 interactive session. The stage pages explain what each stage
 does, what it writes and how to change its settings.
 
@@ -563,7 +563,7 @@ bsub -P acc_xxx -q interactive -n 4 -W 1:00 -R "rusage[mem=4000]" -Is /bin/bash
   itself takes a minute or two.
 - `-Is /bin/bash` opens a shell on the node as soon as the session starts.
 
-In the session, go to the `gentrex` folder and follow steps 1 to 3 of
+In the session, go to the `gentrex` folder and follow steps 1 to 4 of
 [stage 4](stage4.md#step-1-download-the-hgnc-complete-set). The first
 `uv run --extra hpo` installs sentence-transformers and PyTorch, the Python
 packages that stage 4 uses to find HPO terms. They take about 1 GB in the
@@ -608,3 +608,17 @@ the same places of its Gentrex folder:
 
 Then follow [stage 5](stage5.md), and name the copied run with `--input`, as in
 `--input results/normalize/20261019-030000`.
+
+## Stage 6: Export report data as Phenopackets
+
+Run stage 6 in the same interactive session, after stage 4 has finished:
+
+```bash
+uv run gentrex stage6
+```
+
+Stage 6 writes one Phenopacket per patient to `results/export/latest/` in a
+second, and it needs no server. Continue on the stage 6 page:
+
+- [Check the result](stage6.md#check-the-result)
+- [When something goes wrong](stage6.md#when-something-goes-wrong)

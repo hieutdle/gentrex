@@ -39,7 +39,7 @@ transcribe:
     concurrency: 8
 
 # Stage 2: Decide which pages to keep, from yes/no questions about each page.
-pagedecide:
+select:
   # Name of the text model, as listed at GENTREX_LLM_BASE_URL/models.
   model: google/gemma-4-26B-A4B-it
   # Text sent before every page.
@@ -102,6 +102,10 @@ normalize:
   # The HGNC complete set, a tab-separated file from genenames.org. Gentrex
   # looks up each gene symbol in it to find the approved symbol and HGNC ID.
   hgnc_path: data/ontology/hgnc_complete_set_2026-10-06.txt
+  # The MONDO release, from github.com/monarch-initiative/mondo. Gentrex looks
+  # up the disease that each variant's associated_phenotype names in it, by
+  # the diseases' labels and exact synonyms.
+  mondo_path: data/ontology/mondo-base.json
   hpo:
     # The sentence-transformers models that embed the HPO names and the
     # clinical features, as named on Hugging Face. Each model scores the HPO

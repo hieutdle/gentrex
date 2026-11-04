@@ -7,7 +7,7 @@ import time
 from concurrent import futures
 
 from gentrex import records
-from gentrex.pagedecide import score
+from gentrex.select import score
 
 _logger = logging.getLogger(__name__)
 
@@ -26,7 +26,7 @@ def _decide(page: records.PageRecord, scorer: score.PageScorer) -> records.PageD
             page.page,
             dict.fromkeys(config.questions),
             keep=True,
-            error=f"stage 1: {page.error}",
+            error=f"transcribe: {page.error}",
         )
     if not page.text:
         return records.PageDecision(

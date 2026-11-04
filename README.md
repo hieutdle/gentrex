@@ -6,7 +6,8 @@ record per report. The record holds the patient's identifiers, the specimen,
 the test, the overall result, the patient's clinical features and every
 variant reported, with its gene, HGVS changes, classification and zygosity.
 Gentrex then loads the records into a database, so that you can count and
-compare reports with SQL.
+compare reports with SQL. It can also export them as Phenopackets, the GA4GH
+format for sharing a patient's clinical features and genetic findings.
 
 Gentrex is a command-line program. The models of stages 1 to 3 run in a
 separate model server, [vLLM](https://docs.vllm.ai), on GPUs that you
@@ -14,11 +15,11 @@ control. Gentrex sends each page or report to that server and writes what
 comes back. Stage 4 needs no server, because its models run inside Gentrex
 on the CPU. Stage 5 loads the records into one of three databases. A SQLite
 file needs no server, and PostgreSQL and MySQL run as servers in Docker on
-your workstation.
+your workstation. Stage 6 writes files and needs no server either.
 
 ## How it works
 
-Gentrex works in five stages. You run them in order, and each stage reads
+Gentrex works in six stages. You run them in order, and each stage reads
 the output of the stage before it.
 
 | Stage | What it does | Writes to | Model and GPU |
@@ -26,8 +27,9 @@ the output of the stage before it.
 | [1. Transcribe PDF pages](docs/stage1.md) | Reads the text of every page. Scanned pages go to an OCR model, which reads the text off the image. | `results/transcribe/` | LightOnOCR-3-4B on one GPU, only for scanned pages |
 | [2. Decide which pages to keep](docs/stage2.md) | Asks a language model yes/no questions about every page, and keeps the pages with the result or the patient's symptoms. | `results/pagedecide/` | Gemma 4 26B-A4B on one GPU with 80 GB |
 | [3. Extract report data](docs/stage3.md) | Sends the kept pages of each report to a language model, which returns one record per report. | `results/extract/` | Gemma 4 31B on two GPUs with 80 GB, or one B200 |
-| [4. Normalize report data](docs/stage4.md) | Adds standard values to each record: ISO dates, categories for the specimen and the result, HGNC IDs for the genes and HPO terms for the clinical features. | `results/normalize/` | SapBERT and EmbeddingGemma 2 on the CPU, no GPU |
+| [4. Normalize report data](docs/stage4.md) | Adds standard values to each record: ISO dates, categories for the specimen and the result, HGNC IDs for the genes, MONDO IDs for the diseases and HPO terms for the clinical features. | `results/normalize/` | SapBERT and EmbeddingGemma 2 on the CPU, no GPU |
 | [5. Load report data into a database](docs/stage5.md) | Loads the records into tables of a SQLite, PostgreSQL or MySQL database, with the HPO terms and their hierarchy, so that you can query them with SQL. | The database, and `results/load/` | No model and no GPU |
+| [6. Export report data as Phenopackets](docs/stage6.md) | Writes one Phenopacket per patient, the GA4GH format that rare-disease tools read and other centers can import. | `results/export/` | No model and no GPU |
 
 Many pages of a report only describe the test. Stage 2 drops them, so stage 3
 has less to read.
@@ -71,7 +73,8 @@ All the fields, with what each one holds, are in
 records. [Stage 4](docs/stage4.md#check-the-result) adds the standard values
 next to them, in a field named `normalized`.
 [Stage 5](docs/stage5.md#check-the-result) loads both into tables of a
-database.
+database, and [stage 6](docs/stage6.md#check-the-result) writes them as
+Phenopackets.
 
 ## What you need
 
@@ -83,9 +86,9 @@ database.
   you to log in.
 - About 120 GB of disk for the models: 9 GB for stage 1, 50 GB for stage 2
   and 62 GB for stage 3.
-- About 3 GB of disk for stage 4: 300 MB for the HGNC complete set, the HPO
-  release and the HPO index, and 2.8 GB for sentence-transformers, PyTorch
-  and the two embedding models, which stage 4 uses to find HPO terms.
+- About 3 GB of disk for stage 4: 400 MB for the HGNC complete set, the HPO
+  and MONDO releases and the HPO index, and 2.8 GB for sentence-transformers,
+  PyTorch and the two embedding models, which stage 4 uses to find HPO terms.
 - A database for stage 5. SQLite needs nothing more, because it comes with
   Python. PostgreSQL 18 and MySQL 8.4 are the servers that stage 5 is tested
   with, and it refuses the address of any other database.
@@ -108,11 +111,12 @@ server before the next stage starts its own.
 3. [Stage 3: Extract report data](docs/stage3.md)
 4. [Stage 4: Normalize report data](docs/stage4.md)
 5. [Stage 5: Load report data into a database](docs/stage5.md)
+6. [Stage 6: Export report data as Phenopackets](docs/stage6.md)
 
-Stages 4 and 5 need no model server.
+Stages 4 to 6 need no model server.
 
 On Mount Sinai's Minerva cluster, stages 1 to 3 run as batch jobs, and stages
-4 and 5 run in an interactive session. Follow
+4 to 6 run in an interactive session. Follow
 [Running on Minerva](docs/minerva.md).
 
 ## Runs and results
@@ -174,6 +178,7 @@ Reports, and everything Gentrex writes from them, may contain patient data.
 - [Stage 4: Normalize report data](docs/stage4.md)
 - [Stage 5: Load report data into a database](docs/stage5.md)
   - [Stage 5 tables](docs/stage5-tables.md)
+- [Stage 6: Export report data as Phenopackets](docs/stage6.md)
 - [Running on Minerva (Mount Sinai)](docs/minerva.md)
 - [Development](docs/development.md)
 - [Evaluate HPO matching](evaluation/README.md)

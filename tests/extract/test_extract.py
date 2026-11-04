@@ -113,7 +113,7 @@ def test_page_with_a_stage_1_error_is_left_out_and_noted(tmp_path):
     assert failed == ["a.pdf"]
     assert extraction["pages"] == [1]
     assert extraction["data"] == {"sent": "--- PAGE 1 ---\nResult: positive"}
-    assert extraction["error"] == "page 2: stage 1: OCR failed"
+    assert extraction["error"] == "page 2: transcribe: OCR failed"
 
 
 def test_report_without_text_skips_the_model(tmp_path):

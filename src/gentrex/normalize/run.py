@@ -7,6 +7,7 @@ import time
 from typing import Any
 
 from gentrex import records
+from gentrex.normalize import diseases
 from gentrex.normalize import genes as genes_lib
 from gentrex.normalize import phenotypes
 from gentrex.normalize import rules
@@ -17,6 +18,7 @@ _logger = logging.getLogger(__name__)
 def _normalize(
     data: dict[str, Any],
     hgnc: genes_lib.HgncIndex,
+    mondo: diseases.MondoIndex,
     hpo: phenotypes.HpoIndex | None,
 ) -> dict[str, Any]:
     """Returns the normalized values of one record's data."""
@@ -31,7 +33,11 @@ def _normalize(
         **rules.overall_result(data.get("overall_result_raw"), variants),
         "patient_phenotypes": None,
         "variants": [
-            hgnc.normalize(variant.get("gene_symbol")) for variant in variants
+            {
+                **hgnc.normalize(variant.get("gene_symbol")),
+                **mondo.normalize(variant.get("associated_phenotype")),
+            }
+            for variant in variants
         ],
     }
     if hpo is not None:
@@ -45,6 +51,7 @@ def _normalize(
 def _normalize_report(
     extraction: records.ReportExtraction,
     hgnc: genes_lib.HgncIndex,
+    mondo: diseases.MondoIndex,
     hpo: phenotypes.HpoIndex | None,
 ) -> records.NormalizedReport:
     """Normalizes one stage 3 record; a record without data passes through."""
@@ -52,9 +59,9 @@ def _normalize_report(
     normalized = None
     if extraction.data is not None:
         try:
-            normalized = _normalize(extraction.data, hgnc, hpo)
+            normalized = _normalize(extraction.data, hgnc, mondo, hpo)
         except Exception as exc:  # One report's failure must not cost the others.
-            errors.append(f"stage 4: {type(exc).__name__}: {exc}")
+            errors.append(f"normalize: {type(exc).__name__}: {exc}")
     return records.NormalizedReport(
         extraction.file,
         extraction.pages,
@@ -68,6 +75,7 @@ def run(
     input_path: pathlib.Path,
     output_path: pathlib.Path,
     hgnc: genes_lib.HgncIndex,
+    mondo: diseases.MondoIndex,
     hpo: phenotypes.HpoIndex | None,
 ) -> list[str]:
     """Normalizes every record of a stage 3 run, in input order.
@@ -77,6 +85,7 @@ def run(
         output_path: JSONL file of NormalizedReports to write; an existing
             file is replaced.
         hgnc: Gene symbols to approved HGNC symbols.
+        mondo: Disease names to MONDO diseases.
         hpo: Phenotypes to HPO terms, or None to leave them unmapped.
 
     Returns:
@@ -90,7 +99,7 @@ def run(
     # Stage 3 data may hold half of a surrogate pair; it is kept as a JSON escape.
     with output_path.open("w", encoding="utf-8", errors="backslashreplace") as fh:
         for extraction in extractions:
-            report = _normalize_report(extraction, hgnc, hpo)
+            report = _normalize_report(extraction, hgnc, mondo, hpo)
             _logger.info("normalized %s", report.file)
             fh.write(report.to_json() + "\n")
             if report.error:

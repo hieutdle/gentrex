@@ -14,8 +14,8 @@ class MissingLogprobsError(Exception):
 
 
 @dataclasses.dataclass(frozen=True)
-class DecideConfig:
-    """The `pagedecide` settings.
+class SelectConfig:
+    """The `select` settings.
 
     Attributes:
         model: Text model name on the server.
@@ -59,7 +59,7 @@ def p_yes(
 class PageScorer:
     """Asks a text model yes/no questions about page text."""
 
-    def __init__(self, config: DecideConfig, client: openai.OpenAI) -> None:
+    def __init__(self, config: SelectConfig, client: openai.OpenAI) -> None:
         self.config = config
         self._client = client
 

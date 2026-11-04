@@ -7,19 +7,22 @@ import pathlib
 import sys
 
 import sqlalchemy as sa
+import yaml
 
 from gentrex import config
 from gentrex import llm
 from gentrex import runs
+from gentrex.export import run as export_run
 from gentrex.extract import extractor
 from gentrex.extract import run as extract_run
 from gentrex.load import hpo as hpo_lib
 from gentrex.load import run as load_run
+from gentrex.normalize import diseases
 from gentrex.normalize import genes
 from gentrex.normalize import phenotypes
 from gentrex.normalize import run as normalize_run
-from gentrex.pagedecide import run as pagedecide_run
-from gentrex.pagedecide import score
+from gentrex.select import run as select_run
+from gentrex.select import score
 from gentrex.transcribe import ocr as ocr_lib
 from gentrex.transcribe import run as transcribe_run
 
@@ -32,7 +35,7 @@ _LLM_API_KEY_ENV = "GENTREX_LLM_API_KEY"
 _DATABASE_URL_ENV = "GENTREX_DATABASE_URL"
 
 
-def _run_stage1(args: argparse.Namespace) -> int:
+def _run_transcribe(args: argparse.Namespace) -> int:
     pdf_paths = sorted(
         path for path in args.input_dir.iterdir() if path.suffix.lower() == ".pdf"
     )
@@ -63,29 +66,29 @@ def _run_stage1(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_stage2(args: argparse.Namespace) -> int:
+def _run_select(args: argparse.Namespace) -> int:
     pages_path = args.input / "pages.jsonl"
     if not pages_path.is_file():
-        _logger.error("%s not found; run stage 1 first", pages_path)
+        _logger.error("%s not found; run gentrex transcribe first", pages_path)
         return 1
     base_url = os.environ.get(_LLM_BASE_URL_ENV)
     if not base_url:
         _logger.error("%s is not set (see .env.example)", _LLM_BASE_URL_ENV)
         return 2
 
-    settings = config.load_settings()["pagedecide"]
-    decide_config = score.DecideConfig(**settings)
+    settings = config.load_settings()["select"]
+    select_config = score.SelectConfig(**settings)
     client = llm.make_client(
         base_url,
         os.environ.get(_LLM_API_KEY_ENV) or "EMPTY",
-        decide_config.timeout_seconds,
+        select_config.timeout_seconds,
     )
-    with runs.new_run("pagedecide", args.input, settings) as run_dir:
-        failed = pagedecide_run.run(
+    with runs.new_run("select", args.input, settings) as run_dir:
+        failed = select_run.run(
             pages_path,
             run_dir / "decisions.jsonl",
             run_dir / "pages.jsonl",
-            score.PageScorer(decide_config, client),
+            score.PageScorer(select_config, client),
         )
         if failed:
             _logger.error("failed files: %s", ", ".join(failed))
@@ -93,10 +96,10 @@ def _run_stage2(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_stage3(args: argparse.Namespace) -> int:
+def _run_extract(args: argparse.Namespace) -> int:
     pages_path = args.input / "pages.jsonl"
     if not pages_path.is_file():
-        _logger.error("%s not found; run stage 2 first", pages_path)
+        _logger.error("%s not found; run gentrex select first", pages_path)
         return 1
     base_url = os.environ.get(_LLM_BASE_URL_ENV)
     if not base_url:
@@ -123,28 +126,35 @@ def _run_stage3(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_stage4(args: argparse.Namespace) -> int:
+def _run_normalize(args: argparse.Namespace) -> int:
     extractions_path = args.input / "extractions.jsonl"
     if not extractions_path.is_file():
-        _logger.error("%s not found; run stage 3 first", extractions_path)
+        _logger.error("%s not found; run gentrex extract first", extractions_path)
         return 1
 
     settings = config.load_settings()["normalize"]
     hgnc_path = pathlib.Path(settings["hgnc_path"])
     if not hgnc_path.is_file():
-        _logger.error("%s not found; download it as docs/stage4.md shows", hgnc_path)
+        _logger.error("%s not found; download it as docs/normalize.md shows", hgnc_path)
         return 1
     try:
         hgnc = genes.HgncIndex.from_tsv(hgnc_path)
     except ValueError as exc:
-        _logger.error("%s; download it again as docs/stage4.md shows", exc)
+        _logger.error("%s; download it again as docs/normalize.md shows", exc)
         return 1
+    mondo_path = pathlib.Path(settings["mondo_path"])
+    if not mondo_path.is_file():
+        _logger.error(
+            "%s not found; download it as docs/normalize.md shows", mondo_path
+        )
+        return 1
+    mondo = diseases.MondoIndex.from_release(mondo_path)
     hpo = None
     if not args.no_hpo:
         hpo_path = pathlib.Path(settings["hpo"]["path"])
         if not hpo_path.is_file():
             _logger.error(
-                "%s not found; build it as docs/stage4.md shows, or use --no-hpo",
+                "%s not found; build it as docs/normalize.md shows, or use --no-hpo",
                 hpo_path,
             )
             return 1
@@ -153,17 +163,22 @@ def _run_stage4(args: argparse.Namespace) -> int:
                 hpo_path, settings["hpo"]["models"], settings["hpo"]["top_k"]
             )
         except ValueError as exc:
-            _logger.error("%s; build it again as docs/stage4.md shows", exc)
+            _logger.error("%s; build it again as docs/normalize.md shows", exc)
             return 1
         except ImportError as exc:
-            _logger.error("%s; run stage 4 with uv run --extra hpo", exc)
+            _logger.error("%s; run gentrex normalize with uv run --extra hpo", exc)
             return 1
 
-    # Added to the settings, so that run.yaml records the HGNC version used.
-    record = {**settings, "hgnc_sha256": hgnc.sha256}
+    # Added to the settings, so that run.yaml records the versions used.
+    record = {
+        **settings,
+        "hgnc_sha256": hgnc.sha256,
+        "mondo_version": mondo.version,
+        "hpo_version": hpo.version if hpo else None,
+    }
     with runs.new_run("normalize", args.input, record) as run_dir:
         failed = normalize_run.run(
-            extractions_path, run_dir / "normalized.jsonl", hgnc, hpo
+            extractions_path, run_dir / "normalized.jsonl", hgnc, mondo, hpo
         )
         if failed:
             _logger.error("failed files: %s", ", ".join(failed))
@@ -171,10 +186,10 @@ def _run_stage4(args: argparse.Namespace) -> int:
     return 0
 
 
-def _run_stage5(args: argparse.Namespace) -> int:
+def _run_load(args: argparse.Namespace) -> int:
     normalized_path = args.input / "normalized.jsonl"
     if not normalized_path.is_file():
-        _logger.error("%s not found; run stage 4 first", normalized_path)
+        _logger.error("%s not found; run gentrex normalize first", normalized_path)
         return 1
     database_url = os.environ.get(_DATABASE_URL_ENV)
     if not database_url:
@@ -184,17 +199,22 @@ def _run_stage5(args: argparse.Namespace) -> int:
     settings = config.load_settings()["load"]
     release = pathlib.Path(settings["hpo_release"])
     if not release.is_file():
-        _logger.error("%s not found; download it as docs/stage4.md shows", release)
+        _logger.error("%s not found; download it as docs/normalize.md shows", release)
         return 1
     try:
         engine = load_run.make_engine(database_url)
         with engine.connect():
             pass
     except ValueError as exc:
-        _logger.error("%s: %s (see docs/stage5.md)", _DATABASE_URL_ENV, exc)
+        _logger.error("%s: %s (see docs/load.md)", _DATABASE_URL_ENV, exc)
         return 1
     except sa.exc.OperationalError as exc:
         _logger.error("can't connect to the database: %s", exc.orig)
+        return 1
+    try:
+        load_run.prepare_tables(engine)
+    except load_run.TableVersionError as exc:
+        _logger.error("%s", exc)
         return 1
     tree = hpo_lib.HpoTree.from_release(release)
 
@@ -208,61 +228,106 @@ def _run_stage5(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_export_phenopackets(args: argparse.Namespace) -> int:
+    normalized_path = args.input / "normalized.jsonl"
+    if not normalized_path.is_file():
+        _logger.error("%s not found; run gentrex normalize first", normalized_path)
+        return 1
+    run_yaml = args.input / "run.yaml"
+    stage4 = (
+        yaml.safe_load(run_yaml.read_text(encoding="utf-8"))
+        if run_yaml.is_file()
+        else {}
+    )
+    settings = (stage4 or {}).get("settings") or {}
+    if "mondo_version" not in settings:
+        _logger.error(
+            "%s doesn't record the MONDO release, because it is from before"
+            " gentrex normalize found diseases; run gentrex normalize again",
+            run_yaml,
+        )
+        return 1
+
+    versions = {"hpo": settings["hpo_version"], "mondo": settings["mondo_version"]}
+    with runs.new_run("export/phenopackets", args.input, versions) as run_dir:
+        failed = export_run.run(normalized_path, run_dir / "phenopackets", versions)
+        if failed:
+            _logger.error("failed files: %s", ", ".join(failed))
+            return 1
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gentrex", description=__doc__)
-    subparsers = parser.add_subparsers(required=True)
+    # In the order you run them, so that --help lists them that way.
+    commands = parser.add_subparsers(required=True, title="commands")
 
-    stage1 = subparsers.add_parser("stage1", help="Transcribe PDF pages.")
-    stage1.add_argument(
+    transcribe = commands.add_parser("transcribe", help="Transcribe PDF pages.")
+    transcribe.add_argument(
         "--input-dir", type=pathlib.Path, default=pathlib.Path("data/raw")
     )
-    stage1.add_argument(
+    transcribe.add_argument(
         "--no-ocr",
         action="store_true",
         help="Skip OCR; scanned pages are written with empty text.",
     )
-    stage1.set_defaults(func=_run_stage1)
+    transcribe.set_defaults(func=_run_transcribe)
 
-    stage2 = subparsers.add_parser("stage2", help="Decide which pages to keep.")
-    stage2.add_argument(
+    select = commands.add_parser("select", help="Select the pages to keep.")
+    select.add_argument(
         "--input",
         type=pathlib.Path,
         default=runs.latest("transcribe"),
-        help="Stage 1 run folder to read.",
+        help="Run folder of gentrex transcribe to read.",
     )
-    stage2.set_defaults(func=_run_stage2)
+    select.set_defaults(func=_run_select)
 
-    stage3 = subparsers.add_parser("stage3", help="Extract report data.")
-    stage3.add_argument(
+    extract = commands.add_parser("extract", help="Extract report data.")
+    extract.add_argument(
         "--input",
         type=pathlib.Path,
-        default=runs.latest("pagedecide"),
-        help="Stage 2 run folder to read.",
+        default=runs.latest("select"),
+        help="Run folder of gentrex select to read.",
     )
-    stage3.set_defaults(func=_run_stage3)
+    extract.set_defaults(func=_run_extract)
 
-    stage4 = subparsers.add_parser("stage4", help="Normalize report data.")
-    stage4.add_argument(
+    normalize = commands.add_parser("normalize", help="Normalize report data.")
+    normalize.add_argument(
         "--input",
         type=pathlib.Path,
         default=runs.latest("extract"),
-        help="Stage 3 run folder to read.",
+        help="Run folder of gentrex extract to read.",
     )
-    stage4.add_argument(
+    normalize.add_argument(
         "--no-hpo",
         action="store_true",
         help="Leave the clinical features without HPO terms.",
     )
-    stage4.set_defaults(func=_run_stage4)
+    normalize.set_defaults(func=_run_normalize)
 
-    stage5 = subparsers.add_parser("stage5", help="Load report data into a database.")
-    stage5.add_argument(
+    load = commands.add_parser("load", help="Load report data into a database.")
+    load.add_argument(
         "--input",
         type=pathlib.Path,
         default=runs.latest("normalize"),
-        help="Stage 4 run folder to read.",
+        help="Run folder of gentrex normalize to read.",
     )
-    stage5.set_defaults(func=_run_stage5)
+    load.set_defaults(func=_run_load)
+
+    export = commands.add_parser(
+        "export", help="Export report data in a standard format."
+    )
+    formats = export.add_subparsers(required=True, title="formats", dest="format")
+    phenopackets = formats.add_parser(
+        "phenopackets", help="Export report data as Phenopackets."
+    )
+    phenopackets.add_argument(
+        "--input",
+        type=pathlib.Path,
+        default=runs.latest("normalize"),
+        help="Run folder of gentrex normalize to read.",
+    )
+    phenopackets.set_defaults(func=_run_export_phenopackets)
     return parser
 
 

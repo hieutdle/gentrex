@@ -23,7 +23,7 @@ def _extract(
     """
     sent = [page for page in pages if page.text]
     errors = [
-        f"page {page.page}: stage 1: {page.error}" for page in pages if page.error
+        f"page {page.page}: transcribe: {page.error}" for page in pages if page.error
     ]
     data = None
     if sent:

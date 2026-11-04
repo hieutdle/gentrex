@@ -261,6 +261,7 @@ inside the container.
 | `hpo_terms` | Current HPO term, with its label. |
 | `hpo_ancestors` | HPO term and one of its ancestors. |
 | `hpo_release` | The HPO release that `hpo_terms` and `hpo_ancestors` were loaded from. It has one row. |
+| `schema_version` | The version of the tables. It has one row. |
 
 [Stage 5 tables](stage5-tables.md) lists every column, with its type and
 what it holds.
@@ -548,8 +549,14 @@ release file in `hpo_release`. A run with the same release keeps the terms,
 which saves the few seconds that the 223,079 rows take. A run with another
 release replaces them, in one transaction.
 
-Stage 5 creates the tables at the start of a run if they don't exist yet. To
-start again with an empty database, delete it and do step 1 again. This
+Stage 5 creates the tables at the start of a run if they don't exist yet. It
+never changes a table that exists. When a new version of Gentrex changes the
+tables, stage 5 stops on a database made by an older version, with
+`the database holds version 1 of the stage 5 tables, but this Gentrex writes
+version 2`. Then delete the database as below, do step 1 again and load each
+stage 4 run again.
+
+To start again with an empty database, delete it and do step 1 again. This
 deletes every loaded report:
 
 | Database | Delete the database |
@@ -632,6 +639,7 @@ If something is missing, stage 5 stops before it loads anything:
 | `can't connect to the database: ... Connection refused` | The server isn't running. Start it as in step 1, or with `docker start gentrex-postgres` or `docker start gentrex-mysql`. |
 | `can't connect to the database: ... password authentication failed` or `... Access denied for user` | The password in `GENTREX_DATABASE_URL` differs from the one in step 1. Correct it in `.env`. |
 | `can't connect to the database: unable to open database file` | Gentrex can't write the SQLite file. Check the path after `sqlite:///` in `.env`, and that you may write there. |
+| `the database holds version 1 of the stage 5 tables, but this Gentrex writes version 2` | The database was made by an older version of Gentrex. Delete it and load the stage 4 runs again, as [Load a run again](#load-a-run-again) shows. |
 
 While it loads, stage 5 prints a line for each report that it doesn't load:
 

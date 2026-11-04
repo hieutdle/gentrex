@@ -1,7 +1,8 @@
-# Stage 1: Transcribe PDF pages
+# Transcribe PDF pages
 
-Stage 1 reads a folder of PDF reports and writes the text of every page to one
-file, `pages.jsonl`. Stages 2 and 3 read that file instead of the PDFs.
+`gentrex transcribe` reads a folder of PDF reports and writes the text of every
+page to one file, `pages.jsonl`. `gentrex select` and `gentrex extract` read
+that file instead of the PDFs.
 
 Gentrex handles each page on its own, because one report can mix two kinds of
 page:

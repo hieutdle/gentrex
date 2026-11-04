@@ -20,6 +20,11 @@ _HPO_ID = sa.String(32).with_variant(
 # PostgreSQL's jsonb answers queries faster than its json.
 _JSON = sa.JSON().with_variant(postgresql.JSONB(), "postgresql")
 
+# The version of these tables, kept in schema_version. Stage 5 never changes a
+# table that exists already, so raise the version whenever a column changes,
+# and stage 5 then refuses a database with the old tables.
+SCHEMA_VERSION = 2
+
 metadata = sa.MetaData()
 
 reports = sa.Table(
@@ -85,6 +90,9 @@ variants = sa.Table(
     sa.Column("parental_origin", sa.Text),
     sa.Column("parental_origin_raw", sa.Text),
     sa.Column("associated_phenotype", sa.Text),
+    sa.Column("disease_id", sa.Text),
+    sa.Column("disease_label", sa.Text),
+    sa.Column("disease_status", sa.Text),
     sa.Column("mode_of_inheritance", sa.Text),
     sa.Column("mode_of_inheritance_raw", sa.Text),
     sa.Column("is_secondary_finding", sa.Boolean),
@@ -146,4 +154,10 @@ hpo_release = sa.Table(
     metadata,
     sa.Column("sha256", sa.String(64), primary_key=True),
     sa.Column("loaded_at", sa.DateTime(timezone=True), nullable=False),
+)
+
+schema_version = sa.Table(
+    "schema_version",
+    metadata,
+    sa.Column("version", sa.Integer, primary_key=True),
 )

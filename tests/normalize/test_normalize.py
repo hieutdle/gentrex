@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 
 from gentrex import records
+from gentrex.normalize import diseases
 from gentrex.normalize import genes
 from gentrex.normalize import phenotypes
 from gentrex.normalize import rules
@@ -67,6 +68,38 @@ def _hpo_index(
     models = [{"name": name} for name in names]
     phenotypes.build_index(_write_release(tmp_path), tmp_path / "hpo.npz", models)
     return phenotypes.HpoIndex(tmp_path / "hpo.npz", models, top_k)
+
+
+def _mondo_index(tmp_path: pathlib.Path) -> diseases.MondoIndex:
+    """Returns an index over two diseases, two that share a name and an obsolete one."""
+
+    def disease(number: str, label: str, *synonyms: dict) -> dict:
+        meta = {"synonyms": list(synonyms)}
+        return {
+            "id": f"{_OBO}MONDO_{number}",
+            "type": "CLASS",
+            "lbl": label,
+            "meta": meta,
+        }
+
+    exact = {"pred": "hasExactSynonym"}
+    abbreviation = {**exact, "synonymType": f"{_OBO}mondo#ABBREVIATION"}
+    nodes = [
+        disease("0010726", "Rett syndrome", {**abbreviation, "val": "RTS"}),
+        disease(
+            "0003582",
+            "hereditary breast ovarian cancer syndrome",
+            {**exact, "val": "hereditary breast and ovarian cancer syndrome"},
+            {"pred": "hasRelatedSynonym", "val": "breast cancer"},
+        ),
+        disease("9999991", "SYN disease one", {**exact, "val": "SYN shared name"}),
+        disease("9999992", "SYN disease two", {**exact, "val": "SYN shared name"}),
+        {**disease("9999993", "SYN obsolete disease"), "meta": {"deprecated": True}},
+    ]
+    meta = {"version": f"{_OBO}mondo/releases/2026-11-03/mondo-base.owl"}
+    path = tmp_path / "mondo-base.json"
+    path.write_text(json.dumps({"graphs": [{"meta": meta, "nodes": nodes}]}))
+    return diseases.MondoIndex.from_release(path)
 
 
 def _hgnc_index(tmp_path: pathlib.Path) -> genes.HgncIndex:
@@ -176,6 +209,37 @@ def test_gene_symbols_map_to_one_approved_symbol(tmp_path, printed, expected):
     assert (gene["gene_symbol"], gene["hgnc_id"], gene["gene_status"]) == expected
 
 
+@pytest.mark.parametrize(
+    ("printed", "expected"),
+    [
+        ("RETT SYNDROME", ("MONDO:0010726", "Rett syndrome", "label")),
+        (
+            "Hereditary breast and ovarian cancer syndrome (HBOC)",
+            ("MONDO:0003582", "hereditary breast ovarian cancer syndrome", "synonym"),
+        ),
+        ("RTS", (None, None, "unmapped")),
+        ("Breast cancer", (None, None, "unmapped")),
+        ("SYN shared name", (None, None, "ambiguous")),
+        ("SYN obsolete disease", (None, None, "unmapped")),
+        (None, (None, None, "missing")),
+    ],
+)
+def test_disease_names_map_to_one_mondo_disease(tmp_path, printed, expected):
+    """Only a label or exact synonym counts, and never an abbreviation."""
+    disease = _mondo_index(tmp_path).normalize(printed)
+
+    assert (
+        disease["disease_id"],
+        disease["disease_label"],
+        disease["disease_status"],
+    ) == expected
+
+
+def test_mondo_index_knows_its_release(tmp_path):
+    """Stage 6 names the release in each Phenopacket's metadata."""
+    assert _mondo_index(tmp_path).version == "2026-11-03"
+
+
 def test_phenotype_gets_the_closest_terms_once_each(tmp_path, monkeypatch):
     """Two names of one term must not take two of the top_k places."""
     term = _hpo_index(tmp_path, monkeypatch, top_k=2).map("Epileptic seizure")
@@ -250,7 +314,9 @@ def test_every_report_gets_a_record_and_failures_stay_with_their_report(tmp_path
     input_path.write_text("".join(e.to_json() + "\n" for e in extractions))
     output_path = tmp_path / "normalized.jsonl"
 
-    failed = run.run(input_path, output_path, _hgnc_index(tmp_path), None)
+    failed = run.run(
+        input_path, output_path, _hgnc_index(tmp_path), _mondo_index(tmp_path), None
+    )
 
     written = [json.loads(line) for line in output_path.read_text().splitlines()]
     assert failed == ["b.pdf", "c.pdf"]
@@ -260,4 +326,4 @@ def test_every_report_gets_a_record_and_failures_stay_with_their_report(tmp_path
         "TimeoutError: slow",
     )
     assert written[2]["normalized"] is None
-    assert written[2]["error"].startswith("stage 4: AttributeError")
+    assert written[2]["error"].startswith("normalize: AttributeError")

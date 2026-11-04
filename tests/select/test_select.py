@@ -10,10 +10,10 @@ from openai.types.chat import chat_completion
 from openai.types.chat import chat_completion_token_logprob as token_logprob
 
 from gentrex import records
-from gentrex.pagedecide import run
-from gentrex.pagedecide import score
+from gentrex.select import run
+from gentrex.select import score
 
-_CONFIG = score.DecideConfig(
+_CONFIG = score.SelectConfig(
     model="fake",
     instruction="Read the page.",
     questions={
