@@ -3,8 +3,11 @@
 On Minerva, Mount Sinai's high-performance computing cluster, stages 1 to 3
 of Gentrex each run as one batch job on a GPU node. The job starts the stage's
 model with [vLLM](https://docs.vllm.ai), runs Gentrex against it, and stops
-vLLM when Gentrex is done. Stages 4 and 5 need no GPU, so you run them
-yourself in an interactive session. The stage pages explain what each stage
+vLLM when Gentrex is done. Stage 3 can instead use Minerva's AI service,
+which runs the model for you, as
+[Use Minerva's AI service instead of a job](#use-minervas-ai-service-instead-of-a-job)
+explains. Stages 4 and 5 need no GPU, so you run them yourself in an
+interactive session. The stage pages explain what each stage
 does, what it writes and how to change its settings.
 
 Minerva schedules jobs with LSF. You describe a job in a script, submit the
@@ -454,6 +457,86 @@ log lists any files that failed. Continue on the stage 3 page:
 - [Check the result](stage3.md#check-the-result)
 - [Change the schema](stage3.md#settings)
 - [When something goes wrong](stage3.md#when-something-goes-wrong)
+
+### Use Minerva's AI service instead of a job
+
+Minerva runs a shared AI service at `https://assistant.hpc.mssm.edu`, which
+serves `gemma4:31b`, a build of the stage 3 model. Stage 3 can send its
+requests there instead of to a vLLM job of your own. You then need no GPU, no
+model download and no job script, and stage 3 runs in an interactive session.
+The service runs the model with [Ollama](https://ollama.com), another model
+server, behind Open WebUI, a program that checks your API key and passes each
+request on to Ollama.
+[Minerva's page](https://labs.icahn.mssm.edu/minervalab/documentation/ollama/)
+describes the service and lists its models.
+
+Stages 1 and 2 keep their jobs, because the service lacks what they need:
+
+- Stage 1 uses LightOnOCR, which the service doesn't offer.
+- Stage 2 reads [logprobs](../README.md#terms), and Open WebUI passes none on
+  from Ollama. Stage 2 would stop at once with `the server sent no logprobs`.
+
+Before you send reports, ask Minerva's support whether the service is
+approved for patient data. Its page says that the service stays inside Mount
+Sinai, but not that it may receive patient data.
+
+To run stage 3 on the service:
+
+1. Log in at `https://assistant.hpc.mssm.edu` with your Mount Sinai account.
+   Under Settings > Account, create an API key.
+2. In `src/gentrex/defaults/settings.yaml`, change `extract.model` to the
+   service's name of the model:
+
+   ```yaml
+   extract:
+     model: gemma4:31b
+   ```
+
+   Change it back to `google/gemma-4-31B-it` before you submit `stage3.lsf`
+   again, because the job's vLLM serves the model under that name.
+3. In the `gentrex` folder, create `.env` from the example file, if you have
+   none yet:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Then set the service's address and your key in `.env`:
+
+   ```
+   GENTREX_LLM_BASE_URL=https://assistant.hpc.mssm.edu/api
+   GENTREX_LLM_API_KEY=<your API key>
+   ```
+
+   The address ends in `/api` instead of `/v1`, because Gentrex adds
+   `/chat/completions` to it and the service answers at
+   `/api/chat/completions`. Git ignores `.env`, so the key stays out of the
+   repository.
+4. Start an interactive session on a login node:
+
+   ```bash
+   bsub -P acc_xxx -q interactive -n 1 -W 4:00 -R "rusage[mem=2000]" -Is /bin/bash
+   ```
+
+   One core and 2,000 MB of memory are enough, because Gentrex only sends the
+   requests. `-W 4:00` gives the run four hours. The service is shared, so how
+   fast it answers depends on how many others use it, and a run that the
+   session cuts off can't be resumed. The other options work as in
+   [stage 4](#stage-4-normalize-report-data).
+5. In the session, go to the `gentrex` folder and run stage 3:
+
+   ```bash
+   uv run --env-file .env gentrex stage3
+   ```
+
+The result is in `results/extract/latest/`, as after the job. The records can
+differ from those of the job in two ways. Open WebUI doesn't pass on the
+temperature of 0 that Gentrex sends, so the model may answer the same report
+differently from one run to the next. The service also sets the model's
+context length, and Ollama shortens a request that is longer, so a long
+report can lose pages without an error. Check a few records against their
+PDFs, the longest reports among them, as in
+[Check the result](stage3.md#check-the-result).
 
 ## Stage 4: Normalize report data
 
