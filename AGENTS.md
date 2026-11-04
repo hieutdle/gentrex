@@ -43,7 +43,7 @@ Good docs = what the reader needs for the task − what they already know.
 **Explain what they don't know. Skip what they do.**
 
 - Define each computing term the first time a page uses it, in a few plain
-  words, and link to the Terms section of README.md for more.
+  words.
 - Use the standard term, then explain it. Never replace it with a made-up
   everyday phrase, such as "first words" for tokens. Readers can't search for
   the phrase or match it to an error message.

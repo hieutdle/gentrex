@@ -51,10 +51,10 @@ vllm serve google/gemma-4-26B-A4B-it --max-model-len 16384
 
 - `google/gemma-4-26B-A4B-it` is the model's name on Hugging Face, and the
   name Gentrex asks for (`pagedecide.model` in settings.yaml). The first start
-  downloads the model's [weights](../README.md#terms), about 50 GB, into
+  downloads the model's weights, about 50 GB, into
   `~/.cache/huggingface/`. The weights also take 50 GB of GPU memory, so the
   model needs a GPU with 80 GB.
-- `--max-model-len 16384` sets the [context length](../README.md#terms), the
+- `--max-model-len 16384` sets the context length, the
   most tokens one request can hold. Tokens are words or pieces of words. A
   request holds one page and one question, which is a few thousand tokens even
   for a dense page.
@@ -62,7 +62,7 @@ vllm serve google/gemma-4-26B-A4B-it --max-model-len 16384
 vLLM's [Gemma 4 guide](https://recipes.vllm.ai/Google/gemma-4-26B-A4B-it) adds
 `--reasoning-parser gemma4` to some of its commands. Leave it out. A reasoning
 parser separates the model's reasoning from its answer, and Gentrex turns
-[thinking](../README.md#terms) off, so there is no reasoning to separate.
+thinking off, so there is no reasoning to separate.
 
 If the download stops with an error that access to the model is restricted,
 open the [model's page](https://huggingface.co/google/gemma-4-26B-A4B-it) on
@@ -78,9 +78,9 @@ If you add options of your own, keep these:
 
 - Prefix caching stays on. Gentrex asks all questions about a page one after
   another, and each request starts with the same page. With
-  [prefix caching](../README.md#terms), vLLM reads the page once and reuses
+  prefix caching, vLLM reads the page once and reuses
   that work for the other questions.
-- `--logprobs-mode` stays `raw_logprobs`. [Logprobs](../README.md#terms) are
+- `--logprobs-mode` stays `raw_logprobs`. Logprobs are
   the probabilities of the most likely tokens, which stage 2 reads instead of
   the answer. `raw_logprobs` returns them as the model computed them, before
   settings such as temperature change them.
@@ -284,7 +284,7 @@ was neither Yes nor No. For example, `'<|channel>'` is the token that starts
 Gemma 4's reasoning, and `'**'` starts bold text. If many pages have such
 errors, check that the server runs `google/gemma-4-26B-A4B-it` with the
 model's own chat template, and reword the questions that cause them. A
-[chat template](../README.md#terms) comes with each model. It turns each
+chat template comes with each model. It turns each
 request into the exact text format the model was trained on, including the
 switch that turns thinking off. vLLM uses the model's own template unless you
 start it with `--chat-template`.

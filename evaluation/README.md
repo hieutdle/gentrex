@@ -1,7 +1,7 @@
 # Evaluate HPO matching
 
 Stage 4 matches each clinical feature to an HPO term by comparing
-[embeddings](../README.md#terms), as
+embeddings, as
 [stage 4](../docs/stage4.md#hpo-terms) describes. The script in this folder
 measures how often that match is right. It also compares the current setup
 with each of its two models alone, and with BM25 added. It reads GSC+, a public test set in which experts

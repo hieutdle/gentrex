@@ -20,8 +20,8 @@ hierarchy, so that a query on a term like Neurodevelopmental delay finds the
 features matched to the terms under it. Stage 5 needs no model server and no
 GPU, and it loads a few hundred reports in a few seconds.
 
-The database is a [SQLite](../README.md#terms) file, which needs no server,
-or a PostgreSQL or MySQL [database server](../README.md#terms). You choose in
+The database is a SQLite file, which needs no server,
+or a PostgreSQL or MySQL database server. You choose in
 step 1, and the rest of this page is the same for all three.
 [Supported databases](#supported-databases) says what that means.
 
@@ -37,9 +37,9 @@ You need:
 - A machine approved for patient data, because the database holds the
   records of every report.
 - [Docker](https://docs.docker.com/get-started/get-docker/), if you choose
-  PostgreSQL or MySQL in step 1. It runs the server in a
-  [container](../README.md#terms), which takes 1 to 2 GB of disk with the
-  database. SQLite needs neither.
+  PostgreSQL or MySQL in step 1. It runs the server in a container, a
+  package of the server with everything it needs. The container takes 1 to
+  2 GB of disk with the database. SQLite needs neither.
 
 On Minerva, run stage 5 with SQLite in the interactive session of stage 4, as
 [Running on Minerva](minerva.md#stage-5-load-report-data-into-a-database)
@@ -538,7 +538,7 @@ database. You can also load a report again after running stages 1 to 4 for it
 once more. A report replaces any earlier report with the same file name, so
 keep file names unique across batches.
 
-Each report is loaded in one [transaction](../README.md#terms), a group of
+Each report is loaded in one transaction, a group of
 changes that the database makes all together or not at all. If loading a
 report fails, its rows from an earlier run stay as they were, and the other
 reports are still loaded.

@@ -58,8 +58,7 @@ snapshot, download it and change `hgnc_path` to its name.
 Stage 4 finds the HPO term for a clinical feature by comparing embeddings. An
 embedding is a list of numbers that a model computes for a text, so that texts
 with similar meanings get similar lists. The HPO index is one file that holds
-the embeddings of all HPO labels and synonyms. [Terms](../README.md#terms) in
-the README explains these words further.
+the embeddings of all HPO labels and synonyms.
 
 First, download the HPO release of 1 September 2026:
 

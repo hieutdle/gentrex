@@ -10,8 +10,8 @@ page:
   text directly, which is fast and exact.
 - A **scanned** page is only a picture, such as a scan or a fax. Gentrex sends
   the picture to an OCR (optical character recognition) model, which reads the
-  text off the image. The model runs in a
-  [model server](../README.md#terms) on a GPU.
+  text off the image. The model runs in a model server, a
+  program that loads it onto a GPU and answers Gentrex's requests.
 
 A page counts as scanned when the PDF holds fewer than 20 characters of text
 for it, not counting spaces and line breaks.
@@ -29,7 +29,7 @@ You need:
   Gentrex needs.
 - Your PDF reports in one folder.
 - For scanned pages, an NVIDIA GPU and [vLLM](https://docs.vllm.ai). The OCR
-  model's [weights](../README.md#terms), the numbers it learned in training,
+  model's weights, the numbers it learned in training,
   take about 9 GB of GPU memory.
 
 On Mount Sinai's Minerva cluster, follow [Running on Minerva](minerva.md)
@@ -84,13 +84,13 @@ vllm serve lightonai/LightOnOCR-3-4B \
   name Gentrex asks for (`transcribe.ocr.model` in settings.yaml). The first
   start downloads the model's weights, about 9 GB, into
   `~/.cache/huggingface/`. Later starts reuse them.
-- `--max-model-len 18000` sets the [context length](../README.md#terms), the
+- `--max-model-len 18000` sets the context length, the
   most tokens one request can hold. Tokens are words or pieces of words, the
   units a model reads and writes. A page image takes a few thousand tokens and
   the answer at most 8,192 (`transcribe.ocr.max_tokens` in settings.yaml), so
   18,000 holds both.
 - `--default-chat-template-kwargs '{"enable_thinking": false}'` turns off the
-  model's [thinking](../README.md#terms) mode, in which it would write out
+  model's thinking mode, in which it would write out
   reasoning before the page text. LightOnOCR is trained with thinking off.
 
 vLLM is ready when its terminal shows `Application startup complete`. To
@@ -172,7 +172,7 @@ Stage 2 reads the newest finished run, `results/transcribe/latest`, unless you
 name another. [Runs and results](../README.md#runs-and-results) explains run
 folders and `latest`.
 
-`pages.jsonl` is a [JSONL](../README.md#terms) file, with one JSON object per
+`pages.jsonl` is a JSONL file, with one JSON object per
 line and one line per page:
 
 ```json

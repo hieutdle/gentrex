@@ -44,12 +44,12 @@ vllm serve google/gemma-4-31B-it \
 
 - `google/gemma-4-31B-it` is the model's name on Hugging Face, and the name
   Gentrex asks for (`extract.model` in settings.yaml). The first start
-  downloads the model's [weights](../README.md#terms), about 62 GB, into
+  downloads the model's weights, about 62 GB, into
   `~/.cache/huggingface/`.
 - `--tensor-parallel-size 2` splits the model across two GPUs
-  ([tensor parallelism](../README.md#terms)), so each GPU holds half of the
+  (tensor parallelism), so each GPU holds half of the
   weights. Leave it out on a single B200.
-- `--max-model-len 32768` sets the [context length](../README.md#terms), the
+- `--max-model-len 32768` sets the context length, the
   most tokens one request can hold. Tokens are words or pieces of words. The
   instruction and the schema take about 2,000 tokens, and the answer up to
   4,096 (`extract.max_tokens` in settings.yaml). That leaves about 26,000
@@ -57,14 +57,14 @@ vllm serve google/gemma-4-31B-it \
   [When something goes wrong](#when-something-goes-wrong) describes.
 - `--gpu-memory-utilization 0.95` lets vLLM use 95% of each GPU's memory. The
   model's weights take 62 GB. The rest becomes the
-  [KV cache](../README.md#terms), the memory that holds the reports vLLM is
+  KV cache, the memory that holds the reports vLLM is
   processing. On one 80 GB GPU, too little is left for a 32,768-token request,
   so vLLM stops at startup.
 
 vLLM's [Gemma 4 guide](https://recipes.vllm.ai/Google/gemma-4-31B-it) adds
 `--reasoning-parser gemma4` to some of its commands. Leave it out. A reasoning
 parser separates the model's reasoning from its answer, and Gentrex turns
-[thinking](../README.md#terms) off, so there is no reasoning to separate.
+thinking off, so there is no reasoning to separate.
 With thinking off, the parser can also stop vLLM from enforcing the schema
 ([vLLM issue 39130](https://github.com/vllm-project/vllm/issues/39130)).
 
@@ -203,7 +203,7 @@ The fields of that object are defined in the extraction schema,
 in two ways. The model reads it to learn what each field means, because
 Gentrex sends it as JSON after the instruction (`extract.instruction` in
 settings.yaml). And vLLM enforces it as the answer format, which is called
-[structured output](../README.md#terms). The model can then write only JSON
+structured output. The model can then write only JSON
 that follows the schema and has every field.
 
 A field the report doesn't state comes back `null`, and a report without

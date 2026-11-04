@@ -82,8 +82,9 @@ uvx --from huggingface_hub hf download lightonai/LightOnOCR-3-4B \
   --local-dir models/LightOnOCR-3-4B
 ```
 
-`hf download` saves the model's [weights](../README.md#terms), about 9 GB, in
-`models/LightOnOCR-3-4B`. Every stage 1 job reuses them.
+`hf download` saves the model's weights, the numbers it learned in training.
+They take about 9 GB in `models/LightOnOCR-3-4B`, and every stage 1 job
+reuses them.
 
 ### Write the job script
 
@@ -188,7 +189,7 @@ options:
 - `--mm-processor-cache-gb 0` turns off vLLM's cache of processed images.
   Every page image is sent once, so the cache would only take memory.
 - `--no-enable-prefix-caching` turns off
-  [prefix caching](../README.md#terms). Every request holds a different page
+  prefix caching. Every request holds a different page
   image, so requests share no start that vLLM could reuse.
 
 ### Choose the GPU and time limit
@@ -473,8 +474,9 @@ describes the service and lists its models.
 Stages 1 and 2 keep their jobs, because the service lacks what they need:
 
 - Stage 1 uses LightOnOCR, which the service doesn't offer.
-- Stage 2 reads [logprobs](../README.md#terms), and Open WebUI passes none on
-  from Ollama. Stage 2 would stop at once with `the server sent no logprobs`.
+- Stage 2 reads logprobs, the probabilities of the most likely tokens, instead
+  of the model's answer. Open WebUI passes none on from Ollama, so stage 2
+  would stop at once with `the server sent no logprobs`.
 
 Before you send reports, ask Minerva's support whether the service is
 approved for patient data. Its page says that the service stays inside Mount

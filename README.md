@@ -166,31 +166,6 @@ Reports, and everything Gentrex writes from them, may contain patient data.
   file, or run a database server, only on a machine approved for patient
   data.
 
-## Terms
-
-| Term | What it means | Where you meet it |
-| --- | --- | --- |
-| Model server | A program that loads a model onto GPUs and answers requests over HTTP. Gentrex uses [vLLM](https://docs.vllm.ai). | `vllm serve`, the addresses in `.env` |
-| OpenAI-compatible API | The request format of OpenAI's API, which vLLM accepts too. Gentrex sends requests in this format to the server address in `.env` and nowhere else. | The `/v1` at the end of the address, `openai.` in error names |
-| Weights | The numbers a model learned in training. They are files of several GB that vLLM loads into GPU memory, so their size sets how much memory a model needs. | Model sizes on the stage pages |
-| Token | A word or a piece of a word, the unit a model reads and writes. 1,000 tokens are about 750 English words. | `--max-model-len`, `max_tokens` in settings.yaml |
-| Context length | The most tokens one request can hold, counting both the input and the answer. | `--max-model-len`, `maximum context length` errors |
-| KV cache | The GPU memory that holds the requests vLLM is working on. It gets the memory that the weights leave free. | `--gpu-memory-utilization`, memory errors when vLLM starts |
-| Prefix caching | vLLM keeps the KV cache of text it has read. A later request that starts with the same text reuses it instead of reading that text again. It is on by default. | `--no-enable-prefix-caching` |
-| Logprobs | Log-probabilities. With each token the model writes, vLLM can return the most likely tokens and how likely each one was. | `--logprobs-mode`, `--max-logprobs`, `the server sent no logprobs` |
-| Chat template | A file that comes with a model and turns a request into the exact text format the model was trained on. vLLM applies it to every request. | `--default-chat-template-kwargs`, `--chat-template` |
-| Thinking | A mode in which the model writes out its reasoning before the answer. Every stage runs its model with thinking off, so vLLM needs no `--reasoning-parser`. | `enable_thinking` |
-| Structured output | vLLM lets the model write only text that follows a given format. Stage 3 gives the format as a [JSON Schema](https://json-schema.org/), a standard way to describe the fields of a JSON object. | `schema.yaml`, `response_format` |
-| Tensor parallelism | Splitting a model across several GPUs, so that a model too large for one GPU runs on two. | `--tensor-parallel-size` |
-| JSONL | JSON Lines, a text file with one JSON object per line. | `pages.jsonl`, `decisions.jsonl`, `extractions.jsonl`, `normalized.jsonl` |
-| Embedding | A list of numbers that a model computes for a text, so that texts with similar meanings get similar lists. | The HPO index of stage 4 |
-| Cosine similarity | A measure of how alike two embeddings are. It is 1.0 for embeddings that point the same way and lower the more they differ. | `similarity` in `normalized.jsonl` |
-| Database server | A program that keeps data in tables and answers queries from several users and programs at once. PostgreSQL and MySQL are database servers. | `postgresql://` and `mysql://` in `GENTREX_DATABASE_URL`, `psql`, `mysql` |
-| SQLite | A database kept in one file, which Python reads and writes without a server. | `sqlite:///` in `GENTREX_DATABASE_URL`, `results/load/gentrex.db` |
-| SQL | The language of queries to databases. SQLite, PostgreSQL and MySQL all read it, with small differences. | The queries in [stage 5](docs/stage5.md#query-the-tables) |
-| Container | A program packaged with everything it needs, so that it runs the same on any machine. Docker runs containers from images, the files that hold these packages. | `docker run`, `postgres:18` and `mysql:8.4` in stage 5 |
-| Transaction | A group of changes to a database that it makes all together or not at all. Stage 5 loads each report in one transaction. | [Load a run again](docs/stage5.md#load-a-run-again) in stage 5 |
-
 ## Documentation
 
 - [Stage 1: Transcribe PDF pages](docs/stage1.md)
