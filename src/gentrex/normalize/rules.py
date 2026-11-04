@@ -103,7 +103,7 @@ def overall_result(
 
     Args:
         raw: The report's result statement (`overall_result_raw`).
-        variants: The report's variants, as stage 3 extracted them.
+        variants: The report's variants, as Gentrex extracted them.
 
     Returns:
         `overall_result`: positive, negative, uncertain, carrier,

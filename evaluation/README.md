@@ -1,15 +1,15 @@
 # Evaluate HPO matching
 
-Stage 4 matches each clinical feature to an HPO term by comparing
-embeddings, as
-[stage 4](../docs/stage4.md#hpo-terms) describes. The script in this folder
+`gentrex normalize` matches each clinical feature to an HPO term by comparing
+embeddings, as [Normalize report data](../docs/normalize.md#hpo-terms)
+describes. The script in this folder
 measures how often that match is right. It also compares the current setup
 with each of its two models alone, and with BM25 added. It reads GSC+, a public test set in which experts
 marked 2,122 phenotype mentions in 228 PubMed abstracts and gave each one its
 HPO term. It writes the results to `evaluation_results/`.
 
 Run it when you change `normalize.hpo.models` in settings.yaml, or the way
-stage 4 ranks HPO terms. The results of the last run,
+`gentrex normalize` ranks HPO terms. The results of the last run,
 and what they mean for Gentrex, are in
 [evaluation_results/README.md](../evaluation_results/README.md).
 
@@ -17,9 +17,10 @@ and what they mean for Gentrex, are in
 
 You need:
 
-- Gentrex installed, as in [stage 1, step 1](../docs/stage1.md#step-1-install).
-- The HPO release `data/ontology/hp-base.json`, from
-  [stage 4, step 2](../docs/stage4.md#step-2-build-the-hpo-index).
+- Gentrex installed, as in step 1 of
+  [Transcribe PDF pages](../docs/transcribe.md#step-1-install).
+- The HPO release `data/ontology/hp-base.json`, from step 2 of
+  [Normalize report data](../docs/normalize.md#step-2-build-the-hpo-index).
 - About 3 GB of free disk for the two models that the script downloads from
   Hugging Face and the packages it installs.
 - About 15 minutes. The last run took 10 minutes on a laptop with an
@@ -53,9 +54,10 @@ uv run --extra hpo --group evaluation python evaluation/hpo_normalization.py
 ```
 
 `--extra hpo` installs sentence-transformers, PyTorch and torchvision, as
-for stage 4. `--group evaluation` adds scipy, which computes the significance
-tests. Both are listed in pyproject.toml. The script prints a line after each
-step and ends with `wrote evaluation_results/hpo_normalization.json and .md`.
+for `gentrex normalize`. `--group evaluation` adds scipy, which computes the
+significance tests. Both are listed in pyproject.toml. The script prints a
+line after each step and ends with
+`wrote evaluation_results/hpo_normalization.json and .md`.
 
 ## Check the result
 
@@ -86,22 +88,23 @@ Each setup ranks the HPO terms for every mention, with each term once:
 
 | Setup | What it does |
 | --- | --- |
-| The models that settings.yaml names, joined by `+` | Stage 4 as it is set up, with SapBERT and EmbeddingGemma 2 combined. The script builds the HPO index and searches it with Gentrex's own code, on the CPU. |
+| The models that settings.yaml names, joined by `+` | `gentrex normalize` as it is set up, with SapBERT and EmbeddingGemma 2 combined. The script builds the HPO index and searches it with Gentrex's own code, on the CPU. |
 | One of these models alone | The model's own ranking. A prompt in brackets is put before every text, as `prompt` in settings.yaml does. |
 | A model that has a prompt, without it | The same model with no prompt, such as `google/embeddinggemma-2` without `SentenceSimilarity`. |
-| `<setup> + BM25` | Adds BM25 scores to the setup's scores, the way stage 4 adds the scores of its models. BM25 scores HPO names by the words they share with the mention, and a word that few names contain counts more. |
+| `<setup> + BM25` | Adds BM25 scores to the setup's scores, the way `gentrex normalize` adds the scores of its models. BM25 scores HPO names by the words they share with the mention, and a word that few names contain counts more. |
 
 Every setup uses Gentrex's own code to embed, score and combine. Only the
-setup from settings.yaml runs through the index file and the search of stage
-4, and the script checks that its terms match the combined scores of its
-models.
+setup from settings.yaml runs through the index file and the search of
+`gentrex normalize`, and the script checks that its terms match the combined
+scores of its models.
 
 ### Measures
 
 - **Top 1** is the share of mentions whose first term is one that the experts
   gave.
 - **Top 5** is the share of mentions with the experts' term among the first 5
-  terms. These are the `candidates` that stage 4 writes for each feature.
+  terms. These are the `candidates` that `gentrex normalize` writes for each
+  feature.
   **Top 10** counts the first 10 terms in the same way.
 - **p** compares a setup with the current setup on the same mentions, with an
   exact McNemar test. The test looks only at the mentions that one of the two
@@ -110,12 +113,13 @@ models.
 
 ### Speed
 
-The script times each model on the CPU, because stage 4 runs there. "Index
-build" is the time to embed all 45,178 HPO names. "Per clinical feature" is
-the time to rank the terms for one feature. For the setup from settings.yaml,
-both are measured through stage 4, which ranks 50 terms here instead of 5,
-so stage 4 is slightly faster in practice. For the single models, the times
-come from a sample of names and mentions.
+The script times each model on the CPU, because `gentrex normalize` runs
+there. "Index build" is the time to embed all 45,178 HPO names. "Per clinical
+feature" is the time to rank the terms for one feature. For the setup from
+settings.yaml, both are measured through `gentrex normalize`, which ranks 50
+terms here instead of 5, so `gentrex normalize` is slightly faster in
+practice. For the single models, the times come from a sample of names and
+mentions.
 
 ## Evaluate other models
 

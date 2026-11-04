@@ -1,4 +1,4 @@
-"""Stage 4 orchestration: stage 3 records to a JSONL file of NormalizedReports."""
+"""Orchestration: records of `gentrex extract` to a JSONL file of NormalizedReports."""
 
 import json
 import logging
@@ -54,7 +54,7 @@ def _normalize_report(
     mondo: diseases.MondoIndex,
     hpo: phenotypes.HpoIndex | None,
 ) -> records.NormalizedReport:
-    """Normalizes one stage 3 record; a record without data passes through."""
+    """Normalizes one ReportExtraction; a record without data passes through."""
     errors = [extraction.error] if extraction.error else []
     normalized = None
     if extraction.data is not None:
@@ -78,10 +78,10 @@ def run(
     mondo: diseases.MondoIndex,
     hpo: phenotypes.HpoIndex | None,
 ) -> list[str]:
-    """Normalizes every record of a stage 3 run, in input order.
+    """Normalizes every record of a run of `gentrex extract`, in input order.
 
     Args:
-        input_path: JSONL file of ReportExtractions, from stage 3.
+        input_path: JSONL file of ReportExtractions, from `gentrex extract`.
         output_path: JSONL file of NormalizedReports to write; an existing
             file is replaced.
         hgnc: Gene symbols to approved HGNC symbols.
@@ -89,14 +89,15 @@ def run(
         hpo: Phenotypes to HPO terms, or None to leave them unmapped.
 
     Returns:
-        Names of the files whose record has an error, from stage 3 or from
-        normalizing, in input order. Their records are still written.
+        Names of the files whose record has an error, from `gentrex extract`
+        or from normalizing, in input order. Their records are still written.
     """
     start = time.perf_counter()
     with input_path.open(encoding="utf-8") as fh:
         extractions = [records.ReportExtraction(**json.loads(line)) for line in fh]
     failed: list[str] = []
-    # Stage 3 data may hold half of a surrogate pair; it is kept as a JSON escape.
+    # Data from `gentrex extract` may hold half of a surrogate pair; it is kept as
+    # a JSON escape.
     with output_path.open("w", encoding="utf-8", errors="backslashreplace") as fh:
         for extraction in extractions:
             report = _normalize_report(extraction, hgnc, mondo, hpo)

@@ -28,7 +28,7 @@ class HpoTree:
 
     @classmethod
     def from_release(cls, release: pathlib.Path) -> "HpoTree":
-        """Reads the terms that the HPO index of stage 4 holds, and their links.
+        """Reads the terms in the HPO index of `gentrex normalize`, and their links.
 
         Args:
             release: HPO release in obographs JSON, such as hp-base.json.

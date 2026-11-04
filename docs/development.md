@@ -18,11 +18,11 @@ Run the tests:
 uv run pytest
 ```
 
-The tests of stage 5 run on SQLite, which needs no server. To run them on
-PostgreSQL and MySQL too, start the servers of
-[stage 5, step 1](stage5.md#step-1-choose-a-database), list their addresses
-in `GENTREX_TEST_DATABASE_URLS`, separated by spaces, and add the extras that
-install their drivers:
+The tests of `gentrex load` run on SQLite, which needs no server. To run them
+on PostgreSQL and MySQL too, start the servers of step 1 in
+[Load report data into a database](load.md#step-1-choose-a-database), list
+their addresses in `GENTREX_TEST_DATABASE_URLS`, separated by spaces, and add
+the extras that install their drivers:
 
 ```bash
 GENTREX_TEST_DATABASE_URLS="postgresql://gentrex:gentrex@127.0.0.1:5432/gentrex mysql://root:gentrex@127.0.0.1:3306/mysql" uv run --extra postgresql --extra mysql pytest

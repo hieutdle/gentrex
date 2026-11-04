@@ -1,4 +1,4 @@
-"""Stage 5 orchestration: NormalizedReports to rows of the database tables."""
+"""Orchestration: NormalizedReports to rows of the database tables."""
 
 import dataclasses
 import datetime
@@ -15,14 +15,14 @@ from gentrex import records
 from gentrex.load import hpo
 from gentrex.load import tables
 
-# The databases that stage 5 is tested on, with the driver that Gentrex picks
-# for a URL that names none, such as postgresql://. Every driver but SQLite's
-# comes from the extra of the database's name in pyproject.toml.
+# The databases that `gentrex load` is tested on, with the driver that Gentrex
+# picks for a URL that names none, such as postgresql://. Every driver but
+# SQLite's comes from the extra of the database's name in pyproject.toml.
 DRIVERS = {"sqlite": "pysqlite", "postgresql": "psycopg", "mysql": "pymysql"}
 
 _HALF_SURROGATE = re.compile("[\ud800-\udfff]")
 
-# Fields of `data` that stage 4 leaves as printed.
+# Fields of `data` that `gentrex normalize` leaves as printed.
 _REPORT_FIELDS = (
     "mrn",
     "submitter_patient_id",
@@ -34,8 +34,9 @@ _REPORT_FIELDS = (
     "clinical_indication",
     "lab_name",
 )
-# Fields of `data` that stage 4 finds a standard value for. The standard value
-# goes to the column of the field's name, and the printed one to <name>_raw.
+# Fields of `data` that `gentrex normalize` finds a standard value for. The
+# standard value goes to the column of the field's name, and the printed one
+# to <name>_raw.
 _DATE_FIELDS = (
     "date_of_birth",
     "collection_date",
@@ -70,7 +71,7 @@ _logger = logging.getLogger(__name__)
 
 
 class TableVersionError(Exception):
-    """The database holds the tables of another version of stage 5."""
+    """The database holds the tables of another version of `gentrex load`."""
 
 
 def make_engine(url: str) -> sa.Engine:
@@ -80,7 +81,7 @@ def make_engine(url: str) -> sa.Engine:
     SQLite file's is sqlite:///path, and its folder is created if needed.
 
     Raises:
-        ValueError: The URL is malformed, names a database that stage 5
+        ValueError: The URL is malformed, names a database that `gentrex load`
             doesn't support, or needs a driver that isn't installed.
     """
     try:
@@ -127,8 +128,9 @@ def patient_key(file: str, data: dict[str, Any]) -> str:
 def read_report(line: str) -> records.NormalizedReport:
     """Parses one line of normalized.jsonl.
 
-    Databases and Phenopackets can't hold half of a surrogate pair, which
-    stage 3 data may hold, so it becomes U+FFFD, the replacement character.
+    Databases and Phenopackets can't hold half of a surrogate pair, which data
+    from `gentrex extract` may hold, so it becomes U+FFFD, the replacement
+    character.
     """
     text = json.dumps(json.loads(line), ensure_ascii=False)
     return records.NormalizedReport(**json.loads(_HALF_SURROGATE.sub("�", text)))
@@ -284,7 +286,7 @@ def prepare_tables(engine: sa.Engine) -> None:
 
 
 def run(input_path: pathlib.Path, engine: sa.Engine, tree: hpo.HpoTree) -> list[str]:
-    """Loads every report of a stage 4 run into the database, in input order.
+    """Loads every report of a run of `gentrex normalize`, in input order.
 
     Creates the tables of a new database, and loads the HPO terms unless
     the database holds them from the same release already. Each report
@@ -293,14 +295,14 @@ def run(input_path: pathlib.Path, engine: sa.Engine, tree: hpo.HpoTree) -> list[
     stay.
 
     Args:
-        input_path: JSONL file of NormalizedReports, from stage 4.
+        input_path: JSONL file of NormalizedReports, from `gentrex normalize`.
         engine: The database, from make_engine.
         tree: The HPO terms to load.
 
     Returns:
         Names of the files that have no data, failed to load or have an error
-        from stage 3 or 4, in input order. Reports with an error and data are
-        still loaded.
+        from `gentrex extract` or `gentrex normalize`, in input order. Reports
+        with an error and data are still loaded.
 
     Raises:
         TableVersionError: The database holds the tables of another version.

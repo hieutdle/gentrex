@@ -234,12 +234,12 @@ def _run_export_phenopackets(args: argparse.Namespace) -> int:
         _logger.error("%s not found; run gentrex normalize first", normalized_path)
         return 1
     run_yaml = args.input / "run.yaml"
-    stage4 = (
+    run_record = (
         yaml.safe_load(run_yaml.read_text(encoding="utf-8"))
         if run_yaml.is_file()
         else {}
     )
-    settings = (stage4 or {}).get("settings") or {}
+    settings = (run_record or {}).get("settings") or {}
     if "mondo_version" not in settings:
         _logger.error(
             "%s doesn't record the MONDO release, because it is from before"

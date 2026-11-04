@@ -1,34 +1,38 @@
-# Stage 3: Extract report data
+# Extract report data
 
-Stage 3 turns each report into one record: the patient's identifiers, the
-specimen, the test, the overall result, the patient's clinical features and
-every variant reported. It sends the pages that stage 2 kept for a report to a
-language model in one request, and the model answers with the record as JSON.
-[Stage 4](stage4.md) then adds standard values to these records.
+`gentrex extract` turns each report into one record: the patient's identifiers,
+the specimen, the test, the overall result, the patient's clinical features and
+every variant reported. It sends the pages that `gentrex select` kept for a
+report to a language model in one request, and the model answers with the
+record as JSON. `gentrex normalize` then adds standard values to these records,
+as [Normalize report data](normalize.md) describes.
 
-Stage 3 reads `pages.jsonl` from a stage 2 run and writes `extractions.jsonl`,
-with one line per report, to `results/extract/`. The model, Gemma 4 31B, runs
-on two GPUs with 80 GB each, or on one GPU with more memory, such as a B200.
+`gentrex extract` reads `pages.jsonl` from a run of `gentrex select` and writes
+`extractions.jsonl`, with one line per report, to `results/extract/`. The
+model, Gemma 4 31B, runs on two GPUs with 80 GB each, or on one GPU with more
+memory, such as a B200.
 
 ## Before you start
 
 You need:
 
-- Gentrex installed, as in [stage 1, step 1](stage1.md#step-1-install).
-- A finished stage 2 run, in `results/pagedecide/`.
+- Gentrex installed, as in step 1 of
+  [Transcribe PDF pages](transcribe.md#step-1-install).
+- A finished run of `gentrex select`, in `results/select/`.
 - Two NVIDIA GPUs with 80 GB each, or one B200, and
   [vLLM](https://docs.vllm.ai) 0.19.1 or newer.
 - A [Hugging Face](https://huggingface.co) account, if the model download asks
   you to log in.
 
 On Mount Sinai's Minerva cluster, follow
-[Stage 3 on Minerva](minerva.md#stage-3-extract-report-data) instead of the
+[Extract report data on Minerva](minerva.md#extract-report-data) instead of the
 steps below. Then come back to [Check the result](#check-the-result).
 
 ## Step 1: Start the model server
 
-If the stage 2 server is still running, stop it with Ctrl-C in its terminal.
-Every stage's server uses port 8000, and this model needs the GPUs' memory.
+If the server for `gentrex select` is still running, stop it with Ctrl-C in its
+terminal. Every model server uses port 8000, and this model needs the GPUs'
+memory.
 
 If vLLM isn't installed yet, install it as its
 [installation guide](https://docs.vllm.ai/en/latest/getting_started/installation/)
@@ -71,8 +75,8 @@ With thinking off, the parser can also stop vLLM from enforcing the schema
 If the download stops with an error that access to the model is restricted,
 accept Google's terms on the
 [model's page](https://huggingface.co/google/gemma-4-31B-it) and log in, as
-for the [stage 2 model](stage2.md#step-1-start-the-model-server). Then start
-vLLM again.
+[Select the pages to keep](select.md#step-1-start-the-model-server) describes
+for its model. Then start vLLM again.
 
 vLLM is ready when `curl http://localhost:8000/v1/models` lists
 `google/gemma-4-31B-it`. Gentrex sends the text of every report to this
@@ -80,23 +84,24 @@ server, so run it on a machine approved for patient data.
 
 ## Step 2: Point Gentrex at the model server
 
-Stage 3 reads the same two values in `.env` as stage 2,
-`GENTREX_LLM_BASE_URL` and `GENTREX_LLM_API_KEY`. If you set them for stage 2,
-there is nothing to change. Otherwise, do
-[stage 2, step 2](stage2.md#step-2-point-gentrex-at-the-model-server).
+`gentrex extract` reads the same two values in `.env`, `GENTREX_LLM_BASE_URL`
+and `GENTREX_LLM_API_KEY`, as `gentrex select` does. If you set them for
+`gentrex select`, there is nothing to change. Otherwise, do step 2 of
+[Select the pages to keep](select.md#step-2-point-gentrex-at-the-model-server).
 
 ## Step 3: Run
 
 ```bash
-uv run --env-file .env gentrex stage3
+uv run --env-file .env gentrex extract
 ```
 
-Gentrex reads the newest finished stage 2 run, `results/pagedecide/latest`,
-and writes a new folder named after the time the run started, such as
-`results/extract/20261014-150000/`. To read another stage 2 run:
+Gentrex reads the newest finished run of `gentrex select`,
+`results/select/latest`, and writes a new folder named after the time the run
+started, such as `results/extract/20261014-150000/`. To read another run of
+`gentrex select`:
 
 ```bash
-uv run --env-file .env gentrex stage3 --input results/pagedecide/20261014-131500
+uv run --env-file .env gentrex extract --input results/select/20261014-131500
 ```
 
 While it runs, Gentrex prints one line per report. The last line counts the
@@ -109,7 +114,7 @@ The run folder holds three files:
 | File | Contents |
 | --- | --- |
 | `extractions.jsonl` | One record per report. |
-| `run.yaml` | The command, the stage 2 run that was read, and the settings, including the instruction and the schema. |
+| `run.yaml` | The command, the run of `gentrex select` that was read, and the settings, including the instruction and the schema. |
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/extract/latest` points to the newest finished run.
@@ -121,7 +126,7 @@ line is a JSON object, shown here with most of `data` left out:
 
 ```json
 {"file": "report-01.pdf", "pages": [1, 2], "data": {"mrn": "SYN-MRN-0001", "test_name": "Developmental Disorders Panel", "variants": [{"page": 1, "gene_symbol": "SCN2A", "hgvs_c": "c.2815G>A", "classification_raw": "VUS", "classification": "uncertain_significance"}]}, "error": null}
-{"file": "report-02.pdf", "pages": [1, 3], "data": {"mrn": null, "test_name": "Inherited Arrhythmia Panel", "variants": []}, "error": "page 2: stage 1: APITimeoutError: Request timed out."}
+{"file": "report-02.pdf", "pages": [1, 3], "data": {"mrn": null, "test_name": "Inherited Arrhythmia Panel", "variants": []}, "error": "page 2: transcribe: APITimeoutError: Request timed out."}
 ```
 
 | Field | Meaning |
@@ -129,7 +134,7 @@ line is a JSON object, shown here with most of `data` left out:
 | `file` | Name of the PDF. |
 | `pages` | The pages sent to the model. |
 | `data` | The record, with one entry per field of the schema. `null` if the report got no answer. |
-| `error` | The pages left out because of a stage 1 error, and why the request failed. `null` when nothing went wrong. |
+| `error` | The pages left out because of an error from `gentrex transcribe`, and why the request failed. `null` when nothing went wrong. |
 
 `data` and `error` together tell you how complete a record is:
 
@@ -141,12 +146,12 @@ line is a JSON object, shown here with most of `data` left out:
 
 A record can miss pages, or be missing altogether, for three reasons:
 
-- A page with a stage 1 error has no text. Gentrex leaves it out of the
-  request, and the record's `error` names it.
-- A report whose kept pages all have stage 1 errors gets no request, so its
-  `data` is `null`.
-- Stage 2 passes on only the pages it keeps, so a report with no kept page gets
-  no record at all.
+- A page with an error from `gentrex transcribe` has no text. Gentrex leaves it
+  out of the request, and the record's `error` names it.
+- A report whose kept pages all have errors from `gentrex transcribe` gets no
+  request, so its `data` is `null`.
+- `gentrex select` passes on only the pages it keeps, so a report with no kept
+  page gets no record at all.
 
 To read one record with one field per line:
 
@@ -166,7 +171,7 @@ To list the records with an error:
 grep -v '"error": null' results/extract/latest/extractions.jsonl
 ```
 
-To load the records in Python with pandas, with one row per variant:
+To read the records in Python with pandas, with one row per variant:
 
 ```python
 import pandas as pd
@@ -225,8 +230,9 @@ answer. Gentrex turns it off, so the answer is the record and nothing else.
 
 The fields to extract are in
 [`src/gentrex/defaults/schema.yaml`](../src/gentrex/defaults/schema.yaml).
-The instruction, the model and the other stage 3 settings are under `extract`
-in [`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml).
+The instruction, the model and the other settings of `gentrex extract` are
+under `extract` in
+[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml).
 A comment above each value explains it.
 
 The schema is a [JSON Schema](https://json-schema.org/). The report-level
@@ -266,18 +272,18 @@ diff results/extract/20261014-150000/run.yaml results/extract/20261015-090000/ru
 | Exit code | Meaning | What to do |
 | --- | --- | --- |
 | 0 | Every report has a complete record. | Nothing. |
-| 1 | No finished stage 2 run was found (`pages.jsonl not found; run stage 2 first`), some reports have an error, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
+| 1 | No finished run of `gentrex select` was found (`pages.jsonl not found; run gentrex select first`), some reports have an error, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
 | 2 | `GENTREX_LLM_BASE_URL` is not set. | Do step 2. |
 
 A report is listed as failed in two cases:
 
-- **One of its pages has a stage 1 error.** The record is written from the
-  other pages, and `error` starts with `page N: stage 1:`. Run stage 1 again,
-  then stages 2 and 3.
+- **One of its pages has an error from `gentrex transcribe`.** The record is
+  written from the other pages, and `error` starts with `page N: transcribe:`.
+  Run `gentrex transcribe` again, then `gentrex select` and `gentrex extract`.
 - **The request failed.** `data` is `null`, and `error` says why. If the error
   is a connection error, the server was down or busy, even after Gentrex's
   [retries](../README.md#runs-and-results). Check that the server is running,
-  then run stage 3 again.
+  then run `gentrex extract` again.
 
 Three errors come from the report rather than the server:
 

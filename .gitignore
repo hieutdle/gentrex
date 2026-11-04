@@ -232,4 +232,4 @@ results/
 # models and images
 serving/
 # LSF jobs
-stage*.lsf
+*.lsf

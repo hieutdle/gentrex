@@ -1,44 +1,48 @@
-# Stage 4: Normalize report data
+# Normalize report data
 
-Stage 4 turns the values that stage 3 copied from each report into standard
-values, so that you can compare and count reports from different
-laboratories. A date printed as `29-JUN-1984` becomes `1984-06-29`. The result
-"POSITIVE: One pathogenic variant and one VUS were identified." becomes the
-category `positive`. Each variant's gene gets its approved HGNC symbol and ID,
-and the disease that the report ties to the variant gets its ID in the Mondo
-Disease Ontology (MONDO). Each of the patient's clinical features gets the
-closest term of the Human Phenotype Ontology (HPO), which two embedding models
-find together. [Stage 5](stage5.md) then loads the records into a database,
-and [stage 6](stage6.md) exports them as Phenopackets.
+`gentrex normalize` turns the values that `gentrex extract` copied from each
+report into standard values, so that you can compare and count reports from
+different laboratories. A date printed as `29-JUN-1984` becomes `1984-06-29`.
+The result "POSITIVE: One pathogenic variant and one VUS were identified."
+becomes the category `positive`. Each variant's gene gets its approved HGNC
+symbol and ID, and the disease that the report ties to the variant gets its ID
+in the Mondo Disease Ontology (MONDO). Each of the patient's clinical features
+gets the closest term of the Human Phenotype Ontology (HPO), which two
+embedding models find together. `gentrex load` then puts the records into a
+database, as [Load report data into a database](load.md) shows.
+`gentrex export phenopackets` writes them as Phenopackets, as
+[Export report data as Phenopackets](export-phenopackets.md) shows.
 
-Stage 4 reads `extractions.jsonl` from a stage 3 run and writes
-`normalized.jsonl`, with one line per report, to `results/normalize/`. Each
-line keeps the stage 3 record unchanged and adds the standard values next to
-it. Stage 4 needs no model server and no GPU. It runs on the CPU and
-normalizes a few hundred reports in a minute or two.
+`gentrex normalize` reads `extractions.jsonl` from a run of `gentrex extract`
+and writes `normalized.jsonl`, with one line per report, to
+`results/normalize/`. Each line keeps the record from `gentrex extract`
+unchanged and adds the standard values next to it. `gentrex normalize` needs
+no model server and no GPU. It runs on the CPU and takes a minute or two for
+a few hundred reports.
 
 ## Before you start
 
 You need:
 
-- Gentrex installed, as in [stage 1, step 1](stage1.md#step-1-install).
-- A finished stage 3 run, in `results/extract/`.
+- Gentrex installed, as in step 1 of
+  [Transcribe PDF pages](transcribe.md#step-1-install).
+- A finished run of `gentrex extract`, in `results/extract/`.
 - About 400 MB of free disk in `data/ontology/`, for the HGNC complete set,
   the HPO and MONDO releases and the HPO index.
 - About 3 GB of free disk for sentence-transformers, PyTorch and the two
   embedding models. sentence-transformers and PyTorch are the Python packages
-  that stage 4 uses to find HPO terms. Step 2 installs them.
+  that `gentrex normalize` uses to find HPO terms. Step 2 installs them.
 
 On Mount Sinai's Minerva cluster, start an interactive session first, as
-[Stage 4 on Minerva](minerva.md#stage-4-normalize-report-data) shows. Then
-follow the steps below in that session.
+[Normalize report data on Minerva](minerva.md#normalize-report-data) shows.
+Then follow the steps below in that session.
 
 ## Step 1: Download the HGNC complete set
 
-Stage 4 looks up each gene symbol in the HGNC complete set. This file lists
-every human gene symbol that the HUGO Gene Nomenclature Committee approved,
-with its HGNC ID, aliases and previous symbols. Download the snapshot of 6
-October 2026 into `data/ontology/`:
+`gentrex normalize` looks up each gene symbol in the HGNC complete set. This
+file lists every human gene symbol that the HUGO Gene Nomenclature Committee
+approved, with its HGNC ID, aliases and previous symbols. Download the
+snapshot of 6 October 2026 into `data/ontology/`:
 
 ```bash
 mkdir -p data/ontology
@@ -57,10 +61,10 @@ snapshot, download it and change `hgnc_path` to its name.
 
 ## Step 2: Build the HPO index
 
-Stage 4 finds the HPO term for a clinical feature by comparing embeddings. An
-embedding is a list of numbers that a model computes for a text, so that texts
-with similar meanings get similar lists. The HPO index is one file that holds
-the embeddings of all HPO labels and synonyms.
+`gentrex normalize` finds the HPO term for a clinical feature by comparing
+embeddings. An embedding is a list of numbers that a model computes for a
+text, so that texts with similar meanings get similar lists. The HPO index is
+one file that holds the embeddings of all HPO labels and synonyms.
 
 First, download the HPO release of 1 September 2026:
 
@@ -71,7 +75,8 @@ curl -f -L -o data/ontology/hp-base.json \
 
 `-L` follows GitHub's redirect to the address that serves the file. `-f` and
 `-o` work as in step 1. Keep the file after building the index, because
-[stage 5](stage5.md) reads the HPO hierarchy from it.
+`gentrex load` reads the HPO hierarchy from it, as
+[Load report data into a database](load.md) explains.
 
 Then build the index from it:
 
@@ -92,38 +97,39 @@ settings.yaml names. The script works like this:
   concept, and EmbeddingGemma 2, a general model of about 1.4 GB from Google.
   sentence-transformers downloads both from Hugging Face on the first run.
 - It lowercases every name first, because EmbeddingGemma 2 treats "Ataxia"
-  and "ataxia" as different text. Stage 4 lowercases the clinical features
-  in the same way.
+  and "ataxia" as different text. `gentrex normalize` lowercases the clinical
+  features in the same way.
 - It saves the names, the embeddings from each model, and the models' names
-  and prompts in one NumPy file, with the HPO release, which stage 6 names in
-  each Phenopacket. Stage 4 embeds each clinical feature with
+  and prompts in one NumPy file, with the HPO release, which
+  `gentrex export phenopackets` names in each Phenopacket.
+  `gentrex normalize` embeds each clinical feature with
   the same models and prompts, so that the feature's embeddings can be
   compared with the names' embeddings. If the index was built with other
-  models or prompts, stage 4 stops with a message like
+  models or prompts, `gentrex normalize` stops with a message like
   `the index ... was built with ..., but settings.yaml names ...`, because
   embeddings from different models can't be compared.
 - `--extra hpo` installs sentence-transformers, PyTorch and torchvision into
   Gentrex's `.venv` folder the first time. EmbeddingGemma 2 needs torchvision
-  to load, even for text. Only this script and stage 4 need these packages,
-  so Gentrex lists them in pyproject.toml as an optional extra named `hpo`.
-  uv installs an extra only for a command that names it. uv.lock fixes the
-  versions of these packages, so the embeddings don't change when a new
-  version comes out. Stage 4's command in step 4 has the same option.
+  to load, even for text. Only this script and `gentrex normalize` need these
+  packages, so Gentrex lists them in pyproject.toml as an optional extra
+  named `hpo`. uv installs an extra only for a command that names it. uv.lock
+  fixes the versions of these packages, so the embeddings don't change when a
+  new version comes out. Step 4 runs `gentrex normalize` with the same option.
 
 Running the script again replaces the index. To try other
 sentence-transformers models, change `normalize.hpo.models` in settings.yaml
 and build the index again.
 
-To normalize without HPO terms, skip this step and run stage 4 with
-`--no-hpo` in step 4.
+To normalize without HPO terms, skip this step and run `gentrex normalize`
+with `--no-hpo` in step 4.
 
 ## Step 3: Download the MONDO release
 
-Stage 4 looks up the disease that each variant's `associated_phenotype`
-names, such as `Dravet syndrome`, in the Mondo Disease Ontology (MONDO). MONDO
-merges the disease lists of OMIM, Orphanet and other sources, and gives each
-disease one ID, such as MONDO:0100135. Download the release of 3 November
-2026:
+`gentrex normalize` looks up the disease that each variant's
+`associated_phenotype` names, such as `Dravet syndrome`, in the Mondo Disease
+Ontology (MONDO). MONDO merges the disease lists of OMIM, Orphanet and other
+sources, and gives each disease one ID, such as MONDO:0100135. Download the
+release of 3 November 2026:
 
 ```bash
 curl -f -L -o data/ontology/mondo-base.json \
@@ -137,29 +143,31 @@ download it in its place. `run.yaml` records the release that each run used.
 ## Step 4: Run
 
 ```bash
-uv run --extra hpo gentrex stage4
+uv run --extra hpo gentrex normalize
 ```
 
-This reads the newest finished stage 3 run, `results/extract/latest`, and
-writes a new folder named after the time the run started, such as
-`results/normalize/20261019-030000/`. To read another stage 3 run:
+This reads the newest finished run of `gentrex extract`,
+`results/extract/latest`, and writes a new folder named after the time the
+run started, such as `results/normalize/20261019-030000/`. To read another
+run of `gentrex extract`:
 
 ```bash
-uv run --extra hpo gentrex stage4 --input results/extract/20261014-150000
+uv run --extra hpo gentrex normalize --input results/extract/20261014-150000
 ```
 
 To run without the HPO index:
 
 ```bash
-uv run gentrex stage4 --no-hpo
+uv run gentrex normalize --no-hpo
 ```
 
 The clinical features then get no HPO terms. This command needs no
 `--extra hpo`, because it embeds nothing.
 
 Gentrex first loads the two embedding models, which print a few lines of
-their own. Then Gentrex prints one line per report. The last line counts the reports
-written and the reports with an error.
+their own. Then Gentrex prints one line per report, and a line that counts the
+reports written and the reports with an error. If some reports have an error,
+a last line lists their files, as in `failed files: report-07.pdf`.
 
 ## Check the result
 
@@ -168,17 +176,17 @@ Each run folder holds three files:
 | File | Contents |
 | --- | --- |
 | `normalized.jsonl` | One record per report. |
-| `run.yaml` | The command, the stage 3 run that was read and the settings, including the embedding models. It also records the checksum of the HGNC complete set (`hgnc_sha256`) and the MONDO and HPO releases (`mondo_version`, `hpo_version`), so you can tell which versions a run used. |
+| `run.yaml` | The command, the run of `gentrex extract` that was read and the settings, including the embedding models. It also records the checksum of the HGNC complete set (`hgnc_sha256`) and the MONDO and HPO releases (`mondo_version`, `hpo_version`), so you can tell which versions a run used. |
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/normalize/latest` points to the newest finished run.
 [Runs and results](../README.md#runs-and-results) explains run folders and
 `latest`.
 
-`normalized.jsonl` has one line per report, in the order of the stage 3
-records. Each line is a JSON object with the fields of a stage 3 record and
-one more, `normalized`. Shortened and spread over several lines, a record
-looks like this:
+`normalized.jsonl` has one line per report, in the order of the records from
+`gentrex extract`. Each line is a JSON object with the fields of a record from
+`gentrex extract` and one more, `normalized`. Shortened and spread over
+several lines, a record looks like this:
 
 ```json
 {
@@ -242,7 +250,7 @@ looks like this:
 
 A field in `normalized` has the name of the `data` field it comes from, or
 that name without `_raw`. `overall_result_basis` and `overall_result_conflict`
-have no `data` field, because they describe how stage 4 chose
+have no `data` field, because they describe how Gentrex chose
 `overall_result`. Lists keep their order, so `normalized.variants[0]` belongs
 to `data.variants[0]`.
 
@@ -253,7 +261,7 @@ to `data.variants[0]`.
 | `overall_result` | `positive`, `negative`, `uncertain`, `carrier` or `inconclusive`. It is `null` if neither the result statement nor the classifications give a category. |
 | `overall_result_basis` | `wording` if the category comes from the result statement, `overall_result_raw`. `variants` if it comes from the variants' classifications. `null` if `overall_result` is `null`. |
 | `overall_result_conflict` | `true` if the result statement and the classifications give different categories. Check these reports against their PDFs. |
-| `patient_phenotypes` | One HPO match per clinical feature, or `null` when stage 4 ran with `--no-hpo`. |
+| `patient_phenotypes` | One HPO match per clinical feature, or `null` when `gentrex normalize` ran with `--no-hpo`. |
 | `variants` | One entry per variant. It holds the approved symbol, the HGNC ID and `gene_status`, and the MONDO ID, label and `disease_status` of the disease in `associated_phenotype`. |
 
 Each HPO match has these fields:
@@ -325,7 +333,7 @@ grep '"overall_result_conflict": true' results/normalize/latest/normalized.jsonl
 
 ### Overall result
 
-Stage 4 takes the category from the laboratory's own result statement,
+Gentrex takes the category from the laboratory's own result statement,
 because the laboratory has already weighed the variants, their inheritance and
 any secondary findings. The first category word in the statement decides:
 
@@ -338,7 +346,7 @@ any secondary findings. The first category word in the statement decides:
 | PRIMARY RESULT: NEGATIVE. SECONDARY RESULT: POSITIVE. | `negative` |
 | INCONCLUSIVE: Additional characterization is required. | `inconclusive` |
 
-Stage 4 ignores the statement from the word "secondary" on, because a
+Gentrex ignores the statement from the word "secondary" on, because a
 secondary finding doesn't change the primary result. Besides the category
 words, "pathogenic variant" counts as positive, and "VUS" and "unknown
 significance" count as uncertain. "No" or "not" followed within six words by
@@ -360,7 +368,7 @@ compared, because the classifications can't express them.
 
 ### Dates
 
-Stage 4 reads dates printed like `2026-08-27`, `08/27/2026`, `27-AUG-2026`,
+Gentrex reads dates printed like `2026-08-27`, `08/27/2026`, `27-AUG-2026`,
 `27-August-2026`, `August 27, 2026` and `Aug 27, 2026`. A date in any other
 format becomes `null` instead of a guess.
 
@@ -377,15 +385,15 @@ exactly one rule matches, so "Blood and saliva" gets `null`.
 
 ### Genes
 
-Stage 4 looks up each symbol among the approved symbols of the HGNC complete
+Gentrex looks up each symbol among the approved symbols of the HGNC complete
 set first, and then among the aliases and previous symbols. Upper and lower case
 don't matter.
 
 ### Diseases
 
-Stage 4 looks up each `associated_phenotype` among the labels of the current
+Gentrex looks up each `associated_phenotype` among the labels of the current
 MONDO diseases first, and then among their exact synonyms. Case and
-punctuation don't matter. If the name as printed matches nothing, stage 4
+punctuation don't matter. If the name as printed matches nothing, Gentrex
 tries it again without the text in parentheses, so
 `Hereditary breast and ovarian cancer syndrome (HBOC)` matches too.
 
@@ -398,11 +406,11 @@ Rubinstein-Taybi syndrome. So `MELAS` alone stays unmapped, while
 `Mitochondrial encephalomyopathy, lactic acidosis, and stroke-like episodes`
 matches. A name that ties the disease to a gene, such as
 `SCN1A-related disorders`, is not a MONDO disease and stays unmapped too, so
-that stage 4 never guesses a diagnosis.
+that Gentrex never guesses a diagnosis.
 
 ### HPO terms
 
-Stage 4 lowercases each clinical feature and embeds it with each model in
+Gentrex lowercases each clinical feature and embeds it with each model in
 `normalize.hpo.models`, the models that built the HPO index. With each model,
 it compares the feature's embedding with the embeddings of all 45,178 HPO
 labels and synonyms, by cosine similarity. Several names can belong to one
@@ -410,7 +418,7 @@ term, so each term scores the similarity of its closest name.
 
 SapBERT learned which names mean the same biomedical concept, including many
 abbreviations. EmbeddingGemma 2 learned general language. The two models
-score on different scales, so stage 4 puts their scores on a common scale
+score on different scales, so Gentrex puts their scores on a common scale
 before it adds them. For each model, it turns every term's score into a
 z-score, which says how far the score lies above that model's average for
 this feature, in units of the model's spread. Then it adds each term's two
@@ -420,7 +428,7 @@ more. The 5 terms with the highest sums (`normalize.hpo.top_k`) become the
 `candidates`.
 
 EmbeddingGemma 2 is trained with task prompts, short texts put before each
-input. Stage 4 gives it the prompt `SentenceSimilarity`, which puts
+input. Gentrex gives it the prompt `SentenceSimilarity`, which puts
 "task: sentence similarity | query: " before every feature and every HPO
 name. With the prompt, the model put the experts' term among its first 5
 terms for 81.9% of the GSC+ mentions, and without it for 79.7%.
@@ -431,7 +439,7 @@ in `data.patient_phenotypes`.
 
 ## Settings
 
-The settings of stage 4 are in
+The settings of `gentrex normalize` are in
 [`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml),
 under `normalize`:
 
@@ -448,25 +456,25 @@ under `normalize`:
 | Exit code | Meaning | What to do |
 | --- | --- | --- |
 | 0 | Every report has a record without an error. | Nothing. |
-| 1 | A file that stage 4 needs is missing, unreadable or doesn't match the settings, some reports have an error, or the run stopped with a traceback. The end of the output says which. | See below. |
+| 1 | A file that `gentrex normalize` needs is missing, unreadable or doesn't match the settings, some reports have an error, or the run stopped with a traceback. The end of the output says which. | See below. |
 
-If a file is missing, unreadable or doesn't match the settings, stage 4 stops
+If a file is missing, unreadable or doesn't match the settings, Gentrex stops
 before it writes anything:
 
 | Message | What to do |
 | --- | --- |
-| `results/extract/latest/extractions.jsonl not found` | Run stage 3 first, or name a stage 3 run with `--input`. |
+| `results/extract/latest/extractions.jsonl not found` | Run `gentrex extract` first, or name a run of `gentrex extract` with `--input`. |
 | `data/ontology/hgnc_complete_set_2026-10-06.txt not found` | Do step 1. |
 | `lacks columns: alias_symbol, hgnc_id, prev_symbol, symbol` | The file that `normalize.hgnc_path` names is not the HGNC complete set, for example a web page saved in its place. Download it again as in step 1. |
 | `data/ontology/mondo-base.json not found` | Do step 3. |
 | `data/ontology/hpo-v2026-09-01.npz not found` | Do step 2, or run with `--no-hpo`. |
-| `No module named 'sentence_transformers'` or `requires the Torchvision library` | Run stage 4 with `uv run --extra hpo`, as in step 4. |
+| `No module named 'sentence_transformers'` or `requires the Torchvision library` | Run `gentrex normalize` with `uv run --extra hpo`, as in step 4. |
 | `the index ... was built with ..., but settings.yaml names ...` | `normalize.hpo.models` changed after the index was built, or an older version of Gentrex built the index. Build the index again as in step 2. |
 
 A report with an error still gets a record. Its `error` field says what went
 wrong:
 
-- A stage 3 error, such as a failed request, is copied over. If stage 3
-  extracted no data, `normalized` is `null`.
-- If normalizing failed, the error contains `stage 4:` and the reason. Then
+- An error from `gentrex extract`, such as a failed request, is copied over.
+  If the record from `gentrex extract` has no data, `normalized` is `null`.
+- If normalizing failed, the error contains `normalize:` and the reason. Then
   `normalized` is `null`, and `data` is kept for you to check.

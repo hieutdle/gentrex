@@ -1,4 +1,4 @@
-"""Run folders: every stage run writes to a new folder under results/."""
+"""Run folders: every run of a command writes to a new folder under results/."""
 
 import contextlib
 import datetime
@@ -18,31 +18,31 @@ _RESULTS_DIR = pathlib.Path("results")
 _logger = logging.getLogger(__name__)
 
 
-def latest(stage: str) -> pathlib.Path:
-    """Returns the link to the newest finished run of `stage`."""
-    return _RESULTS_DIR / stage / "latest"
+def latest(name: str) -> pathlib.Path:
+    """Returns the link to the newest finished run in results/<name>/."""
+    return _RESULTS_DIR / name / "latest"
 
 
 @contextlib.contextmanager
 def new_run(
-    stage: str, input_path: pathlib.Path, settings: dict[str, Any]
+    name: str, input_path: pathlib.Path, settings: dict[str, Any]
 ) -> Iterator[pathlib.Path]:
-    """Creates results/<stage>/<start time>/ for one run.
+    """Creates results/<name>/<start time>/ for one run.
 
     The folder gets run.yaml, recording the command, the input with links
-    resolved and the settings, and log.txt, a copy of the log. latest(stage)
+    resolved and the settings, and log.txt, a copy of the log. latest(name)
     is pointed at the folder when the run finishes without raising.
 
     Args:
-        stage: Folder under results/ that holds the stage's runs.
+        name: Folder under results/ that holds the command's runs.
         input_path: File or folder the run reads.
-        settings: The stage's settings, as used.
+        settings: The command's settings, as used.
 
     Yields:
         The run folder.
     """
     started = datetime.datetime.now()
-    run_dir = _RESULTS_DIR / stage / started.strftime("%Y%m%d-%H%M%S")
+    run_dir = _RESULTS_DIR / name / started.strftime("%Y%m%d-%H%M%S")
     run_dir.mkdir(parents=True)
     record = {
         "command": shlex.join(["gentrex", *sys.argv[1:]]),
@@ -62,6 +62,6 @@ def new_run(
     finally:
         root.removeHandler(log_file)
         log_file.close()
-    link = latest(stage)
+    link = latest(name)
     link.unlink(missing_ok=True)
     link.symlink_to(run_dir.name)

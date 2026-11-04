@@ -18,7 +18,7 @@ def test_run_records_the_input_run_it_read(tmp_path, monkeypatch):
 
 
 def test_crashed_run_does_not_become_latest(tmp_path, monkeypatch):
-    """The next stage must not read a run that stopped halfway."""
+    """`gentrex select` must not read a run that stopped halfway."""
     monkeypatch.chdir(tmp_path)
 
     with pytest.raises(RuntimeError), runs.new_run("transcribe", tmp_path, {}):

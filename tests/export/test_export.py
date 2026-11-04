@@ -65,7 +65,10 @@ def _report(
     date_of_birth: str | None = None,
     result: str | None = "positive",
 ) -> records.NormalizedReport:
-    """Returns a stage 4 record; each feature is (text, present, HPO ID, label)."""
+    """Returns a record as `gentrex normalize` writes it.
+
+    Each feature is (text, present, HPO ID, label).
+    """
     candidates = [
         {"hpo_id": hpo_id, "label": label, "models": {}}
         for _, _, hpo_id, label in features
@@ -94,7 +97,7 @@ def _report(
 def _export(
     tmp_path: pathlib.Path, reports: list[records.NormalizedReport]
 ) -> tuple[list[str], dict[str, dict[str, Any]]]:
-    """Writes `reports` as stage 4 does and exports them.
+    """Writes `reports` as `gentrex normalize` does and exports them.
 
     Returns:
         The failed files, and each Phenopacket by its file name.
@@ -140,7 +143,7 @@ def test_every_phenopacket_follows_the_ga4gh_schema(tmp_path):
 
 
 def test_reports_of_one_patient_make_one_phenopacket(tmp_path):
-    """A Phenopacket describes one patient, as patient_key does in stage 5."""
+    """A Phenopacket describes one patient, as patient_key does in `gentrex load`."""
     reports = [
         _report("report-01.pdf", "SYN-MRN-0001", variants=(_SCN1A,)),
         _report("report-02.pdf", "SYN-MRN-0001", result="negative"),

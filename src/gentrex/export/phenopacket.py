@@ -43,11 +43,12 @@ def build(
     """Returns the Phenopacket of one patient.
 
     Args:
-        patient_key: The patient's key from stage 5, which identifies the
-            Phenopacket and its subject.
+        patient_key: The patient's key from `gentrex load`, which identifies
+            the Phenopacket and its subject.
         reports: The patient's reports, each with data, in input order.
-        versions: The HPO and MONDO releases that stage 4 used, under "hpo"
-            and "mondo". "hpo" is None if stage 4 ran with --no-hpo.
+        versions: The HPO and MONDO releases that `gentrex normalize` used,
+            under "hpo" and "mondo". "hpo" is None if `gentrex normalize` ran
+            with --no-hpo.
         created: When the Phenopacket was made, as an ISO 8601 time in UTC.
     """
     subject: dict[str, Any] = {"id": patient_key}

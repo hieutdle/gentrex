@@ -39,15 +39,17 @@ like an HPO label or synonym.
 ## What this means for Gentrex
 
 **Combining the models' similarities works.** The two models score on
-different scales, so stage 4 turns each model's scores into z-scores before
-it adds them, as [stage 4](../docs/stage4.md#hpo-terms) describes. An earlier
-version of stage 4 combined the models' ranks instead. It got 65.7% for the
-first term and 84.2% for the 5 candidates, no better than SapBERT alone.
+different scales, so `gentrex normalize` turns each model's scores into
+z-scores before it adds them, as
+[Normalize report data](../docs/normalize.md#hpo-terms) describes. An earlier
+version of `gentrex normalize` combined the models' ranks instead. It got
+65.7% for the first term and 84.2% for the 5 candidates, no better than
+SapBERT alone.
 
-**Use the agreement flag to decide what to check first.** Stage 4 marks each
-match with `models_agree`. The models disagreed on 26.8% of the mentions, and
-those matches were right for only 36.1% of them. Checking them first saves a
-reviewer the most time.
+**Use the agreement flag to decide what to check first.** `gentrex normalize`
+marks each match with `models_agree`. The models disagreed on 26.8% of the
+mentions, and those matches were right for only 36.1% of them. Checking them
+first saves a reviewer the most time.
 
 **Keep the prompt.** With the `SentenceSimilarity` prompt, EmbeddingGemma 2
 put the experts' term among its first 5 terms for 81.9% of the mentions, and
@@ -69,7 +71,7 @@ average. So a better way to choose among the candidates could gain a few
 more points. In the OntologyAligner study (arXiv 2609.10055), a large
 language model that chose among the candidates raised the share of right
 first terms by about 4 points on seven HPO test sets. Gentrex already runs
-Gemma 4 31B in stage 3, so this could be tried on Minerva.
+Gemma 4 31B in `gentrex extract`, so this could be tried on Minerva.
 
 ## Examples
 

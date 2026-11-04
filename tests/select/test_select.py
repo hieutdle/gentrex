@@ -67,9 +67,12 @@ def _client(
 def _run(
     tmp_path: pathlib.Path, client: mock.Mock, *pages: records.PageRecord
 ) -> tuple[list[str], list[dict]]:
-    """Runs stage 2 on `pages`; returns the failed files and the decisions.
+    """Runs `gentrex select` on `pages`.
 
     The kept pages are written to tmp_path / "kept.jsonl".
+
+    Returns:
+        The failed files and the decisions.
     """
     input_path = tmp_path / "input.jsonl"
     input_path.write_text("".join(page.to_json() + "\n" for page in pages))
@@ -142,8 +145,11 @@ def test_threshold_decides_keep(tmp_path, p_yes, keep):
     assert decision["keep"] is keep
 
 
-def test_only_kept_pages_are_copied_for_the_next_stage(tmp_path):
-    """The next stage reads its pages from one file, as stage 1 wrote them."""
+def test_only_kept_pages_are_copied_for_gentrex_extract(tmp_path):
+    """`gentrex extract` reads its pages from one file.
+
+    The file holds the pages as `gentrex transcribe` wrote them.
+    """
 
     def answer(prompt: str) -> token_logprob.ChatCompletionTokenLogprob:
         p_yes = 0.9 if "RESULT" in prompt else 0.1
@@ -164,12 +170,15 @@ def test_only_kept_pages_are_copied_for_the_next_stage(tmp_path):
         pytest.param(
             records.PageRecord("a.pdf", 1, "scanned", "", "OCR failed"),
             True,
-            id="stage-1-error",
+            id="transcribe-error",
         ),
     ],
 )
 def test_pages_without_text_skip_the_model(tmp_path, page, keep):
-    """A blank page holds nothing; a page stage 1 failed on must not be lost."""
+    """A blank page holds nothing.
+
+    A page that `gentrex transcribe` failed on must not be lost.
+    """
     client = _client(lambda prompt: _first_token({"Yes": 1.0}))
 
     _, (decision,) = _run(tmp_path, client, page)

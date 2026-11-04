@@ -1,1 +1,1 @@
-"""Stage 5: load normalized report data into a database."""
+"""Load normalized report data into a database."""

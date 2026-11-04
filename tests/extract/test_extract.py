@@ -66,7 +66,11 @@ def _client(answer: Callable[[str], tuple[str, str]] = _echo) -> mock.Mock:
 def _run(
     tmp_path: pathlib.Path, client: mock.Mock, *pages: records.PageRecord
 ) -> tuple[list[str], list[dict]]:
-    """Runs stage 3 on `pages`; returns the failed files and the records."""
+    """Runs `gentrex extract` on `pages`.
+
+    Returns:
+        The failed files and the records.
+    """
     input_path = tmp_path / "pages.jsonl"
     input_path.write_text("".join(page.to_json() + "\n" for page in pages))
     output_path = tmp_path / "extractions.jsonl"
@@ -101,7 +105,7 @@ def test_pages_of_a_report_go_in_one_request_in_page_order(tmp_path):
     ]
 
 
-def test_page_with_a_stage_1_error_is_left_out_and_noted(tmp_path):
+def test_page_with_a_transcribe_error_is_left_out_and_noted(tmp_path):
     """The other pages still give a record, marked as possibly incomplete."""
     failed, (extraction,) = _run(
         tmp_path,
@@ -117,7 +121,7 @@ def test_page_with_a_stage_1_error_is_left_out_and_noted(tmp_path):
 
 
 def test_report_without_text_skips_the_model(tmp_path):
-    """With every page lost in stage 1, there is nothing to send."""
+    """With every page lost in `gentrex transcribe`, there is nothing to send."""
     client = _client()
     page = records.PageRecord("a.pdf", 1, "scanned", "", "OCR failed")
 

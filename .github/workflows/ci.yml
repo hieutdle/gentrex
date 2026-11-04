@@ -8,7 +8,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    # The stage 5 tests run on SQLite, and on each server listed in
+    # The tests of `gentrex load` run on SQLite, and on each server listed in
     # GENTREX_TEST_DATABASE_URLS.
     services:
       postgres:

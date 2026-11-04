@@ -1,8 +1,8 @@
 """Phenotypes to HPO terms, by comparing their embeddings with those of HPO names.
 
 Each model in normalize.hpo.models scores the HPO terms by the cosine
-similarity of their closest name, and stage 4 adds the models' scores as
-z-scores.
+similarity of their closest name, and `gentrex normalize` adds the models'
+scores as z-scores.
 """
 
 import json
@@ -200,7 +200,7 @@ class HpoIndex:
                         index["models"].tolist(), index["prompts"].tolist(), strict=True
                     )
                 )
-            else:  # An index from before stage 4 combined models.
+            else:  # An index from before `gentrex normalize` combined models.
                 built = [(index["model"].item(), "")]
             if built != wanted:
                 raise ValueError(

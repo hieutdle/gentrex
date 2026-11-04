@@ -1,4 +1,4 @@
-"""Stage 2 orchestration: stage 1 pages to a JSONL file of PageDecisions."""
+"""Orchestration: pages from `gentrex transcribe` to a JSONL file of PageDecisions."""
 
 import json
 import logging
@@ -17,7 +17,8 @@ def _decide(page: records.PageRecord, scorer: score.PageScorer) -> records.PageD
 
     A page is kept when a question's P(yes) reaches the threshold or has no
     answer, so a failure never drops a page unseen. A page without text is
-    dropped and a page with a stage 1 error is kept, both without a request.
+    dropped and a page with an error from `gentrex transcribe` is kept, both
+    without a request.
     """
     config = scorer.config
     if page.error:
@@ -56,22 +57,23 @@ def run(
     kept_path: pathlib.Path,
     scorer: score.PageScorer,
 ) -> list[str]:
-    """Decides which pages of a stage 1 file to keep.
+    """Decides which pages of a file from `gentrex transcribe` to keep.
 
     Up to the config's `concurrency` pages are scored at once, each asking
     its questions in turn. Both outputs are written in input order; existing
     files are replaced.
 
     Args:
-        input_path: JSONL file of PageRecords, from stage 1.
+        input_path: JSONL file of PageRecords, from `gentrex transcribe`.
         decisions_path: JSONL file of PageDecisions to write, one per page.
         kept_path: JSONL file to copy the kept PageRecords to, unchanged, so
-            the next stage reads its pages from one file.
+            `gentrex extract` reads its pages from one file.
         scorer: Asks the questions.
 
     Returns:
-        Names of the files with a page error (a failed question or a stage 1
-        error), in input order. Their pages are still written.
+        Names of the files with a page error (a failed question or an error
+        from `gentrex transcribe`), in input order. Their pages are still
+        written.
 
     Raises:
         openai.OpenAIError: The endpoint is misconfigured (llm.FATAL_ERRORS).

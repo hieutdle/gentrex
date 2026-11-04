@@ -15,7 +15,7 @@
   "mentions": 939,
   "worded_differently": 626,
   "baseline": "cambridgeltl/SapBERT-from-PubMedBERT-fulltext + google/embeddinggemma-2 (prompt SentenceSimilarity)",
-  "fused_rankings_differing_from_stage_4": 0
+  "fused_rankings_differing_from_normalize": 0
  },
  "setups": {
   "cambridgeltl/SapBERT-from-PubMedBERT-fulltext + google/embeddinggemma-2 (prompt SentenceSimilarity)": {

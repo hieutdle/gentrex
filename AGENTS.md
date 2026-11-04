@@ -50,20 +50,25 @@ Good docs = what the reader needs for the task − what they already know.
 - Don't explain genetics. HGVS, VUS, zygosity and ACMG classes need no
   definition.
 - Name things exactly: the file and key (`extract.max_tokens` in
-  settings.yaml), not "the settings". Use one name per thing. A stage's title,
-  results folder and settings key share a word.
+  settings.yaml), not "the settings". Use one name per thing. A command's
+  name, page title, page file, results folder and settings key share a word,
+  as `gentrex extract`, "Extract report data", docs/extract.md,
+  results/extract/ and the settings key `extract` do. Commands have no
+  numbers, so that adding or removing a command renumbers nothing. A new
+  export format becomes `gentrex export <format>`, with the page
+  docs/export-<format>.md and the results folder results/export/<format>/.
 
 #### Big Picture First
 
 **What it does and why, before how it works.**
 
 - Open each page with what goes in, what comes out, and why to run it.
-- Order a stage page: before you start, steps, check the result, how it
+- Order a command's page: before you start, steps, check the result, how it
   works, settings, when something goes wrong. Internals (token probabilities,
   schema order, GPU memory) go in "How it works", after the steps.
 - Title pages and sections by what the reader does or gets, verb first
   ("Extract report data"), not with a slogan ("One record per report").
-- Describe behavior shared by all stages once, in README.md, and link to it.
+- Describe behavior shared by all commands once, in README.md, and link to it.
 
 #### Explain, Don't Compress
 

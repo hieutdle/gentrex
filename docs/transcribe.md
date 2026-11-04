@@ -1,8 +1,9 @@
 # Transcribe PDF pages
 
 `gentrex transcribe` reads a folder of PDF reports and writes the text of every
-page to one file, `pages.jsonl`. `gentrex select` and `gentrex extract` read
-that file instead of the PDFs.
+page to one file, `pages.jsonl`. `gentrex select` reads that file instead of
+the PDFs. It writes a copy with only the pages it keeps, and `gentrex extract`
+reads that copy.
 
 Gentrex handles each page on its own, because one report can mix two kinds of
 page:
@@ -18,9 +19,9 @@ A page counts as scanned when the PDF holds fewer than 20 characters of text
 for it, not counting spaces and line breaks.
 
 If none of your reports has a scanned page, you need no GPU and no model server
-for this stage. To find out, do steps 1 and 2, then run stage 1 with
-`--no-ocr` as in [step 5](#step-5-run). The last line of its output counts the
-scanned pages.
+for this command. To find out, do steps 1 and 2, then run `gentrex transcribe`
+with `--no-ocr` as in [step 5](#step-5-run). The last line of its output counts
+the scanned pages.
 
 ## Before you start
 
@@ -57,7 +58,7 @@ cp /path/to/your/reports/*.pdf data/raw/
 ```
 
 Gentrex reads only the PDFs directly inside the folder, not those in
-subfolders. The file name identifies the report in every later stage, so keep
+subfolders. Every later command identifies a report by its file name, so keep
 names unique.
 
 The reports contain patient data, so keep the repository folder on storage
@@ -130,7 +131,7 @@ Git ignores `.env`, so the address and key stay out of the repository.
 ## Step 5: Run
 
 ```bash
-uv run --env-file .env gentrex stage1
+uv run --env-file .env gentrex transcribe
 ```
 
 `uv run` runs Gentrex in the environment that step 1 created, and
@@ -141,13 +142,13 @@ as `results/transcribe/20261014-123000/`.
 To read PDFs from another folder:
 
 ```bash
-uv run --env-file .env gentrex stage1 --input-dir my/reports
+uv run --env-file .env gentrex transcribe --input-dir my/reports
 ```
 
 To skip OCR, which leaves scanned pages empty:
 
 ```bash
-uv run gentrex stage1 --no-ocr
+uv run gentrex transcribe --no-ocr
 ```
 
 While it runs, Gentrex prints one line per PDF. The last line counts the pages
@@ -169,9 +170,9 @@ The run folder holds three files:
 | `run.yaml` | The command, the input folder and the settings the run used. |
 | `log.txt` | What Gentrex printed during the run. |
 
-Stage 2 reads the newest finished run, `results/transcribe/latest`, unless you
-name another. [Runs and results](../README.md#runs-and-results) explains run
-folders and `latest`.
+`gentrex select` reads the newest finished run, `results/transcribe/latest`,
+unless you name another. [Runs and results](../README.md#runs-and-results)
+explains run folders and `latest`.
 
 `pages.jsonl` is a JSONL file, with one JSON object per
 line and one line per page:
@@ -252,7 +253,7 @@ A file is listed as failed in two cases:
   the failed page has an `error`. If the error is a connection error or a
   timeout, the server was down or busy, even after Gentrex's
   [retries](../README.md#runs-and-results). Check that the server is running,
-  then run stage 1 again.
+  then run `gentrex transcribe` again.
 - **The PDF could not be opened.** Nothing is written for it. The error is in
   the output. The file is usually damaged or not a real PDF.
 

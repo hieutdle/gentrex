@@ -55,7 +55,11 @@ def _load(
     reports: list[records.NormalizedReport],
     tree: hpo.HpoTree = _NO_TERMS,
 ) -> list[str]:
-    """Writes `reports` as stage 4 does, loads them and returns the failed files."""
+    """Writes `reports` as `gentrex normalize` does and loads them.
+
+    Returns:
+        The failed files.
+    """
     path = tmp_path / "normalized.jsonl"
     with path.open("w", encoding="utf-8", errors="backslashreplace") as fh:
         fh.writelines(report.to_json() + "\n" for report in reports)
@@ -63,7 +67,10 @@ def _load(
 
 
 def _match(hpo_id: str, label: str) -> dict[str, Any]:
-    """Returns stage 4's match of a feature, with the term as only candidate."""
+    """Returns the match of a feature, as `gentrex normalize` writes it.
+
+    The term is the only candidate.
+    """
     models = {"words": {"name": label, "similarity": 1.0}}
     candidate = {"hpo_id": hpo_id, "label": label, "models": models}
     return {**candidate, "models_agree": None, "candidates": [candidate]}
@@ -191,7 +198,7 @@ def test_a_report_that_fails_to_load_keeps_its_earlier_rows(engine, tmp_path):
 
 
 def test_half_a_surrogate_pair_is_loaded_as_a_replacement_character(engine, tmp_path):
-    """Stage 3 keeps it as a JSON escape, but no database can store it."""
+    """`gentrex extract` keeps it as a JSON escape, but no database can store it."""
     report = records.NormalizedReport("a.pdf", [1], {"test_name": "Panel \ud835"}, None)
 
     assert _load(engine, tmp_path, [report]) == []
@@ -246,7 +253,7 @@ def test_hpo_terms_are_loaded_again_only_when_the_release_changes(engine, tmp_pa
 
 @pytest.mark.parametrize("stored", [1, None], ids=["version-1", "no-version"])
 def test_a_database_with_older_tables_is_refused(engine, tmp_path, stored):
-    """Stage 5 never changes a table, so loading into old tables would fail."""
+    """`gentrex load` never changes a table, so loading into old tables would fail."""
     _load(engine, tmp_path, [])
     with engine.begin() as conn:
         conn.execute(sa.text("DELETE FROM schema_version"))

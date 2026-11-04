@@ -1,1 +1,1 @@
-"""Stage 6: export normalized report data as Phenopackets."""
+"""Export normalized report data as Phenopackets."""

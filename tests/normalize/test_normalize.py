@@ -236,7 +236,7 @@ def test_disease_names_map_to_one_mondo_disease(tmp_path, printed, expected):
 
 
 def test_mondo_index_knows_its_release(tmp_path):
-    """Stage 6 names the release in each Phenopacket's metadata."""
+    """`gentrex export phenopackets` names the release in the Phenopackets' metadata."""
     assert _mondo_index(tmp_path).version == "2026-11-03"
 
 

@@ -225,7 +225,7 @@ def main() -> None:
         "--release",
         type=pathlib.Path,
         default=pathlib.Path("data/ontology/hp-base.json"),
-        help="HPO release in JSON, as stage 4, step 2 downloads it.",
+        help="HPO release in JSON, as step 2 of docs/normalize.md downloads it.",
     )
     parser.add_argument(
         "--corpus",
@@ -238,7 +238,7 @@ def main() -> None:
     )
     args = parser.parse_args()
     if not args.release.is_file():
-        parser.error(f"{args.release} not found; see stage 4, step 2")
+        parser.error(f"{args.release} not found; see step 2 of docs/normalize.md")
     if not list(args.corpus.glob("GSCplus_*_gold.tsv")):
         parser.error(f"no GSC+ files in {args.corpus}; see evaluation/README.md")
     started = time.perf_counter()
@@ -253,8 +253,8 @@ def main() -> None:
     setups: dict[str, list[list[str]]] = {}
     speed: dict[str, dict[str, float]] = {}
 
-    # The models that settings.yaml names, through stage 4's own index and
-    # search, on the CPU.
+    # The models that settings.yaml names, through the same index and search as
+    # `gentrex normalize`, on the CPU.
     with tempfile.TemporaryDirectory() as tmp:
         path = pathlib.Path(tmp) / "hpo.npz"
         for model in configured:
@@ -317,14 +317,17 @@ def main() -> None:
         setups[_label(model)] = _rankings(model_scores[_label(model)], terms)
         print(f"ranked the mentions with {_label(model)}", flush=True)
 
-    # Fusing the models' own scores must give stage 4's terms, apart from rare
-    # ties that the CPU and the GPU break differently.
+    # Fusing the models' own scores must give the terms of `gentrex normalize`,
+    # apart from rare ties that the CPU and the GPU break differently.
     fused = phenotypes.fuse([model_scores[_label(model)] for model in configured])
     differ = sum(
         a[:5] != b[:5]
         for a, b in zip(_rankings(fused, terms), setups[baseline], strict=True)
     )
-    print(f"{differ} mentions where the fused rankings differ from stage 4's")
+    print(
+        f"{differ} mentions where the fused rankings differ from those of"
+        " gentrex normalize"
+    )
 
     # BM25 scores each name by the words it shares with the mention, and its
     # z-scores are added as a further model's. A mention that shares no word
@@ -409,7 +412,7 @@ def main() -> None:
             "mentions": len(mentions),
             "worded_differently": int((~exact).sum()),
             "baseline": baseline,
-            "fused_rankings_differing_from_stage_4": differ,
+            "fused_rankings_differing_from_normalize": differ,
         },
         "setups": table,
         "agreement": agreement,

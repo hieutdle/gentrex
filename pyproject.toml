@@ -29,7 +29,8 @@ hpo = [
     "torch>=2.14.1",
     "torchvision>=0.29.1",
 ]
-# Drivers for the database servers that stage 5 supports. SQLite needs none.
+# Drivers for the database servers that `gentrex load` supports. SQLite
+# needs none.
 mysql = [
     "pymysql[rsa]>=1.1",
 ]
@@ -48,9 +49,9 @@ evaluation = [
     "scipy>=1.18.1",
 ]
 
-# Stage 4 embeds on the CPU. On Linux, torch from PyPI brings several GB of
-# CUDA libraries, so torch and torchvision come from PyTorch's CPU-only index
-# instead.
+# `gentrex normalize` embeds on the CPU. On Linux, torch from PyPI brings
+# several GB of CUDA libraries, so torch and torchvision come from PyTorch's
+# CPU-only index instead.
 [tool.uv.sources]
 torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 torchvision = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]

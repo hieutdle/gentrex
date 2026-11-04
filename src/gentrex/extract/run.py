@@ -1,4 +1,4 @@
-"""Stage 3 orchestration: kept pages to a JSONL file of ReportExtractions."""
+"""Orchestration: kept pages to a JSONL file of ReportExtractions."""
 
 import itertools
 import json
@@ -18,8 +18,8 @@ def _extract(
 ) -> records.ReportExtraction:
     """Extracts one report from its pages, in one request.
 
-    Pages with a stage 1 error are left out and named in the record's error.
-    A report without page text gets no request.
+    Pages with an error from `gentrex transcribe` are left out and named in
+    the record's error. A report without page text gets no request.
     """
     sent = [page for page in pages if page.text]
     errors = [
@@ -45,13 +45,13 @@ def run(
     output_path: pathlib.Path,
     extractor: extractor_lib.ReportExtractor,
 ) -> list[str]:
-    """Extracts one record per report from a stage 2 file of kept pages.
+    """Extracts one record per report from a file of pages that `gentrex select` kept.
 
     Up to the config's `concurrency` reports are extracted at once. Records
     are written in input order; an existing file is replaced.
 
     Args:
-        input_path: JSONL file of PageRecords, from stage 2, with each
+        input_path: JSONL file of PageRecords, from `gentrex select`, with each
             report's pages together and in page order.
         output_path: JSONL file of ReportExtractions to write, one per report.
         extractor: Sends the requests.

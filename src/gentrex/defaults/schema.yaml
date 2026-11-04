@@ -1,4 +1,4 @@
-# Extraction schema. It describes the record that stage 3 extracts from each
+# Extraction schema. It describes the record that Gentrex extracts from each
 # report, as a JSON Schema. Report-level fields are under `properties`, and
 # the fields of each variant are under `variants.items.properties`.
 #

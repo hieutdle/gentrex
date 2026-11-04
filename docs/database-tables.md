@@ -1,9 +1,9 @@
-# Stage 5 tables
+# Database tables
 
-Stage 5 loads each stage 4 run into eight tables. They are the same in
-SQLite, PostgreSQL and MySQL, and [`tables.py`](../src/gentrex/load/tables.py)
-defines them. To open the database, see
-[Stage 5](stage5.md#check-the-result).
+`gentrex load` stores each run of `gentrex normalize` in eight tables. They
+are the same in SQLite, PostgreSQL and MySQL, and
+[`tables.py`](../src/gentrex/load/tables.py) defines them. To open the
+database, see [Load report data into a database](load.md#check-the-result).
 
 ## How the tables link
 
@@ -21,14 +21,14 @@ schema_version                version
 
 Each table is shown with its primary key. An indented table belongs to the
 table above it and repeats its key, so every variant row has the `file` of
-its report. When stage 5 loads a report again, it deletes the old report, and
+its report. When Gentrex loads a report again, it deletes the old report, and
 the database deletes its variants, features and candidates with it.
 
 The HPO tables and `schema_version` are not linked to the others. Queries join them on `hpo_id`,
 as in
-[Find a term together with the terms under it](stage5.md#find-a-term-together-with-the-terms-under-it).
+[Find a term together with the terms under it](load.md#find-a-term-together-with-the-terms-under-it).
 A feature matched to a term that is missing from the HPO release still loads,
-and stage 5 warns about it.
+and Gentrex warns about it.
 
 ## Column types
 
@@ -47,7 +47,7 @@ Key columns are `VARCHAR`, text with a maximum length, because MySQL can't
 use text of unlimited length in a key. The limits are 255 characters for
 `file`, 32 for HPO IDs and 64 for `sha256`. On MySQL, `file` and the HPO ID
 columns are case-sensitive and the other text columns are not, as
-[Supported databases](stage5.md#supported-databases) explains.
+[Supported databases](load.md#supported-databases) explains.
 
 To write a query that runs on all three databases:
 
@@ -62,32 +62,33 @@ To write a query that runs on all three databases:
 ## Columns
 
 Columns ending in `_raw` hold the text as the report printed it. The column
-with the same name minus `_raw` holds the standard value from stage 4 or the
-category that stage 3 picked, such as `date_of_birth` next to
-`date_of_birth_raw`. The categories listed are those of the default
-[`schema.yaml`](../src/gentrex/defaults/schema.yaml). If stage 4 failed on a
-report, its standard values are null and `error` says why.
+with the same name minus `_raw` holds the standard value from
+`gentrex normalize` or the category that `gentrex extract` picked, such as
+`date_of_birth` next to `date_of_birth_raw`. The categories listed are those
+of the default [`schema.yaml`](../src/gentrex/defaults/schema.yaml). If
+`gentrex normalize` failed on a report, its standard values are null and
+`error` says why.
 
 In the Null column, yes means that the value can be missing.
 
 ### reports
 
-One row per report. Reports that got no data from stage 3 are left out. The
-key is `file`. Dates are null when the report gives none, or when stage 4
-can't read the printed one.
+One row per report. Reports that got no data from `gentrex extract` are left
+out. The key is `file`. Dates are null when the report gives none, or when
+`gentrex normalize` can't read the printed one.
 
 | Column | Type | Null | Holds |
 | --- | --- | --- | --- |
 | `file` | text, up to 255 characters | no | The PDF's file name, such as `report-01.pdf`. |
-| `patient_key` | text | no | Identifies the patient across reports, such as `mrn:SYN-MRN-0001`. [Link reports to patients](stage5.md#link-reports-to-patients) explains how it is built. |
-| `pages` | JSON | no | Pages sent to the model in stage 3, such as `[1, 2]`. |
-| `error` | text | yes | Error from stage 3 or 4, if any. [Stage 4](stage4.md#when-something-goes-wrong) explains the errors. |
+| `patient_key` | text | no | Identifies the patient across reports, such as `mrn:SYN-MRN-0001`. [Link reports to patients](load.md#link-reports-to-patients) explains how it is built. |
+| `pages` | JSON | no | Pages sent to the model by `gentrex extract`, such as `[1, 2]`. |
+| `error` | text | yes | Error from `gentrex extract` or `gentrex normalize`, if any. [Normalize report data](normalize.md#when-something-goes-wrong) explains the errors. |
 | `mrn` | text | yes | Medical record number, as printed. |
 | `submitter_patient_id` | text | yes | Patient ID from the ordering clinic or submitter, as printed. |
 | `lab_accession_number` | text | yes | Laboratory accession or order number, as printed. |
 | `date_of_birth` | date | yes | Date of birth. |
 | `date_of_birth_raw` | text | yes | Date of birth as printed, such as `29-JUN-1984`. |
-| `sex` | text | yes | Sex as printed, such as `Female` or `M`. Stage 4 doesn't standardize it, so a query must match `F` and `Female` separately. |
+| `sex` | text | yes | Sex as printed, such as `Female` or `M`. `gentrex normalize` doesn't standardize it, so a query must match `F` and `Female` separately. |
 | `specimen_type` | text | yes | Specimen category, one of `buccal_swab`, `whole_blood`, `saliva`, `bone_marrow`, `amniotic_fluid`, `chorionic_villus`, `fibroblast` or `tissue`. It is null when no category fits or more than one does. |
 | `specimen_type_raw` | text | yes | Specimen as printed, such as `Blood in EDTA`. |
 | `collection_date` | date | yes | Date the specimen was collected. |
@@ -106,9 +107,9 @@ can't read the printed one.
 | `overall_result_raw` | text | yes | Overall result statement, copied verbatim. |
 | `clinical_indication` | text | yes | Why the test was ordered, as printed, such as `Diagnostic evaluation`. |
 | `lab_name` | text | yes | Testing laboratory. |
-| `record` | JSON | no | The full line of `normalized.jsonl`, including fields without a column of their own, such as one you added to `schema.yaml`. [See what each table holds](stage5.md#see-what-each-table-holds) shows how to query it. |
-| `normalize_run` | text | no | Full path of the stage 4 run folder that the report came from. |
-| `loaded_at` | timestamp | no | When stage 5 loaded the report, in UTC. |
+| `record` | JSON | no | The full line of `normalized.jsonl`, including fields without a column of their own, such as one you added to `schema.yaml`. [See what each table holds](load.md#see-what-each-table-holds) shows how to query it. |
+| `normalize_run` | text | no | Full path of the run folder of `gentrex normalize` that the report came from. |
+| `loaded_at` | timestamp | no | When Gentrex loaded the report, in UTC. |
 
 ### variants
 
@@ -122,7 +123,7 @@ One row per reported variant. The key is `file` and `variant_number`.
 | `gene_symbol` | text | yes | Approved HGNC symbol. It is null when the printed symbol matches no gene or more than one. |
 | `gene_symbol_raw` | text | yes | Gene symbol as printed, such as `BRCA1`. |
 | `hgnc_id` | text | yes | HGNC ID, such as `HGNC:1100`. |
-| `gene_status` | text | yes | How the printed symbol matched, one of `approved`, `alias`, `previous`, `alias_or_previous`, `ambiguous`, `unmapped` or `missing`. [Stage 4](stage4.md#check-the-result) explains the values. |
+| `gene_status` | text | yes | How the printed symbol matched, one of `approved`, `alias`, `previous`, `alias_or_previous`, `ambiguous`, `unmapped` or `missing`. [Normalize report data](normalize.md#check-the-result) explains the values. |
 | `transcript` | text | yes | Reference transcript, such as `NM_007294.4`. |
 | `hgvs_c` | text | yes | Coding DNA change, copied verbatim, such as `c.5266dupC`. |
 | `hgvs_p` | text | yes | Protein change, copied verbatim, such as `p.(Gln1756Profs*74)`. |
@@ -135,9 +136,9 @@ One row per reported variant. The key is `file` and `variant_number`.
 | `parental_origin` | text | yes | Origin of the variant, one of `de_novo`, `maternal`, `paternal`, `both_parents` or `other`. |
 | `parental_origin_raw` | text | yes | Origin as printed, such as `Maternally inherited`. |
 | `associated_phenotype` | text | yes | Disease or condition that the report links to the variant, such as `Cystic fibrosis`. |
-| `disease_id` | text | yes | MONDO ID of that disease, from stage 4, such as `MONDO:0009061`. It is null when the name matches no MONDO disease, or several. |
+| `disease_id` | text | yes | MONDO ID of that disease, from `gentrex normalize`, such as `MONDO:0009061`. It is null when the name matches no MONDO disease, or several. |
 | `disease_label` | text | yes | MONDO label of the disease, such as `cystic fibrosis`. |
-| `disease_status` | text | yes | How the name matched, one of `label`, `synonym`, `ambiguous`, `unmapped` or `missing`. [Stage 4](stage4.md#check-the-result) explains the values. |
+| `disease_status` | text | yes | How the name matched, one of `label`, `synonym`, `ambiguous`, `unmapped` or `missing`. [Normalize report data](normalize.md#check-the-result) explains the values. |
 | `mode_of_inheritance` | text | yes | Inheritance pattern of the condition, one of `autosomal_dominant`, `autosomal_recessive`, `x_linked_dominant`, `x_linked_recessive`, `x_linked`, `mitochondrial` or `other`. `x_linked` means X-linked without dominant or recessive. |
 | `mode_of_inheritance_raw` | text | yes | Inheritance pattern as printed, such as `Autosomal recessive`. |
 | `is_secondary_finding` | boolean | yes | True for a secondary or incidental finding, false for a primary finding, and null when the report doesn't say. |
@@ -154,7 +155,7 @@ One row per clinical feature of a report. The key is `file` and
 | `phenotype_number` | integer | no | Position of the feature in the report's list, starting at 1. |
 | `text` | text | no | The feature, copied verbatim, such as `Global developmental delay`. |
 | `present` | boolean | yes | True if the patient has the feature, false if the report rules it out, and null if the report is unsure, as in `possible seizure`. Filter on `present` when you count the patients with a feature, or "no hearing impairment" counts as hearing impairment. |
-| `hpo_id` | text, up to 32 characters | yes | Matched HPO term, such as `HP:0001263`. It is the first candidate, and null if stage 4 ran with `--no-hpo`. |
+| `hpo_id` | text, up to 32 characters | yes | Matched HPO term, such as `HP:0001263`. It is the first candidate, and null if `gentrex normalize` ran with `--no-hpo`. |
 | `hpo_label` | text | yes | Label of the matched term. |
 | `models_agree` | boolean | yes | True if all the models rank the same term first. False marks a match worth checking, because these are wrong more often. It is null with a single model, or with `--no-hpo`. |
 
@@ -185,8 +186,8 @@ For example:
 ### hpo_terms
 
 Every current term of the HPO release, meaning every labelled class that
-isn't deprecated. These are the same terms as in the stage 4 HPO index. The
-key is `hpo_id`.
+isn't deprecated. These are the same terms as in the HPO index that
+`gentrex normalize` uses. The key is `hpo_id`.
 
 | Column | Type | Null | Holds |
 | --- | --- | --- | --- |
@@ -196,7 +197,7 @@ key is `hpo_id`.
 ### hpo_ancestors
 
 One row for each term and each of its ancestors, including the term itself.
-[Find a term together with the terms under it](stage5.md#find-a-term-together-with-the-terms-under-it)
+[Find a term together with the terms under it](load.md#find-a-term-together-with-the-terms-under-it)
 shows the 8 rows of HP:0002384. The key is `hpo_id` and `ancestor_id`.
 
 | Column | Type | Null | Holds |
@@ -217,9 +218,9 @@ a different release replaces all three tables. The key is `sha256`.
 ### schema_version
 
 A single row with the version of the tables. A new version of Gentrex raises
-it when a column changes. Stage 5 never changes a table that exists, so it
-stops on a database with tables of another version, and
-[Load a run again](stage5.md#load-a-run-again) says what to do. A database
+it when a column changes. `gentrex load` never changes a table that exists, so
+it stops on a database with tables of another version, and
+[Load a run again](load.md#load-a-run-again) says what to do. A database
 from before `schema_version` existed counts as version 1. The key is
 `version`.
 
@@ -229,7 +230,7 @@ from before `schema_version` existed counts as version 1. The key is
 
 ## SQL that creates the tables
 
-Stage 5 creates the tables of a new database at the start of a run, and
+`gentrex load` creates the tables of a new database at the start of a run, and
 never changes tables that exist. To print the `CREATE TABLE` statements for one
 database, without connecting to it:
 

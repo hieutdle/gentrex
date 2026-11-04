@@ -1,8 +1,8 @@
-"""The tables of stage 5, defined once for every database that stage 5 supports.
+"""The tables of `gentrex load`, defined once for every database that it supports.
 
 A column whose name ends in _raw holds the report's wording, and the column of
-the same name without _raw holds the standard value that stage 4 found for it.
-docs/stage5-tables.md describes the columns.
+the same name without _raw holds the standard value that `gentrex normalize`
+found for it. docs/database-tables.md describes the columns.
 """
 
 import sqlalchemy as sa
@@ -20,9 +20,9 @@ _HPO_ID = sa.String(32).with_variant(
 # PostgreSQL's jsonb answers queries faster than its json.
 _JSON = sa.JSON().with_variant(postgresql.JSONB(), "postgresql")
 
-# The version of these tables, kept in schema_version. Stage 5 never changes a
-# table that exists already, so raise the version whenever a column changes,
-# and stage 5 then refuses a database with the old tables.
+# The version of these tables, kept in schema_version. `gentrex load` never
+# changes a table that exists already, so raise the version whenever a column
+# changes, and `gentrex load` then refuses a database with the old tables.
 SCHEMA_VERSION = 2
 
 metadata = sa.MetaData()

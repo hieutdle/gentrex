@@ -1,4 +1,4 @@
-"""Stage 6 orchestration: NormalizedReports to one Phenopacket per patient."""
+"""Orchestration: NormalizedReports to one Phenopacket per patient."""
 
 import datetime
 import json
@@ -29,21 +29,23 @@ def run(
     output_dir: pathlib.Path,
     versions: dict[str, str | None],
 ) -> list[str]:
-    """Writes one Phenopacket per patient of a stage 4 run.
+    """Writes one Phenopacket per patient of a run of `gentrex normalize`.
 
-    The reports of one patient, those with the same patient_key as in stage 5,
-    make one Phenopacket. A report without data has nothing to export.
+    The reports of one patient, those with the same patient_key as in
+    `gentrex load`, make one Phenopacket. A report without data has nothing to
+    export.
 
     Args:
-        input_path: JSONL file of NormalizedReports, from stage 4.
+        input_path: JSONL file of NormalizedReports, from `gentrex normalize`.
         output_dir: Folder to create for the Phenopackets, one JSON file per
             patient.
-        versions: The HPO and MONDO releases that stage 4 used, under "hpo"
-            and "mondo".
+        versions: The HPO and MONDO releases that `gentrex normalize` used,
+            under "hpo" and "mondo".
 
     Returns:
-        Names of the files that have no data or have an error from stage 3 or
-        4, in input order. Reports with an error and data are still exported.
+        Names of the files that have no data or have an error from
+        `gentrex extract` or `gentrex normalize`, in input order. Reports with
+        an error and data are still exported.
     """
     start = time.perf_counter()
     with input_path.open(encoding="utf-8") as fh:

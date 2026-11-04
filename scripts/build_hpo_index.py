@@ -1,4 +1,4 @@
-"""Builds the HPO index that stage 4 reads, from an HPO release.
+"""Builds the HPO index that gentrex normalize reads, from an HPO release.
 
 The models are normalize.hpo.models in settings.yaml, and the index goes to
 the file that normalize.hpo.path names.

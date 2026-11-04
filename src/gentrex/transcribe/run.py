@@ -1,4 +1,4 @@
-"""Stage 1 orchestration: PDFs to a JSONL file of PageRecords."""
+"""Orchestration: PDFs to a JSONL file of PageRecords."""
 
 import collections
 import dataclasses

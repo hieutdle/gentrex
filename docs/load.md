@@ -1,8 +1,8 @@
-# Stage 5: Load report data into a database
+# Load report data into a database
 
-Stage 5 loads the records of a stage 4 run into a database, so that you can
-answer questions about all your reports with SQL, the query language of
-databases. For example, this query counts the patients with a
+Gentrex loads the records of a run of `gentrex normalize` into a database, so
+that you can answer questions about all your reports with SQL, the query
+language of databases. For example, this query counts the patients with a
 neurodevelopmental delay of any kind:
 
 ```sql
@@ -13,12 +13,12 @@ JOIN reports r ON r.file = p.file
 WHERE a.ancestor_id = 'HP:0012758' AND p.present;
 ```
 
-Stage 5 reads `normalized.jsonl` from a stage 4 run. It writes one row per
-report, per variant and per clinical feature into tables of the database. It
-also loads the terms of the Human Phenotype Ontology (HPO) with their
-hierarchy, so that a query on a term like Neurodevelopmental delay finds the
-features matched to the terms under it. Stage 5 needs no model server and no
-GPU, and it loads a few hundred reports in a few seconds.
+`gentrex load` reads `normalized.jsonl` from a run of `gentrex normalize`. It
+writes one row per report, per variant and per clinical feature into tables of
+the database. It also loads the terms of the Human Phenotype Ontology (HPO)
+with their hierarchy, so that a query on a term like Neurodevelopmental delay
+finds the features matched to the terms under it. `gentrex load` needs no
+model server and no GPU, and it takes a few seconds for a few hundred reports.
 
 The database is a SQLite file, which needs no server,
 or a PostgreSQL or MySQL database server. You choose in
@@ -29,11 +29,12 @@ step 1, and the rest of this page is the same for all three.
 
 You need:
 
-- Gentrex installed, as in [stage 1, step 1](stage1.md#step-1-install).
-- A finished stage 4 run, in `results/normalize/`.
-- The HPO release `data/ontology/hp-base.json`, which
-  [stage 4, step 2](stage4.md#step-2-build-the-hpo-index) downloads. Stage 5
-  needs it even if you ran stage 4 with `--no-hpo`.
+- Gentrex installed, as in step 1 of
+  [Transcribe PDF pages](transcribe.md#step-1-install).
+- A finished run of `gentrex normalize`, in `results/normalize/`.
+- The HPO release `data/ontology/hp-base.json`, which step 2 of
+  [Normalize report data](normalize.md#step-2-build-the-hpo-index) downloads.
+  `gentrex load` needs it even if you ran `gentrex normalize` with `--no-hpo`.
 - A machine approved for patient data, because the database holds the
   records of every report.
 - [Docker](https://docs.docker.com/get-started/get-docker/), if you choose
@@ -41,15 +42,15 @@ You need:
   package of the server with everything it needs. The container takes 1 to
   2 GB of disk with the database. SQLite needs neither.
 
-On Minerva, run stage 5 with SQLite in the interactive session of stage 4, as
-[Running on Minerva](minerva.md#stage-5-load-report-data-into-a-database)
-shows.
+On Minerva, run `gentrex load` with SQLite in the interactive session in which
+you ran `gentrex normalize`, as
+[Running on Minerva](minerva.md#load-report-data-into-a-database) shows.
 
 ## Step 1: Choose a database
 
 | Database | Choose it when | What it needs |
 | --- | --- | --- |
-| SQLite | You query the records yourself, from the machine that runs Gentrex. This fits most projects, and Minerva. | Nothing. The database is one file, which stage 5 creates. |
+| SQLite | You query the records yourself, from the machine that runs Gentrex. This fits most projects, and Minerva. | Nothing. The database is one file, which Gentrex creates. |
 | PostgreSQL 18 | Several people or programs query the database at once, or your group runs a PostgreSQL server already. | A server. The command below starts one in Docker. |
 | MySQL 8.4 | The same as PostgreSQL, when your group runs MySQL. | A server. The command below starts one in Docker. |
 
@@ -57,7 +58,7 @@ shows.
 
 There is nothing to start and nothing to install. SQLite keeps the whole
 database in one file, `results/load/gentrex.db`, which Python reads and
-writes without a server. Stage 5 creates the file on the first run. Go on to
+writes without a server. Gentrex creates the file on the first run. Go on to
 step 2.
 
 ### PostgreSQL
@@ -107,9 +108,9 @@ it again with `docker start gentrex-postgres`. The database stays in the
 volume in between.
 
 Gentrex talks to PostgreSQL through a driver, the Python package psycopg. It
-is not installed with Gentrex, because stages 1 to 4 don't need it. In step
-3, you run stage 5 with `--extra postgresql`, which installs it the first
-time.
+is not installed with Gentrex, because the other commands don't need it. In
+step 3, you run `gentrex load` with `--extra postgresql`, which installs it
+the first time.
 
 ### MySQL
 
@@ -157,7 +158,7 @@ step 3 installs the first time.
 
 ## Step 2: Point Gentrex at the database
 
-Stage 5 reads the database's address from `GENTREX_DATABASE_URL` in `.env`.
+Gentrex reads the database's address from `GENTREX_DATABASE_URL` in `.env`.
 If you have no `.env` file yet, create it from the example file:
 
 ```bash
@@ -192,23 +193,23 @@ slashes, as in `sqlite:////data/gentrex/gentrex.db`.
 With SQLite:
 
 ```bash
-uv run --env-file .env gentrex stage5
+uv run --env-file .env gentrex load
 ```
 
 With a server, add the extra that installs its driver, `--extra postgresql`
 or `--extra mysql`:
 
 ```bash
-uv run --env-file .env --extra postgresql gentrex stage5
+uv run --env-file .env --extra postgresql gentrex load
 ```
 
-This reads the newest finished stage 4 run, `results/normalize/latest`, and
-loads it into the database. It also writes a new folder named after the time
-the run started, such as `results/load/20261021-122822/`. To load another
-stage 4 run:
+This reads the newest finished run of `gentrex normalize`,
+`results/normalize/latest`, and loads it into the database. It also writes a
+new folder named after the time the run started, such as
+`results/load/20261021-122822/`. To load another run of `gentrex normalize`:
 
 ```bash
-uv run --env-file .env gentrex stage5 --input results/normalize/20261019-030000
+uv run --env-file .env gentrex load --input results/normalize/20261019-030000
 ```
 
 Gentrex prints the database it loads into, as in
@@ -227,7 +228,7 @@ The run folder holds two files:
 
 | File | Contents |
 | --- | --- |
-| `run.yaml` | The command, the stage 4 run that was loaded, the settings and `hpo_sha256`, the checksum of the HPO release. |
+| `run.yaml` | The command, the run of `gentrex normalize` that was loaded, the settings and `hpo_sha256`, the checksum of the HPO release. |
 | `log.txt` | What Gentrex printed during the run. |
 
 The records themselves are in the database. `results/load/latest` points to
@@ -254,7 +255,7 @@ inside the container.
 
 | Table | One row per |
 | --- | --- |
-| `reports` | Report, with its report-level fields from stage 3 and their standard values from stage 4. |
+| `reports` | Report, with its report-level fields from `gentrex extract` and their standard values from `gentrex normalize`. |
 | `variants` | Variant of a report. |
 | `patient_phenotypes` | Clinical feature of a report, with its HPO term. |
 | `phenotype_candidates` | Candidate HPO term of a clinical feature, 5 per feature by default (`normalize.hpo.top_k` in settings.yaml). |
@@ -263,13 +264,14 @@ inside the container.
 | `hpo_release` | The HPO release that `hpo_terms` and `hpo_ancestors` were loaded from. It has one row. |
 | `schema_version` | The version of the tables. It has one row. |
 
-[Stage 5 tables](stage5-tables.md) lists every column, with its type and
+[Database tables](database-tables.md) lists every column, with its type and
 what it holds.
 [`tables.py`](../src/gentrex/load/tables.py) defines the tables.
 
-Most columns have the name of a field of the stage 4 record. Where stage 4
-found a standard value for a field, the column of the field's name holds the
-standard value, and the column with `_raw` added holds the report's wording.
+Most columns have the name of a field of the record from `gentrex normalize`.
+Where `gentrex normalize` found a standard value for a field, the column of
+the field's name holds the standard value, and the column with `_raw` added
+holds the report's wording.
 For a report with the date of birth `29-JUN-1984`:
 
 | Column | Holds | Example |
@@ -280,7 +282,7 @@ For a report with the date of birth `29-JUN-1984`:
 The same goes for `collection_date`, `received_date`, `test_started_date`,
 `report_date`, `specimen_type` and the `gene_symbol` of each variant. The
 other `_raw` columns, such as `classification_raw`, keep their names from
-stage 3, because the field without `_raw` is already the category.
+`gentrex extract`, because the field without `_raw` is already the category.
 
 A feature that the patient doesn't have has a row too, with `present` false.
 When you count the patients with a feature, add `p.present` to the `WHERE`
@@ -350,7 +352,7 @@ ORDER BY p.file, p.phenotype_number, c.rank;
 ```
 
 Check these matches first, because they are more often wrong
-([stage 4](stage4.md#check-the-result)).
+([Normalize report data](normalize.md#check-the-result)).
 
 To read a table in Python with pandas:
 
@@ -366,7 +368,8 @@ variants = pd.read_sql("SELECT * FROM variants", engine)
 ```
 
 `run.make_engine` opens the database that `GENTREX_DATABASE_URL` names, in
-the same way as stage 5, so the same address works for all three databases.
+the same way as `gentrex load`, so the same address works for all three
+databases.
 In Gentrex's environment, `uv run --env-file .env --with pandas python`
 starts Python with pandas and with the address set. With a server, add its
 extra, as in step 3.
@@ -378,15 +381,15 @@ extra, as in step 3.
 Each line of `normalized.jsonl` becomes one row in `reports`. Each item of
 `data.variants` becomes a row in `variants`, and each item of
 `data.patient_phenotypes` a row in `patient_phenotypes`, with its candidates
-in `phenotype_candidates`. A report without data, from a failed stage 3
-request, gets no rows, so that it can't count as a patient. Stage 5 lists it
-among the failed files.
+in `phenotype_candidates`. A report without data, from a failed request in
+`gentrex extract`, gets no rows, so that it can't count as a patient. Gentrex
+lists it among the failed files.
 
 ### Link reports to patients
 
 Research questions are about patients, but the database is filled from
 reports. One patient can have several reports, for example a panel and later
-an exome. If you count reports, that patient counts twice. So stage 5 gives
+an exome. If you count reports, that patient counts twice. So Gentrex gives
 each report a `patient_key`, and reports with the same key count as the same
 patient.
 
@@ -409,7 +412,7 @@ Four reports get these keys:
 
 Reports 01 and 02 count as one patient, because they share the MRN. Report 03
 counts as a second patient, although report 02 shows that SYN-SUB-0002 is the
-same person. Stage 5 doesn't follow such links. This query lists the
+same person. Gentrex doesn't follow such links. This query lists the
 submitter IDs that appear with more than one key, and the keys:
 
 ```sql
@@ -426,8 +429,8 @@ ORDER BY submitter_patient_id, patient_key;
 
 There is no table of patients. Each report keeps the date of birth and the
 sex it printed, so a disagreement between the reports of one patient stays
-visible. Suppose stage 3 misread the date of birth on the second of two
-reports. Both dates remain:
+visible. Suppose `gentrex extract` misread the date of birth on the second of
+two reports. Both dates remain:
 
 | file | patient_key | date_of_birth | sex |
 | --- | --- | --- | --- |
@@ -450,10 +453,10 @@ ORDER BY patient_key, date_of_birth;
 
 ### Find a term together with the terms under it
 
-Stage 4 gives each clinical feature the most specific HPO term that fits.
-Suppose three reports say this:
+`gentrex normalize` gives each clinical feature the most specific HPO term
+that fits. Suppose three reports say this:
 
-| file | Feature in the report | Term from stage 4 |
+| file | Feature in the report | Term from `gentrex normalize` |
 | --- | --- | --- |
 | report-01.pdf | intellectual disability | HP:0001249 Intellectual disability |
 | report-02.pdf | mild intellectual disability | HP:0001256 Mild intellectual disability |
@@ -478,7 +481,7 @@ HP:0002384 Focal impaired awareness seizure
     is a HP:0001250 Seizure
 ```
 
-Stage 5 copies this hierarchy into `hpo_ancestors`. For each term, the table
+Gentrex copies this hierarchy into `hpo_ancestors`. For each term, the table
 lists the term itself and every term above it, each once. HP:0002384 has 8
 rows:
 
@@ -520,41 +523,42 @@ The hierarchy gives you three things:
 - **Counts at the level of the research question.** You can count
   intellectual disability, seizures or developmental delay without lists of
   IDs.
-- **Counts that don't depend on how specific a match is.** Stage 4 matched
-  "seizures since infancy" to Neonatal seizure, which is too specific. The
-  feature still counts as a seizure.
+- **Counts that don't depend on how specific a match is.** `gentrex normalize`
+  matched "seizures since infancy" to Neonatal seizure, which is too specific.
+  The feature still counts as a seizure.
 - **Counts per body system.** With HP:0000707, Abnormality of the nervous
   system, the query counts the patients with any of the 2,831 terms under it.
 
-Stage 5 reads the hierarchy from the HPO release that `load.hpo_release` in
-settings.yaml names. It keeps the same terms as the HPO index of stage 4 and
-follows their `is_a` links. For the release of 1 September 2026, that is
-19,894 terms and 223,079 rows in `hpo_ancestors`.
+Gentrex reads the hierarchy from the HPO release that `load.hpo_release` in
+settings.yaml names. It keeps the same terms as the HPO index of
+`gentrex normalize` and follows their `is_a` links. For the release of
+1 September 2026, that is 19,894 terms and 223,079 rows in `hpo_ancestors`.
 
 ### Load a run again
 
-Stage 5 replaces the rows of each report that it loads, and keeps the reports
+Gentrex replaces the rows of each report that it loads, and keeps the reports
 of other files. So you can load the runs of several batches of PDFs into one
-database. You can also load a report again after running stages 1 to 4 for it
-once more. A report replaces any earlier report with the same file name, so
-keep file names unique across batches.
+database. You can also load a report again after running `gentrex transcribe`,
+`gentrex select`, `gentrex extract` and `gentrex normalize` for it once more.
+A report replaces any earlier report with the same file name, so keep file
+names unique across batches.
 
 Each report is loaded in one transaction, a group of
 changes that the database makes all together or not at all. If loading a
 report fails, its rows from an earlier run stay as they were, and the other
 reports are still loaded.
 
-The HPO tables are loaded once per release. Stage 5 keeps the checksum of the
+The HPO tables are loaded once per release. Gentrex keeps the checksum of the
 release file in `hpo_release`. A run with the same release keeps the terms,
 which saves the few seconds that the 223,079 rows take. A run with another
 release replaces them, in one transaction.
 
-Stage 5 creates the tables at the start of a run if they don't exist yet. It
+Gentrex creates the tables at the start of a run if they don't exist yet. It
 never changes a table that exists. When a new version of Gentrex changes the
-tables, stage 5 stops on a database made by an older version, with
-`the database holds version 1 of the stage 5 tables, but this Gentrex writes
+tables, `gentrex load` stops on a database made by an older version, with
+`the database holds version 1 of the Gentrex tables, but this Gentrex writes
 version 2`. Then delete the database as below, do step 1 again and load each
-stage 4 run again.
+run of `gentrex normalize` again.
 
 To start again with an empty database, delete it and do step 1 again. This
 deletes every loaded report:
@@ -567,8 +571,8 @@ deletes every loaded report:
 
 ### Supported databases
 
-Stage 5 supports SQLite, PostgreSQL 18 and MySQL 8.4. Supported means three
-things:
+`gentrex load` supports SQLite, PostgreSQL 18 and MySQL 8.4. Supported means
+three things:
 
 - Gentrex's tests load reports into each of them on every change to the
   code. SQLite needs no server, so the tests always run on it. PostgreSQL
@@ -600,7 +604,7 @@ Three differences needed handling of their own:
   last for that reason.
 
 Other databases that SQLAlchemy knows, such as MariaDB, are not supported,
-and stage 5 refuses their addresses. To add one, add its name and driver to
+and Gentrex refuses their addresses. To add one, add its name and driver to
 `DRIVERS` in [`run.py`](../src/gentrex/load/run.py), add the driver as an
 extra of that name in `pyproject.toml`, list a server for it in
 `GENTREX_TEST_DATABASE_URLS` in `.github/workflows/ci.yml`, and run the
@@ -608,13 +612,13 @@ queries on this page against it.
 
 ## Settings
 
-The setting of stage 5 is in
+The setting of `gentrex load` is in
 [`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml),
 under `load`:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `hpo_release` | `data/ontology/hp-base.json` | The HPO release that `hpo_terms` and `hpo_ancestors` come from. Use the release that built the HPO index of stage 4, so that every matched term is in it. |
+| `hpo_release` | `data/ontology/hp-base.json` | The HPO release that `hpo_terms` and `hpo_ancestors` come from. Use the release that built the HPO index of `gentrex normalize`, so that every matched term is in it. |
 
 The address of the database is `GENTREX_DATABASE_URL` in `.env`, as in
 step 2.
@@ -627,35 +631,37 @@ step 2.
 | 1 | A file is missing, the database can't be used, some reports have an error or weren't loaded, or the run stopped with a traceback. The end of the output says which. | See below. |
 | 2 | `GENTREX_DATABASE_URL` is not set. | Do step 2. |
 
-If something is missing, stage 5 stops before it loads anything:
+If something is missing, Gentrex stops before it loads anything:
 
 | Message | What to do |
 | --- | --- |
-| `results/normalize/latest/normalized.jsonl not found` | Run stage 4 first, or name a stage 4 run with `--input`. |
-| `data/ontology/hp-base.json not found` | Download the HPO release as in [stage 4, step 2](stage4.md#step-2-build-the-hpo-index). |
+| `results/normalize/latest/normalized.jsonl not found` | Run `gentrex normalize` first, or name a run of `gentrex normalize` with `--input`. |
+| `data/ontology/hp-base.json not found` | Download the HPO release as in step 2 of [Normalize report data](normalize.md#step-2-build-the-hpo-index). |
 | `GENTREX_DATABASE_URL: not a database URL` | Write the address in the form of step 2. |
 | `GENTREX_DATABASE_URL: mariadb is not a supported database` | Use SQLite, PostgreSQL or MySQL, as in step 1. |
-| `GENTREX_DATABASE_URL: No module named 'psycopg'; its driver comes with uv run --extra postgresql` | Run stage 5 with the extra that the message names, as in step 3. |
+| `GENTREX_DATABASE_URL: No module named 'psycopg'; its driver comes with uv run --extra postgresql` | Run `gentrex load` with the extra that the message names, as in step 3. |
 | `can't connect to the database: ... Connection refused` | The server isn't running. Start it as in step 1, or with `docker start gentrex-postgres` or `docker start gentrex-mysql`. |
 | `can't connect to the database: ... password authentication failed` or `... Access denied for user` | The password in `GENTREX_DATABASE_URL` differs from the one in step 1. Correct it in `.env`. |
 | `can't connect to the database: unable to open database file` | Gentrex can't write the SQLite file. Check the path after `sqlite:///` in `.env`, and that you may write there. |
-| `the database holds version 1 of the stage 5 tables, but this Gentrex writes version 2` | The database was made by an older version of Gentrex. Delete it and load the stage 4 runs again, as [Load a run again](#load-a-run-again) shows. |
+| `the database holds version 1 of the Gentrex tables, but this Gentrex writes version 2` | The database was made by an older version of Gentrex. Delete it and load the runs of `gentrex normalize` again, as [Load a run again](#load-a-run-again) shows. |
 
-While it loads, stage 5 prints a line for each report that it doesn't load:
+While it loads, Gentrex prints a line for each report that it doesn't load:
 
 - `skipped report-13.pdf, which has no data: APITimeoutError: Request timed out.`
-  means that stage 3 got no data for the report. Run stage 3 again for it, and
-  then stages 4 and 5.
+  means that `gentrex extract` got no data for the report. Run
+  `gentrex extract` again for it, and then `gentrex normalize` and
+  `gentrex load`.
 - `failed report-07.pdf:` followed by a reason means that loading the report
   failed. Its rows from an earlier run stay.
 
-A report with an error from stage 3 or 4 is still loaded, but it is listed
-among the failed files at the end, as in stages 3 and 4.
+A report with an error from `gentrex extract` or `gentrex normalize` is still
+loaded, but it is listed among the failed files at the end, as in the output
+of those two commands.
 
 The warning `matched HPO terms missing from the HPO release` means that
 `hp-base.json` is another release than the one that built the HPO index.
 Queries through `hpo_ancestors` miss the features matched to the terms it
-lists. Download the release that built the index, and run stage 5 again.
+lists. Download the release that built the index, and run `gentrex load` again.
 
 If `docker run` in step 1 fails with `Bind for 127.0.0.1:5432 failed: port is
 already allocated`, or the same for port 3306, another program uses the port,
