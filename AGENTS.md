@@ -42,8 +42,9 @@ Good docs = what the reader needs for the task − what they already know.
 
 **Explain what they don't know. Skip what they do.**
 
-- Define each computing term the first time a page uses it, in a few plain
-  words.
+- Define a computing term only if the reader won't know it, once per page,
+  in a few plain words. Don't explain everyday shell tools and their flags,
+  such as `curl -f -L -o` or `mkdir -p`.
 - Use the standard term, then explain it. Never replace it with a made-up
   everyday phrase, such as "first words" for tokens. Readers can't search for
   the phrase or match it to an error message.
@@ -81,15 +82,17 @@ Good docs = what the reader needs for the task − what they already know.
 
 #### Explain, Don't Compress
 
-**Full sentences, with the connecting words left in.**
+**Full sentences, without a reason attached to each one.**
 
-- Short sentences are good. Clipped ones are not. Keep the subject and the
-  "because", "so" and "then" that link one fact to the next.
+- Short sentences are good. Clipped ones are not. Give a "because" or "so"
+  only where the reader needs the reason to decide something or to avoid a
+  mistake. Most sentences need none.
 - Don't join two statements with a colon, semicolon or dash. Use "because" or
   start a new sentence.
 - One idea per sentence. If a sentence needs a second read, split it.
-- For every flag, setting and number you show, say what it does and why it
-  has this value.
+- Explain a flag, setting or number when the reader couldn't guess what it
+  does, or when its value matters to them. Do it in one sentence, next to it,
+  not as a list of bullets after every command.
 - Give a concrete example (a command, an output line, a number) before the
   general rule.
 
@@ -105,6 +108,14 @@ Good docs = what the reader needs for the task − what they already know.
   but Y" against a claim nobody made.
 - Group items in threes only when there are three. Bold only what readers
   scan for, and don't use emoji.
+- Use "such as" at most once in a paragraph. Don't chain definitions, as in
+  "Phenopackets, the GA4GH format for ..., and FHIR, HL7's standard for
+  ...".
+- Link to another page plainly. Don't end sentence after sentence with "as
+  [page] shows".
+- Say each fact once per page, where the reader needs it.
+- Vary the length of sentences and their subject. Don't start every sentence
+  with the command's name or "Gentrex".
 
 #### Check Before You Finish
 

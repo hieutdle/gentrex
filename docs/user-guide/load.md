@@ -1,9 +1,8 @@
 # Load report data into a database
 
-Gentrex loads the records of a run of `gentrex normalize` into a database, so
-that you can answer questions about all your reports with SQL, the query
-language of databases. For example, this query counts the patients with a
-neurodevelopmental delay of any kind:
+`gentrex load` puts the records from `gentrex normalize` into the tables of a
+database, so you can ask questions about all your reports in SQL. This query
+counts the patients with a neurodevelopmental delay of any kind:
 
 ```sql
 SELECT count(DISTINCT r.patient_key) AS patients
@@ -13,53 +12,47 @@ JOIN reports r ON r.file = p.file
 WHERE a.ancestor_id = 'HP:0012758' AND p.present;
 ```
 
-`gentrex load` reads `normalized.jsonl` from a run of `gentrex normalize`. It
-writes one row per report, per variant and per clinical feature into tables of
-the database. It also loads the terms of the Human Phenotype Ontology (HPO)
-with their hierarchy, so that a query on a term like Neurodevelopmental delay
-finds the features matched to the terms under it. `gentrex load` needs no
-model server and no GPU, and it takes a few seconds for a few hundred reports.
+This works because the command also loads the Human Phenotype Ontology (HPO)
+with its hierarchy. A query for Neurodevelopmental delay then finds the
+features matched to the terms under it, too. A few hundred reports take a few
+seconds to load.
 
-The database is a SQLite file, which needs no server,
-or a PostgreSQL or MySQL database server. You choose in
-step 1, and the rest of this page is the same for all three.
-[Supported databases](#supported-databases) says what that means.
+The database can be a SQLite file, which needs no server, or a PostgreSQL
+or MySQL server. These are the [supported databases](#supported-databases). You
+choose in step 1, and the rest of the page is the same for all three.
 
 ## Before you start
 
 You need:
 
-- Gentrex installed, as in step 1 of
-  [Transcribe PDF pages](transcribe.md#step-1-install).
-- A finished run of `gentrex normalize`, in `results/normalize/`.
-- The HPO release `data/ontology/hp-base.json`, which step 2 of
-  [Normalize report data](normalize.md#step-2-build-the-hpo-index) downloads.
-  `gentrex load` needs it even if you ran `gentrex normalize` with `--no-hpo`.
-- A machine approved for patient data, because the database holds the
+- Gentrex installed ([Transcribe PDF pages](transcribe.md#step-1-install)).
+- A finished run of `gentrex normalize` in `results/normalize/`.
+- The HPO release `data/ontology/hp-base.json` from step 2 of
+  [Normalize report data](normalize.md#step-2-build-the-hpo-index), even if
+  you ran `gentrex normalize` with `--no-hpo`.
+- A machine approved for patient data, because the database contains the
   records of every report.
-- [Docker](https://docs.docker.com/get-started/get-docker/), if you choose
-  PostgreSQL or MySQL in step 1. It runs the server in a container, a
-  package of the server with everything it needs. The container takes 1 to
-  2 GB of disk with the database. SQLite needs neither.
+- [Docker](https://docs.docker.com/get-started/get-docker/) for PostgreSQL or
+  MySQL. It runs the server in a container, a package of the server with
+  everything it needs. The container takes 1 to 2 GB of disk with the
+  database.
 
-On Minerva, run `gentrex load` with SQLite in the interactive session in which
-you ran `gentrex normalize`, as
-[Running on Minerva](../minerva/minerva.md#load-report-data-into-a-database) shows.
+On Minerva, use SQLite in the
+[interactive session](../minerva/minerva.md#load-report-data-into-a-database)
+where you ran `gentrex normalize`.
 
 ## Step 1: Choose a database
 
 | Database | Choose it when | What it needs |
 | --- | --- | --- |
-| SQLite | You query the records yourself, from the machine that runs Gentrex. This fits most projects, and Minerva. | Nothing. The database is one file, which Gentrex creates. |
-| PostgreSQL 18 | Several people or programs query the database at once, or your group runs a PostgreSQL server already. | A server. The command below starts one in Docker. |
+| SQLite | You query the records yourself, from the machine that runs Gentrex. This fits most projects, and Minerva. | Nothing. The database is one file. |
+| PostgreSQL 18 | Several people or programs query the database at once, or your group already runs a PostgreSQL server. | A server. The command below starts one in Docker. |
 | MySQL 8.4 | The same as PostgreSQL, when your group runs MySQL. | A server. The command below starts one in Docker. |
 
 ### SQLite
 
-There is nothing to start and nothing to install. SQLite keeps the whole
-database in one file, `results/load/gentrex.db`, which Python reads and
-writes without a server. Gentrex creates the file on the first run. Go on to
-step 2.
+There is nothing to start or install. Gentrex creates the database file,
+`results/load/gentrex.db`, on the first run. Go on to step 2.
 
 ### PostgreSQL
 
@@ -74,23 +67,15 @@ docker run -d --name gentrex-postgres \
   postgres:18
 ```
 
-- `-d` runs the container in the background, so the server keeps running
-  after the command returns.
-- `--name gentrex-postgres` names the container. The commands below use this
-  name.
-- `-e POSTGRES_USER=gentrex` and `-e POSTGRES_PASSWORD=gentrex` create the
-  database user `gentrex` with the password `gentrex`. The image also creates
-  a database named after the user. If other people can log in to the
-  machine, choose your own password, and use it in step 2 too.
-- `-p 127.0.0.1:5432:5432` makes the server reachable at port 5432, the usual
-  port of PostgreSQL. The address 127.0.0.1 stands for this machine only, so
-  other machines can't reach the patient data in the database.
-- `-v gentrex-postgres:/var/lib/postgresql` keeps the database in a Docker
-  volume named `gentrex-postgres`. A volume is storage that Docker manages on
-  the machine's disk, so the database stays when the container stops or is
-  removed.
-- `postgres:18` is the image of PostgreSQL 18. The first run downloads it,
-  about 700 MB.
+This creates the database user `gentrex` with the password `gentrex`, and a
+database of the same name. If other people can log in to the machine, choose
+your own password, and use it in step 2 too.
+
+`-p 127.0.0.1:5432:5432` opens port 5432 to this machine only, so other
+machines can't reach the patient data in the database. With `-v`, the
+database lives in `gentrex-postgres`, a Docker volume on the machine's disk,
+and stays there when the container is removed. The first run downloads the
+image, about 700 MB.
 
 The server is ready when this command prints
 `127.0.0.1:5432 - accepting connections`:
@@ -99,18 +84,10 @@ The server is ready when this command prints
 docker exec gentrex-postgres pg_isready -h 127.0.0.1 -U gentrex
 ```
 
-`docker exec` runs a command inside the container, and `pg_isready` asks the
-server whether it accepts connections at port 5432. The first start takes a
-few seconds longer, because the server sets up the database first.
-
-The server runs until you stop it with `docker stop gentrex-postgres`. Start
-it again with `docker start gentrex-postgres`. The database stays in the
-volume in between.
-
-Gentrex talks to PostgreSQL through a driver, the Python package psycopg. It
-is not installed with Gentrex, because the other commands don't need it. In
-step 3, you run `gentrex load` with `--extra postgresql`, which installs it
-the first time.
+The first start takes a few seconds longer, while the server sets up the
+database. The server runs until you stop it with
+`docker stop gentrex-postgres`. `docker start gentrex-postgres` starts it
+again, with the database as you left it.
 
 ### MySQL
 
@@ -127,17 +104,14 @@ docker run -d --name gentrex-mysql \
   mysql:8.4
 ```
 
-- `-d`, `--name`, `-p` and `-v` work as for PostgreSQL. 3306 is the usual
-  port of MySQL, and the volume `gentrex-mysql` keeps the database.
-- `-e MYSQL_DATABASE=gentrex`, `-e MYSQL_USER=gentrex` and
-  `-e MYSQL_PASSWORD=gentrex` create the database `gentrex` and the user
-  `gentrex` with the password `gentrex`, who may use that database.
-- `-e MYSQL_ROOT_PASSWORD=gentrex` sets the password of `root`, the user who
-  may do anything on the server. Gentrex doesn't use `root`, but the image
-  refuses to start without a password for it. If other people can log in to
-  the machine, choose your own passwords.
-- `mysql:8.4` is the image of MySQL 8.4, the current long-term release. The
-  first run downloads it, about 1.1 GB.
+This creates the database `gentrex` and the database user `gentrex` with the
+password `gentrex`. The image won't start without a password for `root`, so
+`MYSQL_ROOT_PASSWORD` sets one, although Gentrex doesn't use `root`. If other
+people can log in to the machine, choose your own passwords.
+
+`-p` and `-v` work as for PostgreSQL, with port 3306 and the volume
+`gentrex-mysql`. MySQL 8.4 is a long-term support release. The first run
+downloads it, about 1.1 GB.
 
 The server is ready when this command prints `mysqld is alive`:
 
@@ -145,21 +119,16 @@ The server is ready when this command prints `mysqld is alive`:
 docker exec gentrex-mysql mysqladmin ping -h 127.0.0.1 -u gentrex -pgentrex
 ```
 
-`mysqladmin ping` asks the server whether it is up. It also prints a warning
-about the password on the command line, which you can ignore on your own
-machine. The first start takes about ten seconds longer, because the server
-sets up the database first.
-
-The server runs until you stop it with `docker stop gentrex-mysql`. Start it
-again with `docker start gentrex-mysql`.
-
-Gentrex talks to MySQL through the driver PyMySQL, which `--extra mysql` in
-step 3 installs the first time.
+It also warns about the password on the command line, which you can ignore
+on your own machine. The first start takes about ten seconds longer, while
+the server sets up the database. Stop the server with
+`docker stop gentrex-mysql`, and start it again with
+`docker start gentrex-mysql`.
 
 ## Step 2: Point Gentrex at the database
 
-Gentrex reads the database's address from `GENTREX_DATABASE_URL` in `.env`.
-If you have no `.env` file yet, create it from the example file:
+The database's address goes in `GENTREX_DATABASE_URL` in `.env`. If you have
+no `.env` file yet, copy the example file:
 
 ```bash
 cp .env.example .env
@@ -183,10 +152,10 @@ A server's address has the form `database://user:password@host:port/name`.
 If you chose your own password in step 1, put it in place of the second
 `gentrex`. Git ignores `.env`, so the password stays out of the repository.
 
-A SQLite address is `sqlite:///` followed by the path of the file. A relative
-path counts from the folder you run Gentrex in, so the example file goes to
-`results/load/`, which Git ignores too. For an absolute path, write four
-slashes, as in `sqlite:////data/gentrex/gentrex.db`.
+For SQLite, a relative path after `sqlite:///` counts from the folder you
+run Gentrex in. The example file goes to `results/load/`, which Git ignores
+too. For an absolute path, write four slashes, as in
+`sqlite:////data/gentrex/gentrex.db`.
 
 ## Step 3: Run
 
@@ -196,49 +165,46 @@ With SQLite:
 uv run --env-file .env gentrex load
 ```
 
-With a server, add the extra that installs its driver, `--extra postgresql`
-or `--extra mysql`:
+With a server, add `--extra postgresql` or `--extra mysql`. This installs the
+server's driver, the Python package that lets Gentrex connect to it:
 
 ```bash
 uv run --env-file .env --extra postgresql gentrex load
 ```
 
-This reads the newest finished run of `gentrex normalize`,
-`results/normalize/latest`, and loads it into the database. It also writes a
-new folder named after the time the run started, such as
-`results/load/20261021-122822/`. To load another run of `gentrex normalize`:
+Either command loads `results/normalize/latest`, the newest finished run of
+`gentrex normalize`, and writes a run folder like
+`results/load/20261021-122822/`. To load another run:
 
 ```bash
 uv run --env-file .env gentrex load --input results/normalize/20261019-030000
 ```
 
-Gentrex prints the database it loads into, as in
-`loading into sqlite+pysqlite:///results/load/gentrex.db`. The part before
-`://` names the database and, after `+`, its driver. A server's password is
-shown as `***`. The first run into a database then prints
-`loaded 19894 HPO terms with 223079 ancestor rows`, which takes a few
-seconds. Later runs print `kept the HPO terms, which are from the same
-release` instead. Then Gentrex prints one line per report, such as
-`loaded report-01.pdf`. The last line counts the reports that were loaded, as
+Gentrex prints the database it loads into, with the driver after `+`, as in
+`loading into sqlite+pysqlite:///results/load/gentrex.db`. A server's
+password shows as `***`. On the first run into a database, loading the HPO
+terms takes a few seconds and prints
+`loaded 19894 HPO terms with 223079 ancestor rows`. Later runs print
+`kept the HPO terms, which are from the same release` instead. Then it
+prints a line per report, such as `loaded report-01.pdf`, and the count, as
 in `loaded 300 of 300 reports in 1 s`.
 
 ## Check the result
 
-The run folder holds two files:
+The records are in the database. The run folder has two files:
 
 | File | Contents |
 | --- | --- |
 | `run.yaml` | The command, the run of `gentrex normalize` that was loaded, the settings and `hpo_sha256`, the checksum of the HPO release. |
 | `log.txt` | What Gentrex printed during the run. |
 
-The records themselves are in the database. `results/load/latest` points to
-the newest finished run. [Runs and results](../../README.md#runs-and-results)
-explains run folders and `latest`.
+`results/load/latest` points to the newest finished run
+([Runs and results](../../README.md#runs-and-results)).
 
 ### Open the database
 
-Each database comes with a command-line client, a program in which you type
-queries. A query ends with `;`.
+Each database has a command-line client for typing queries. End each query
+with `;`.
 
 | Database | Open the client | List the tables | Show a table's columns | Quit |
 | --- | --- | --- | --- | --- |
@@ -246,8 +212,8 @@ queries. A query ends with `;`.
 | PostgreSQL | `docker exec -it gentrex-postgres psql -U gentrex` | `\dt` | `\d reports` | `\q` |
 | MySQL | `docker exec -it gentrex-mysql mysql -u gentrex -pgentrex gentrex` | `SHOW TABLES;` | `DESCRIBE reports;` | `quit` |
 
-`sqlite3` comes with macOS and most Linux systems. In it, `.headers on` and
-`.mode column` print the results of a query as a table with column names.
+`sqlite3` comes with macOS and most Linux systems. Type `.headers on` and
+`.mode column` in it to print query results as a table with column names.
 For the servers, `docker exec -it` connects your terminal to the client
 inside the container.
 
@@ -264,15 +230,14 @@ inside the container.
 | `hpo_release` | The HPO release that `hpo_terms` and `hpo_ancestors` were loaded from. It has one row. |
 | `schema_version` | The version of the tables. It has one row. |
 
-[Database tables](database-tables.md) lists every column, with its type and
-what it holds.
-[`tables.py`](../../src/gentrex/load/tables.py) defines the tables.
+[Database tables](database-tables.md) lists every column with its type and
+contents. The tables are defined in
+[`tables.py`](../../src/gentrex/load/tables.py).
 
-Most columns have the name of a field of the record from `gentrex normalize`.
-Where `gentrex normalize` found a standard value for a field, the column of
-the field's name holds the standard value, and the column with `_raw` added
-holds the report's wording.
-For a report with the date of birth `29-JUN-1984`:
+Most columns are named after a field of the record. Where
+`gentrex normalize` found a standard value for a field, the column of that
+name has the standard value, and the column with `_raw` added has the
+report's wording. For a report with the date of birth `29-JUN-1984`:
 
 | Column | Holds | Example |
 | --- | --- | --- |
@@ -280,30 +245,32 @@ For a report with the date of birth `29-JUN-1984`:
 | `date_of_birth_raw` | The printed date from `data.date_of_birth`, as text. | 29-JUN-1984 |
 
 The same goes for `collection_date`, `received_date`, `test_started_date`,
-`report_date`, `specimen_type` and the `gene_symbol` of each variant. The
-other `_raw` columns, such as `classification_raw`, keep their names from
+`report_date`, `specimen_type` and the `gene_symbol` of each variant. Other
+`_raw` columns, such as `classification_raw`, keep their names from
 `gentrex extract`, because the field without `_raw` is already the category.
 
-A feature that the patient doesn't have has a row too, with `present` false.
-When you count the patients with a feature, add `p.present` to the `WHERE`
-clause, as the queries on this page do. Otherwise "no hearing impairment"
-counts as hearing impairment.
+A feature that the patient doesn't have gets a row too, with `present` false.
+To count the patients with a feature, add `p.present` to the `WHERE` clause,
+as the queries on this page do. Otherwise "no hearing impairment" counts as
+hearing impairment.
 
-To read a value inside a JSON column, such as a field of `record` that has
-no column of its own, each database has a syntax of its own. These queries
-print the laboratory's name from the record:
+Each database has its own syntax for reading a value inside a JSON column.
+You need it for a field that you add to schema.yaml, because only the fields
+that Gentrex knows get a column of their own. These queries read `lab_name`
+from `record`, to show the syntax:
 
 | Database | Query |
 | --- | --- |
 | PostgreSQL | `SELECT file, record->'data'->>'lab_name' FROM reports;` |
 | MySQL and SQLite | `SELECT file, record->>'$.data.lab_name' FROM reports;` |
 
-SQLite reads `->>` from version 3.38 on, which `sqlite3 --version` shows.
+SQLite reads `->>` from version 3.38 on. `sqlite3 --version` shows yours.
 
 ### Query the tables
 
-The queries on this page give the same result on all three databases. To
-count the reports per result category:
+The queries on this page run unchanged on all three databases.
+[Supported databases](#supported-databases) lists where their results can
+differ. To count the reports per result category:
 
 ```sql
 SELECT overall_result, count(*) AS reports
@@ -337,11 +304,11 @@ GROUP BY v.gene_symbol
 ORDER BY patients DESC, v.gene_symbol;
 ```
 
-`count(DISTINCT r.patient_key)` counts each patient once, even a patient with
+`count(DISTINCT r.patient_key)` counts each patient once, even one with
 several reports or several variants in the gene.
 
-To list the clinical features whose match the two models disagree on, each
-with its candidates:
+To list the clinical features whose match the two models disagree on, with
+their candidates:
 
 ```sql
 SELECT p.file, p.text, c.rank, c.hpo_id, c.hpo_label
@@ -351,7 +318,7 @@ WHERE NOT p.models_agree
 ORDER BY p.file, p.phenotype_number, c.rank;
 ```
 
-Check these matches first, because they are more often wrong
+These matches are wrong more often, so check them first
 ([Normalize report data](normalize.md#check-the-result)).
 
 To read a table in Python with pandas:
@@ -367,12 +334,10 @@ engine = run.make_engine(os.environ["GENTREX_DATABASE_URL"])
 variants = pd.read_sql("SELECT * FROM variants", engine)
 ```
 
-`run.make_engine` opens the database that `GENTREX_DATABASE_URL` names, in
-the same way as `gentrex load`, so the same address works for all three
-databases.
-In Gentrex's environment, `uv run --env-file .env --with pandas python`
-starts Python with pandas and with the address set. With a server, add its
-extra, as in step 3.
+`run.make_engine` opens the database in `GENTREX_DATABASE_URL` the same way
+`gentrex load` does, so one address works for all three databases.
+`uv run --env-file .env --with pandas python` starts Python with pandas and
+the address set. With a server, add its extra as in step 3.
 
 ## How it works
 
@@ -382,19 +347,17 @@ Each line of `normalized.jsonl` becomes one row in `reports`. Each item of
 `data.variants` becomes a row in `variants`, and each item of
 `data.patient_phenotypes` a row in `patient_phenotypes`, with its candidates
 in `phenotype_candidates`. A report without data, from a failed request in
-`gentrex extract`, gets no rows, so that it can't count as a patient. Gentrex
-lists it among the failed files.
+`gentrex extract`, gets no rows, so it can't count as a patient. It is listed
+among the failed files instead.
 
 ### Link reports to patients
 
-Research questions are about patients, but the database is filled from
-reports. One patient can have several reports, for example a panel and later
-an exome. If you count reports, that patient counts twice. So Gentrex gives
-each report a `patient_key`, and reports with the same key count as the same
-patient.
+One patient can have several reports, for example a panel and later an exome.
+If you count reports, that patient counts twice. So each report gets a
+`patient_key`, and reports with the same key count as one patient.
 
-The reports have no patient ID in common, only what each laboratory printed.
-So the key comes from the first of these that the report has:
+The reports share no patient ID, only what each laboratory printed. The key
+comes from the first of these that the report has:
 
 1. Its MRN, as in `mrn:SYN-MRN-0001`.
 2. Its submitter patient ID, as in `submitter:SYN-SUB-0002`.
@@ -410,7 +373,7 @@ Four reports get these keys:
 | report-03.pdf | | SYN-SUB-0002 | `submitter:SYN-SUB-0002` |
 | report-04.pdf | | | `file:report-04.pdf` |
 
-Reports 01 and 02 count as one patient, because they share the MRN. Report 03
+Reports 01 and 02 share the MRN, so they count as one patient. Report 03
 counts as a second patient, although report 02 shows that SYN-SUB-0002 is the
 same person. Gentrex doesn't follow such links. This query lists the
 submitter IDs that appear with more than one key, and the keys:
@@ -427,10 +390,10 @@ WHERE submitter_patient_id IN (
 ORDER BY submitter_patient_id, patient_key;
 ```
 
-There is no table of patients. Each report keeps the date of birth and the
-sex it printed, so a disagreement between the reports of one patient stays
-visible. Suppose `gentrex extract` misread the date of birth on the second of
-two reports. Both dates remain:
+There is no table of patients. Each report keeps the date of birth and sex
+that it printed, so you can see when the reports of one patient disagree.
+Suppose `gentrex extract` misread the date of birth on the second of two
+reports. Both dates remain:
 
 | file | patient_key | date_of_birth | sex |
 | --- | --- | --- | --- |
@@ -462,16 +425,13 @@ that fits. Suppose three reports say this:
 | report-02.pdf | mild intellectual disability | HP:0001256 Mild intellectual disability |
 | report-03.pdf | severe intellectual disability | HP:0010864 Severe intellectual disability |
 
-All three patients have intellectual disability. A query for
-`hpo_id = 'HP:0001249'` counts only one of them, because to the database the
-three IDs are unrelated. You would have to know every kind of intellectual
-disability and list all their IDs in the query. For intellectual disability,
-there are 6 IDs. For seizures, there are 347, Seizure itself and 346 kinds of
-seizure.
+All three patients have intellectual disability, but a query for
+`hpo_id = 'HP:0001249'` counts only one of them. To the database, the three
+IDs are unrelated. You would have to list every kind of intellectual
+disability in the query, which is 6 IDs. For seizures, it is 347, Seizure
+itself and 346 kinds of seizure.
 
-HPO records which term is a kind of which, such as "Mild intellectual
-disability is a kind of Intellectual disability". A term can have several
-parents:
+HPO says which term is a kind of which. A term can have several parents:
 
 ```
 HP:0002384 Focal impaired awareness seizure
@@ -512,53 +472,46 @@ WHERE a.ancestor_id = 'HP:0001249' AND p.present;
 ```
 
 For the three reports above, it counts 3 patients. The query at the top of
-this page works the same way. For 12 synthetic reports, it finds 3 patients
+the page works the same way. For 12 synthetic reports, it finds 3 patients
 with Neurodevelopmental delay (HP:0012758), while a query for that exact ID
 finds none. Their features were matched to Global developmental delay,
 Delayed speech and language development and Delayed ability to walk, which
 all lie under Neurodevelopmental delay.
 
-The hierarchy gives you three things:
+The hierarchy also helps when a match is too specific. `gentrex normalize`
+matched "seizures since infancy" to Neonatal seizure, and the feature still
+counts as a seizure. You can count per body system, too. With HP:0000707,
+Abnormality of the nervous system, the query counts the patients with any of
+the 2,831 terms under it.
 
-- **Counts at the level of the research question.** You can count
-  intellectual disability, seizures or developmental delay without lists of
-  IDs.
-- **Counts that don't depend on how specific a match is.** `gentrex normalize`
-  matched "seizures since infancy" to Neonatal seizure, which is too specific.
-  The feature still counts as a seizure.
-- **Counts per body system.** With HP:0000707, Abnormality of the nervous
-  system, the query counts the patients with any of the 2,831 terms under it.
-
-Gentrex reads the hierarchy from the HPO release that `load.hpo_release` in
-settings.yaml names. It keeps the same terms as the HPO index of
+The hierarchy comes from the HPO release that `load.hpo_release` in
+settings.yaml points to. Gentrex keeps the same terms as the HPO index of
 `gentrex normalize` and follows their `is_a` links. For the release of
 1 September 2026, that is 19,894 terms and 223,079 rows in `hpo_ancestors`.
 
 ### Load a run again
 
-Gentrex replaces the rows of each report that it loads, and keeps the reports
-of other files. So you can load the runs of several batches of PDFs into one
-database. You can also load a report again after running `gentrex transcribe`,
-`gentrex select`, `gentrex extract` and `gentrex normalize` for it once more.
-A report replaces any earlier report with the same file name, so keep file
-names unique across batches.
+Loading a report replaces its rows and leaves the other reports alone. So
+you can load several batches of PDFs into one database, or load a report
+again after running `gentrex transcribe`, `gentrex select`, `gentrex extract`
+and `gentrex normalize` for it once more. A report replaces any earlier
+report with the same file name, so keep file names unique across batches.
 
-Each report is loaded in one transaction, a group of
-changes that the database makes all together or not at all. If loading a
-report fails, its rows from an earlier run stay as they were, and the other
-reports are still loaded.
+Each report is loaded in one transaction, a group of changes that the
+database makes all together or not at all. If a report fails to load, its
+rows from an earlier run stay as they were, and the other reports still
+load.
 
-The HPO tables are loaded once per release. Gentrex keeps the checksum of the
-release file in `hpo_release`. A run with the same release keeps the terms,
-which saves the few seconds that the 223,079 rows take. A run with another
-release replaces them, in one transaction.
+The HPO tables are loaded once per release. `hpo_release` stores the
+checksum of the release file, and a run with the same release keeps the
+terms. A run with another release replaces them, in one transaction.
 
-Gentrex creates the tables at the start of a run if they don't exist yet. It
-never changes a table that exists. When a new version of Gentrex changes the
-tables, `gentrex load` stops on a database made by an older version, with
-`the database holds version 1 of the Gentrex tables, but this Gentrex writes
-version 2`. Then delete the database as below, do step 1 again and load each
-run of `gentrex normalize` again.
+Gentrex creates the tables at the start of a run if they don't exist yet,
+and it never changes a table that exists. So when a new version of Gentrex
+changes the tables, `gentrex load` stops on a database from an older version
+with `the database holds version 1 of the Gentrex tables, but this Gentrex
+writes version 2`. Then delete the database as below, do step 1 again and
+load each run of `gentrex normalize` again.
 
 To start again with an empty database, delete it and do step 1 again. This
 deletes every loaded report:
@@ -571,57 +524,51 @@ deletes every loaded report:
 
 ### Supported databases
 
-`gentrex load` supports SQLite, PostgreSQL 18 and MySQL 8.4. Supported means
-three things:
-
-- Gentrex's tests load reports into each of them on every change to the
-  code. SQLite needs no server, so the tests always run on it. PostgreSQL
-  and MySQL run as servers in Gentrex's continuous integration, and
-  [Development](../development/development.md) shows how to run the tests on them yourself.
-- The queries on this page were run on each of them.
-- The ways in which they behave differently are handled in the code, so that
-  a report loads the same way everywhere.
+`gentrex load` supports SQLite, PostgreSQL 18 and MySQL 8.4. Gentrex's tests
+load reports into each of them on every change to the code, with PostgreSQL
+and MySQL as servers in continuous integration. To run the tests on them
+yourself, see [Development](../development/development.md). The queries on
+this page were run on all three, and the code handles the ways in which they
+differ, so a report loads the same way everywhere.
 
 Gentrex talks to all three through SQLAlchemy, a Python package that writes
-the SQL of each database from one description of the tables, which is
-[`tables.py`](../../src/gentrex/load/tables.py). The description uses only
-types that all three have: text, dates, booleans, integers and JSON.
-SQLAlchemy quotes names, sends the rows in batches and begins and ends
-transactions as each database expects.
+each database's SQL from one description of the tables,
+[`tables.py`](../../src/gentrex/load/tables.py). It uses only types that all
+three have: text, dates, booleans, integers and JSON.
 
 Three differences needed handling of their own:
 
 - SQLite ignores the rule that deleting a report deletes its variants and
-  features, unless each connection switches the rule on. Gentrex does.
-  Without it, loading a report again would leave its old variants in place.
-- MySQL compares text without regard to case by default, so the files
-  `report-01.pdf` and `REPORT-01.pdf` would be one report. The key columns
-  `file`, `hpo_id` and `ancestor_id` compare exactly instead. The other text
-  columns keep MySQL's default, so on MySQL `WHERE classification =
-  'Pathogenic'` matches `pathogenic`, and on the others it doesn't.
+  features, unless each connection switches the rule on. Gentrex does,
+  because otherwise loading a report again would leave its old variants in
+  place.
+- MySQL compares text without regard to case by default, so `report-01.pdf`
+  and `REPORT-01.pdf` would be one report. The key columns `file`, `hpo_id`
+  and `ancestor_id` compare exactly instead. The other text columns keep
+  MySQL's default, so on MySQL `WHERE classification = 'Pathogenic'` matches
+  `pathogenic`, and on the others it doesn't.
 - Sorting puts null first on SQLite and MySQL, and last on PostgreSQL. In
   the query per gene above, a variant without a gene symbol comes first or
   last for that reason.
 
 Other databases that SQLAlchemy knows, such as MariaDB, are not supported,
 and Gentrex refuses their addresses. To add one, add its name and driver to
-`DRIVERS` in [`run.py`](../../src/gentrex/load/run.py), add the driver as an
-extra of that name in `pyproject.toml`, list a server for it in
-`GENTREX_TEST_DATABASE_URLS` in `.github/workflows/ci.yml`, and run the
-queries on this page against it.
+`DRIVERS` in [`run.py`](../../src/gentrex/load/run.py), and the driver as an
+extra of that name in `pyproject.toml`. In `.github/workflows/ci.yml`, add a
+server for it under `services`, its address to `GENTREX_TEST_DATABASE_URLS`
+and its extra to the `uv sync` line. Then run the queries on this page
+against it.
 
 ## Settings
 
-The setting of `gentrex load` is in
-[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml),
-under `load`:
+`gentrex load` has one setting, under `load` in
+[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml):
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `hpo_release` | `data/ontology/hp-base.json` | The HPO release that `hpo_terms` and `hpo_ancestors` come from. Use the release that built the HPO index of `gentrex normalize`, so that every matched term is in it. |
+| `hpo_release` | `data/ontology/hp-base.json` | The HPO release that `hpo_terms` and `hpo_ancestors` come from. Use the release that built the HPO index of `gentrex normalize`, so every matched term is in it. |
 
-The address of the database is `GENTREX_DATABASE_URL` in `.env`, as in
-step 2.
+The database's address is set in `GENTREX_DATABASE_URL` in `.env` (step 2).
 
 ## When something goes wrong
 
@@ -635,21 +582,21 @@ If something is missing, Gentrex stops before it loads anything:
 
 | Message | What to do |
 | --- | --- |
-| `results/normalize/latest/normalized.jsonl not found` | Run `gentrex normalize` first, or name a run of `gentrex normalize` with `--input`. |
-| `data/ontology/hp-base.json not found` | Download the HPO release as in step 2 of [Normalize report data](normalize.md#step-2-build-the-hpo-index). |
-| `GENTREX_DATABASE_URL: not a database URL` | Write the address in the form of step 2. |
-| `GENTREX_DATABASE_URL: mariadb is not a supported database` | Use SQLite, PostgreSQL or MySQL, as in step 1. |
-| `GENTREX_DATABASE_URL: No module named 'psycopg'; its driver comes with uv run --extra postgresql` | Run `gentrex load` with the extra that the message names, as in step 3. |
-| `can't connect to the database: ... Connection refused` | The server isn't running. Start it as in step 1, or with `docker start gentrex-postgres` or `docker start gentrex-mysql`. |
+| `results/normalize/latest/normalized.jsonl not found` | Run `gentrex normalize` first, or name one of its runs with `--input`. |
+| `data/ontology/hp-base.json not found` | Download the HPO release in step 2 of [Normalize report data](normalize.md#step-2-build-the-hpo-index). |
+| `GENTREX_DATABASE_URL: not a database URL` | Write the address in the form shown in step 2. |
+| `GENTREX_DATABASE_URL: mariadb is not a supported database` | Use SQLite, PostgreSQL or MySQL. |
+| `GENTREX_DATABASE_URL: No module named 'psycopg'; its driver comes with uv run --extra postgresql` | Run `gentrex load` with the extra that the message names. |
+| `can't connect to the database: ... Connection refused` | The server isn't running. Start it with `docker start gentrex-postgres` or `docker start gentrex-mysql`, or create it in step 1. |
 | `can't connect to the database: ... password authentication failed` or `... Access denied for user` | The password in `GENTREX_DATABASE_URL` differs from the one in step 1. Correct it in `.env`. |
 | `can't connect to the database: unable to open database file` | Gentrex can't write the SQLite file. Check the path after `sqlite:///` in `.env`, and that you may write there. |
-| `the database holds version 1 of the Gentrex tables, but this Gentrex writes version 2` | The database was made by an older version of Gentrex. Delete it and load the runs of `gentrex normalize` again, as [Load a run again](#load-a-run-again) shows. |
+| `the database holds version 1 of the Gentrex tables, but this Gentrex writes version 2` | The database was made by an older version of Gentrex. Delete it and load the runs of `gentrex normalize` again ([Load a run again](#load-a-run-again)). |
 
-While it loads, Gentrex prints a line for each report that it doesn't load:
+While loading, Gentrex prints a line for each report it doesn't load:
 
 - `skipped report-13.pdf, which has no data: APITimeoutError: Request timed out.`
   means that `gentrex extract` got no data for the report. Run
-  `gentrex extract` again for it, and then `gentrex normalize` and
+  `gentrex extract` again for it, then `gentrex normalize` and
   `gentrex load`.
 - `failed report-07.pdf:` followed by a reason means that loading the report
   failed. Its rows from an earlier run stay.
@@ -659,14 +606,15 @@ loaded, but it is listed among the failed files at the end, as in the output
 of those two commands.
 
 The warning `matched HPO terms missing from the HPO release` means that
-`hp-base.json` is another release than the one that built the HPO index.
-Queries through `hpo_ancestors` miss the features matched to the terms it
-lists. Download the release that built the index, and run `gentrex load` again.
+`hp-base.json` is a different release from the one that built the HPO index.
+Queries through `hpo_ancestors` then miss the features matched to the terms
+it lists. Download the release that built the index, and run `gentrex load`
+again.
 
 If `docker run` in step 1 fails with `Bind for 127.0.0.1:5432 failed: port is
-already allocated`, or the same for port 3306, another program uses the port,
-often a database server installed on the machine. Docker still created the
-container, so remove it with `docker rm gentrex-postgres` or
+already allocated`, or the same for port 3306, another program uses the port.
+Often it's a database server installed on the machine. Docker still created
+the container, so remove it with `docker rm gentrex-postgres` or
 `docker rm gentrex-mysql`. Then run step 1 with `-p 127.0.0.1:5433:5432`, or
 `-p 127.0.0.1:3307:3306` for MySQL, and use that port in
 `GENTREX_DATABASE_URL`.

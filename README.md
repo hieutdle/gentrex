@@ -1,57 +1,40 @@
 # Gentrex
 
-Gentrex (Genetic Test Report eXtraction) turns clinical genetic test reports
-into data you can analyze. It reads a folder of PDF reports and writes one JSON
-record per report. The record holds the patient's identifiers, the specimen,
-the test, the overall result, the patient's clinical features and every
-variant reported, with its gene, HGVS changes, classification and zygosity.
-Gentrex can then load the records into a database, so that you can count
-and compare reports with SQL. It can also export them as Phenopackets, the GA4GH
-format for sharing a patient's clinical features and genetic findings, and
-into an OMOP CDM database, where OHDSI's tools can study them together with
-EHR data. As FHIR Bundles, HL7's format for genetic test results, the reports
-can go into an EHR or a FHIR server.
+Gentrex (Genetic Test Report eXtraction) reads clinical genetic test reports
+in PDF form and writes one structured record per report. A record holds the
+patient's identifiers, the specimen, the test, the overall result, the
+clinical features and every reported variant with its gene, HGVS changes,
+classification and zygosity.
 
-Gentrex is a command-line program. `gentrex transcribe`, `gentrex select` and
-`gentrex extract` use models that run in a separate model server,
-[vLLM](https://docs.vllm.ai), on GPUs that you control. Gentrex sends each
-page or report to that server and writes what comes back. `gentrex normalize`
-needs no server, because its models run inside Gentrex on the CPU.
-`gentrex load` writes the records into one of three databases. A SQLite file
-needs no server, and PostgreSQL and MySQL run as servers in Docker on your
-workstation. `gentrex export phenopackets` and `gentrex export fhir` write
-files and need no server either.
+You can query the records with SQL after `gentrex load`, or export them as
+GA4GH Phenopackets, into an OMOP CDM or as HL7 FHIR Bundles. The language
+models run in [vLLM](https://docs.vllm.ai) on GPUs that you control.
 
 ## How it works
 
-Gentrex turns the reports into records with four commands. You run them in
-order, because each one reads the output of the one before it.
+Four commands turn the PDFs into records. Run them in this order:
 
-| Command | What it does | Writes to | Model and GPU |
-| --- | --- | --- | --- |
-| [`gentrex transcribe`](docs/user-guide/transcribe.md) | Reads the text of every page. Scanned pages go to an OCR model, which reads the text off the image. | `results/transcribe/` | LightOnOCR-3-4B on one GPU, only for scanned pages |
-| [`gentrex select`](docs/user-guide/select.md) | Asks a language model yes/no questions about every page, and keeps the pages with the result or the patient's symptoms. | `results/select/` | Gemma 4 26B-A4B on one GPU with 80 GB |
-| [`gentrex extract`](docs/user-guide/extract.md) | Sends the kept pages of each report to a language model, which returns one record per report. | `results/extract/` | Gemma 4 31B on two GPUs with 80 GB, or one B200 |
-| [`gentrex normalize`](docs/user-guide/normalize.md) | Adds standard values to each record: ISO dates, categories for the specimen and the result, HGNC IDs for the genes, MONDO IDs for the diseases and HPO terms for the clinical features. | `results/normalize/` | SapBERT and EmbeddingGemma 2 on the CPU, no GPU |
+| Command | What it does | Model and GPU |
+| --- | --- | --- |
+| [`gentrex transcribe`](docs/user-guide/transcribe.md) | Reads the text of every page. Scanned pages go through OCR. | LightOnOCR-3-4B on one GPU, for scanned pages only |
+| [`gentrex select`](docs/user-guide/select.md) | Keeps the pages with the result or the patient's clinical features. Most other pages only describe the test. | Gemma 4 26B-A4B on one GPU with 80 GB |
+| [`gentrex extract`](docs/user-guide/extract.md) | Turns the kept pages of each report into one record. | Gemma 4 31B on two GPUs with 80 GB, or one B200 |
+| [`gentrex normalize`](docs/user-guide/normalize.md) | Adds ISO dates, categories for the specimen and the result, HGNC IDs, MONDO IDs and HPO terms. | SapBERT and EmbeddingGemma 2 on the CPU |
 
-Many pages of a report only describe the test. `gentrex select` drops them,
-so `gentrex extract` has less to read.
+The other commands all read the output of `gentrex normalize`, so you run
+only the ones you need:
 
-Then you can load the records into a database, export them as Phenopackets
-or FHIR Bundles and export them into an OMOP database, in any combination.
-Each of these commands reads the output of `gentrex normalize`, so you run
-only what you need, in any order.
+| Command | What you get |
+| --- | --- |
+| [`gentrex load`](docs/user-guide/load.md) | Tables in SQLite, PostgreSQL or MySQL, with the HPO hierarchy |
+| [`gentrex export phenopackets`](docs/user-guide/export-phenopackets.md) | One Phenopacket per patient, for rare-disease tools and other centers |
+| [`gentrex export omop`](docs/user-guide/export-omop.md) | Rows in the standard tables of an OMOP CDM in PostgreSQL, for OHDSI tools like ATLAS |
+| [`gentrex export omop-extended`](docs/user-guide/export-omop-extended.md) | The same rows, plus extension tables for what the CDM can't hold |
+| [`gentrex export fhir`](docs/user-guide/export-fhir.md) | One FHIR Bundle per report, in HL7's Genomics Reporting format, for an EHR or a FHIR server |
 
-| Command | What it does | Writes to | Model and GPU |
-| --- | --- | --- | --- |
-| [`gentrex load`](docs/user-guide/load.md) | Writes the records into tables of a SQLite, PostgreSQL or MySQL database, with the HPO terms and their hierarchy, so that you can query them with SQL. | The database, and `results/load/` | No model and no GPU |
-| [`gentrex export phenopackets`](docs/user-guide/export-phenopackets.md) | Writes one Phenopacket per patient, the GA4GH format that rare-disease tools read and other centers can import. | `results/export/phenopackets/` | No model and no GPU |
-| [`gentrex export omop`](docs/user-guide/export-omop.md) | Writes the records into the standard tables of an OMOP CDM database in PostgreSQL, so that OHDSI's tools, such as ATLAS, can select patients by gene, ACMG class and zygosity. | The CDM database, and `results/export/omop/` | No model and no GPU |
-| [`gentrex export omop-extended`](docs/user-guide/export-omop-extended.md) | Writes the same rows, and adds extension tables, outside the CDM's schema, with what the CDM can't hold, such as parental origin and full-length HGVS changes. | The CDM database, and `results/export/omop-extended/` | No model and no GPU |
-| [`gentrex export fhir`](docs/user-guide/export-fhir.md) | Writes one FHIR Bundle per report, following HL7's Genomics Reporting Implementation Guide, so that an EHR or a FHIR server can take in the results. | `results/export/fhir/` | No model and no GPU |
+None of these needs a GPU.
 
-Each record is one line of `extractions.jsonl`. Shortened and spread over
-several lines, a record looks like this:
+A record from `gentrex extract` looks like this, shortened:
 
 ```json
 {
@@ -83,174 +66,141 @@ several lines, a record looks like this:
 }
 ```
 
-All the fields, with what each one holds, are in
-[`schema.yaml`](src/gentrex/defaults/schema.yaml).
-[Extract report data](docs/user-guide/extract.md#check-the-result) explains how to read
-the records. [`gentrex normalize`](docs/user-guide/normalize.md#check-the-result) adds
-the standard values next to them, in a field named `normalized`.
-[`gentrex load`](docs/user-guide/load.md#check-the-result) stores both in tables of a
-database, and
-[`gentrex export phenopackets`](docs/user-guide/export-phenopackets.md#check-the-result)
-writes them as Phenopackets.
-[`gentrex export omop`](docs/user-guide/export-omop.md#check-the-result) writes them into
-an OMOP CDM database, and
-[`gentrex export fhir`](docs/user-guide/export-fhir.md#check-the-result) writes them as
-FHIR Bundles.
+Every field is described in
+[`schema.yaml`](src/gentrex/defaults/schema.yaml). `gentrex normalize` keeps
+the record as it is and adds its standard values in a field named
+`normalized`.
 
 ## What you need
 
-- [uv](https://docs.astral.sh/uv/), which installs Python and the packages
-  Gentrex needs.
-- NVIDIA GPUs with [vLLM](https://docs.vllm.ai) 0.25 or newer, which the
-  model of `gentrex select` needs, or an account on Mount Sinai's Minerva
-  cluster.
-- A [Hugging Face](https://huggingface.co) account, if a Gemma download asks
-  you to log in.
-- About 120 GB of disk for the models: 9 GB for `gentrex transcribe`, 50 GB
-  for `gentrex select` and 62 GB for `gentrex extract`.
-- About 3 GB of disk for `gentrex normalize`: 400 MB for the HGNC complete
-  set, the HPO and MONDO releases and the HPO index, and 2.8 GB for
-  sentence-transformers, PyTorch and the two embedding models, which Gentrex
-  uses to find HPO terms.
-- A database, if you load the records into one. SQLite needs nothing more,
-  because it comes with Python. PostgreSQL 18 and MySQL 8.4 are the servers
-  that `gentrex load` is tested with, and it refuses the address of any other
-  database. [Supported databases](docs/user-guide/load.md#supported-databases) says what
-  the tests check and how to add a database.
-- An OMOP CDM database in PostgreSQL with OHDSI's vocabularies, if you export
-  the records into OMOP. [Get a CDM database](docs/user-guide/export-omop.md#step-1-get-a-cdm-database)
-  says how to get one.
-- [Docker](https://docs.docker.com/get-started/get-docker/), if you load the
-  records into PostgreSQL or MySQL, or create a CDM database of your own. It
-  runs the server in a container, which takes 1 to 2 GB of disk with the
-  database. SQLite needs neither.
-- Storage approved for patient data, for the reports and everything Gentrex
-  writes from them.
+- [uv](https://docs.astral.sh/uv/), which installs Python and the
+  dependencies.
+- NVIDIA GPUs with [vLLM](https://docs.vllm.ai) 0.25 or newer, or an account
+  on Mount Sinai's Minerva cluster.
+- A [Hugging Face](https://huggingface.co) account. Google asks you to accept
+  its terms before you can download a Gemma model.
+- About 120 GB of disk for the models, and 3 GB more for
+  `gentrex normalize`.
+- A database for `gentrex load`. SQLite comes with Python. Gentrex is tested
+  with PostgreSQL 18 and MySQL 8.4 and refuses
+  [other databases](docs/user-guide/load.md#supported-databases).
+- An OMOP CDM in PostgreSQL with OHDSI's vocabularies, for the OMOP exports.
+  [Get a CDM database](docs/user-guide/export-omop.md#step-1-get-a-cdm-database)
+  shows how to set one up.
+- [Docker](https://docs.docker.com/get-started/get-docker/), if you run
+  PostgreSQL, MySQL or a CDM of your own on your workstation.
+- Storage approved for patient data.
 
 ## Get started
 
-On your own machine, follow these pages in order. On each page, you start
-the command's model server, run the command and check the result. You stop
-the server before the next command starts its own.
+Work through these pages in order. Each one starts the model server that the
+command needs, runs the command and checks its output. Stop each server
+before you start the next one.
 
 1. [Transcribe PDF pages](docs/user-guide/transcribe.md)
 2. [Select the pages to keep](docs/user-guide/select.md)
 3. [Extract report data](docs/user-guide/extract.md)
 4. [Normalize report data](docs/user-guide/normalize.md)
 
-Then use the records in one or more of these ways:
+Then load or export the records:
 
 - [Load report data into a database](docs/user-guide/load.md)
 - [Export report data as Phenopackets](docs/user-guide/export-phenopackets.md)
-- [Export report data into an OMOP database](docs/user-guide/export-omop.md), or
-  [with extension tables](docs/user-guide/export-omop-extended.md)
+- [Export report data into an OMOP database](docs/user-guide/export-omop.md),
+  with or without [extension tables](docs/user-guide/export-omop-extended.md)
 - [Export report data as FHIR Bundles](docs/user-guide/export-fhir.md)
 
-`gentrex normalize`, `gentrex load` and the exports need no model server.
-
-On Mount Sinai's Minerva cluster, `gentrex transcribe`, `gentrex select` and
-`gentrex extract` run as batch jobs, and the other commands run in an
-interactive session. Follow [Running on Minerva](docs/minerva/minerva.md).
+On Mount Sinai's Minerva cluster, the three GPU commands run as batch jobs and
+the rest in an interactive session. [Running on Minerva](docs/minerva/minerva.md)
+walks you through it.
 
 ## Runs and results
 
-Every run writes a new folder, named after the time it started, such as
-`results/transcribe/20261014-123000/`. A second run that starts in the same
-second gets `-2` added to the name. Earlier runs stay, so you can compare
-them. Besides the command's output, each run folder holds two files:
+Every run gets a new folder named after its start time, for example
+`results/transcribe/20261014-123000/`. A second run in the same second gets
+`-2` added to the name. Old runs stay, so you can compare them.
 
-- `run.yaml` records the command, the version of Gentrex, the input the run
-  read and the settings it used. The input is the actual run folder, so you
-  can always tell which run a result came from. When Gentrex runs from a git
-  clone, `run.yaml` also records the commit, and `modified: true` if the code
-  in `src/gentrex/` has changes that aren't committed. Changes to
-  settings.yaml and schema.yaml don't count, because `run.yaml` records the
-  settings themselves. `uv run gentrex --version` prints the version.
-- `log.txt` holds everything Gentrex printed during the run.
+Next to its output, each run folder has two files. `run.yaml` records the
+command, the Gentrex version and git commit, the run it read and the
+settings, so you can always trace a result back to what made it. It says
+`modified: true` when the code in `src/gentrex/` had changes that weren't
+committed. `log.txt` holds everything the run printed.
+`uv run gentrex --version` prints the version.
 
-`latest` in each command's folder, such as `results/transcribe/latest`, is a
-link to the newest run that finished. The next command reads it unless you name
-another run with `--input`. A run that finished with some failed files still
-counts, so `latest` moves to it. A run that stopped with an error keeps its
-folder, but `latest` stays where it was.
+`latest` in each command's folder, as in `results/transcribe/latest`, points
+to the newest finished run. The next command reads it unless you name another
+run with `--input`. A run that finished with some failed files still becomes
+`latest`. A run that crashed doesn't.
 
-When the model server can't be reached, is busy, returns a server error or
-takes longer than the command's `timeout_seconds`, Gentrex tries the request
-again after 5, 20 and 60 seconds. If the fourth try fails too, Gentrex records
-the error for that page or report and goes on with the others.
+When a request to the model server fails or times out, Gentrex tries it again
+after 5, 20 and 60 seconds. After the fourth failure it records the error for
+that page or report and moves on to the next. A wrong API key or model name
+stops the run straight away, since every request would fail. A traceback that
+ends in `openai.AuthenticationError` means the API key in `.env` is wrong.
+`openai.NotFoundError` means the server runs a different model than
+settings.yaml names, or the address in `.env` doesn't end in `/v1`.
 
-A wrong API key or a model name the server doesn't know stops the run at once,
-because every request would fail the same way. Gentrex then prints a Python
-traceback. If it ends in `openai.AuthenticationError`, fix the API key in
-`.env`. If it ends in `openai.NotFoundError`, the server runs a different
-model than settings.yaml names, or the address in `.env` doesn't end in
-`/v1`.
-
-Gentrex ends with an exit code, which `echo $?` shows right after a run. 0
-means every file went through. 1 means that some files failed, the input was
-missing or the run stopped with an error. The end of the output says which. 2
-means that a value the command needs from `.env` is not set, such as the
-model server's address, the database's address for `gentrex load` and
-`gentrex export omop`, or the pseudonym key for
-`gentrex export phenopackets --pseudonymize`. 2 also means a mistake on the
-command line, such as a command or option that doesn't exist, and the message
-says which. Each command's page says what to do for each code.
+The exit code, which `echo $?` prints right after a run, tells you how it
+went. 0 means every file went through. 1 means some files failed, the input
+was missing or the run crashed, and the last lines of the output say which. 2
+means a value the command needs from `.env` isn't set, or the command line
+has a mistake. Each command's page lists what to do.
 
 ### Redo failed files
 
-`gentrex transcribe`, `gentrex select` and `gentrex extract` send each page
-or report to a model on a GPU. If some fail, or a job stops at its time limit,
-run the command again with `--retry` and the folder of the earlier run:
+If some pages or reports fail in `gentrex transcribe`, `gentrex select` or
+`gentrex extract`, or a job hits its time limit, run the command again with
+`--retry` and the earlier run's folder:
 
 ```bash
 uv run --env-file .env gentrex extract --retry results/extract/latest
 ```
 
-The new run reuses every record of the earlier run that has no error, and
-sends only the others to the model. It writes all the records to a new run
-folder, so the next command reads one complete run, and `run.yaml` names the
-earlier run under `retry`. The log says how many records were reused, as in
-`reusing 497 of 500 reports from results/extract/latest`.
+Every record that came through without an error is reused, and only the rest
+go to the model. The log tells you how many, as in
+`reusing 497 of 500 reports from results/extract/latest`. The new run still
+writes a complete set of records, and its `run.yaml` names the earlier run
+under `retry`.
 
-A record is reused only if its input is the same as when the earlier run read
-it. So when `gentrex transcribe --retry` reads a page that failed before,
-`gentrex select --retry` and `gentrex extract --retry` send only that page's
-report to the model again. For `gentrex transcribe`, a PDF counts as the same
-if it has the same pages, each scanned or native as before, with the same
-text on its native pages.
+A record is reused only if its input hasn't changed. This lets retries build
+on each other. Once `gentrex transcribe --retry` has read a page that failed,
+`gentrex select --retry` and `gentrex extract --retry` send just that report
+to the model again. For a PDF, unchanged means the same pages, each scanned
+or native as before, with the same text on the native ones.
 
-The settings in settings.yaml must be the same as in the earlier run, except
-`timeout_seconds`, `concurrency` and `max_tokens`. These only limit how long
-Gentrex waits for an answer, how many requests it sends at once and how long
-an answer may be, so raising them is how most failures are fixed. After any
-other change, such as another model, run the command without `--retry`.
+The settings have to match the earlier run, except for `timeout_seconds`,
+`concurrency` and `max_tokens`. Raising those is how most failures get fixed.
+After any other change, such as a different model, run without `--retry`.
 
-`latest` doesn't move to a run that stopped halfway, such as a job that
-reached its time limit. To continue such a run, name its folder, as in
+A run that crashed, like a job that hit its time limit, never becomes
+`latest`. Name its folder instead, as in
 `--retry results/extract/20261019-030000`.
+
+Gentrex refuses the earlier run, with exit code 1, if the folder isn't a run
+of the same command, if that run used other settings, or if the input it read
+no longer exists. The message says which. In the last two cases, run the
+command without `--retry`.
 
 ## Patient data
 
-Reports, and everything Gentrex writes from them, may contain patient data.
+The reports, and everything Gentrex writes from them, can contain patient
+data.
 
-- Keep the Gentrex folder on storage approved for patient data, because the
-  reports go into its `data/` folder and the results into `results/`. Git
-  ignores both folders, and reports and results must never be committed.
-- Gentrex sends page images and page text to the model servers set in `.env`.
-  Run those servers on machines approved for patient data.
-- `gentrex load` and `gentrex export omop` write the records into the
-  databases set in `.env`. Keep a SQLite file, or run a database server, only
-  on a machine approved for patient data.
+- Keep the Gentrex folder on storage approved for patient data. The reports
+  go into `data/` and the results into `results/`. Git ignores both, and
+  neither may ever be committed.
+- Gentrex sends page images and text to the model servers in `.env`. Run
+  them only on machines approved for patient data.
+- The same goes for the databases that `gentrex load` and
+  `gentrex export omop` write into, including a SQLite file.
 - Phenopackets hold the MRN and the date of birth, unless you export them
-  with `--pseudonymize`, as
-  [Share Phenopackets](docs/user-guide/export-phenopackets.md#share-phenopackets) shows.
+  with `--pseudonymize` as
+  [Share Phenopackets](docs/user-guide/export-phenopackets.md#share-phenopackets)
+  explains.
 
 ## Documentation
 
-Most pages are in `docs/`, in one folder for each use.
-
-The user guide, in `docs/user-guide/`, explains how Gentrex works and how to
-run each command:
+The user guide in `docs/user-guide/` has a page for each command:
 
 - [Transcribe PDF pages](docs/user-guide/transcribe.md)
 - [Select the pages to keep](docs/user-guide/select.md)
@@ -263,16 +213,15 @@ run each command:
   - [With extension tables](docs/user-guide/export-omop-extended.md)
 - [Export report data as FHIR Bundles](docs/user-guide/export-fhir.md)
 
-Running Gentrex on Minerva, in `docs/minerva/`:
+Running Gentrex on Minerva:
 
 - [Running on Minerva (Mount Sinai)](docs/minerva/minerva.md)
 
-Working on Gentrex itself, in `docs/development/`:
+Working on Gentrex itself:
 
 - [Development](docs/development/development.md)
 - [Contributing](docs/development/contributing.md)
 - [Release a new version](docs/development/release.md)
-- [Evaluate HPO matching](evaluation/README.md), next to its script in
-  `evaluation/`
+- [Evaluate HPO matching](evaluation/README.md)
 
 The [changelog](docs/CHANGELOG.md) lists what changed in each version.

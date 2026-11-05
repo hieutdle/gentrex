@@ -1,27 +1,24 @@
 # Transcribe PDF pages
 
 `gentrex transcribe` reads a folder of PDF reports and writes the text of every
-page to one file, `pages.jsonl`. `gentrex select` reads that file instead of
-the PDFs. It writes a copy with only the pages it keeps, and `gentrex extract`
-reads that copy.
+page to one file, `pages.jsonl`. `gentrex select` then reads this file instead
+of the PDFs.
 
-Gentrex handles each page on its own, because one report can mix two kinds of
-page:
+Each page is read in one of two ways, and one report can mix both:
 
-- A **native** page has its text stored in the PDF. Gentrex reads that
-  text directly, which is fast and exact.
-- A **scanned** page is only a picture, such as a scan or a fax. Gentrex sends
-  the picture to an OCR (optical character recognition) model, which reads the
-  text off the image. The model runs in a model server, a
-  program that loads it onto a GPU and answers Gentrex's requests.
+- A **native** page has its text stored in the PDF. Gentrex reads that text
+  directly, which is fast and exact.
+- A **scanned** page is only a picture, like a scan or a fax. Gentrex sends it
+  to an OCR (optical character recognition) model, which reads the text off
+  the image. The model runs in a model server, a program that loads it onto a
+  GPU and answers Gentrex's requests.
 
-A page counts as scanned when the PDF holds fewer than 20 characters of text
-for it, not counting spaces and line breaks.
+A page counts as scanned when the PDF has fewer than 20 characters of text for
+it, not counting spaces and line breaks.
 
-If none of your reports has a scanned page, you need no GPU and no model server
-for this command. To find out, do steps 1 and 2, then run `gentrex transcribe`
-with `--no-ocr` as in [step 5](#step-5-run). The last line of its output counts
-the scanned pages.
+If none of your reports has a scanned page, you don't need a GPU or a model
+server. To find out, do steps 1 and 2 and run the command with `--no-ocr`
+([step 5](#step-5-run)). The last line of the output counts the scanned pages.
 
 ## Before you start
 
@@ -31,8 +28,8 @@ You need:
   Gentrex needs.
 - Your PDF reports in one folder.
 - For scanned pages, an NVIDIA GPU and [vLLM](https://docs.vllm.ai). The OCR
-  model's weights, the numbers it learned in training,
-  take about 9 GB of GPU memory.
+  model's weights, the numbers it learned in training, take about 9 GB of GPU
+  memory.
 
 On Mount Sinai's Minerva cluster, follow [Running on Minerva](../minerva/minerva.md)
 instead of the steps below. Then come back to
@@ -57,24 +54,22 @@ mkdir -p data/raw
 cp /path/to/your/reports/*.pdf data/raw/
 ```
 
-Gentrex reads only the PDFs directly inside the folder, not those in
-subfolders. Every later command identifies a report by its file name, so keep
-names unique.
+PDFs in subfolders are left out. Every later command identifies a report by
+its file name, so keep the names unique.
 
 The reports contain patient data, so keep the repository folder on storage
-approved for it. See [Patient data](../../README.md#patient-data).
+approved for it ([Patient data](../../README.md#patient-data)).
 
 ## Step 3: Start the OCR server
 
 Skip this step and step 4 if your reports have no scanned pages.
 
-[vLLM](https://docs.vllm.ai) is a model server. It loads a model onto the GPU
-and answers requests from Gentrex over HTTP. Install it on the GPU machine as
-its
+The model server is [vLLM](https://docs.vllm.ai). Its
 [installation guide](https://docs.vllm.ai/en/latest/getting_started/installation/)
-describes.
+shows how to install it on the GPU machine. Gentrex sends every scanned page to
+the server as an image, so use a machine approved for patient data.
 
-Start vLLM in a second terminal, and leave it running while Gentrex works:
+Start vLLM in a second terminal and leave it running while Gentrex works:
 
 ```bash
 vllm serve lightonai/LightOnOCR-3-4B \
@@ -82,18 +77,16 @@ vllm serve lightonai/LightOnOCR-3-4B \
   --default-chat-template-kwargs '{"enable_thinking": false}'
 ```
 
-- `lightonai/LightOnOCR-3-4B` is the model's name on Hugging Face, and the
-  name Gentrex asks for (`transcribe.ocr.model` in settings.yaml). The first
-  start downloads the model's weights, about 9 GB, into
-  `~/.cache/huggingface/`. Later starts reuse them.
-- `--max-model-len 18000` sets the context length, the
-  most tokens one request can hold. Tokens are words or pieces of words, the
-  units a model reads and writes. A page image takes a few thousand tokens and
-  the answer at most 8,192 (`transcribe.ocr.max_tokens` in settings.yaml), so
-  18,000 holds both.
-- `--default-chat-template-kwargs '{"enable_thinking": false}'` turns off the
-  model's thinking mode, in which it would write out
-  reasoning before the page text. LightOnOCR is trained with thinking off.
+The first start downloads the model's weights, about 9 GB, into
+`~/.cache/huggingface/`. `lightonai/LightOnOCR-3-4B` is its name on Hugging
+Face and the name Gentrex asks for (`transcribe.ocr.model` in settings.yaml).
+
+`--max-model-len 18000` sets the context length, the most tokens one request
+can hold. Tokens are words or pieces of words. A page image takes a few
+thousand tokens and the answer at most 8,192 (`transcribe.ocr.max_tokens` in
+settings.yaml), so 18,000 holds both. `--default-chat-template-kwargs` turns
+off the model's thinking mode, in which it would write out reasoning before the
+page text. LightOnOCR is trained with thinking off.
 
 vLLM is ready when its terminal shows `Application startup complete`. To
 check, run this in your first terminal:
@@ -103,11 +96,8 @@ curl http://localhost:8000/v1/models
 ```
 
 The answer lists the model as `"id":"lightonai/LightOnOCR-3-4B"`. vLLM listens
-on port 8000 unless you start it with `--port`. To stop vLLM, press Ctrl-C in
-its terminal.
-
-Gentrex sends every scanned page to this server as an image. Run the server on
-a machine approved for patient data.
+on port 8000 unless you start it with `--port`. To stop it, press Ctrl-C in its
+terminal.
 
 ## Step 4: Point Gentrex at the OCR server
 
@@ -134,10 +124,11 @@ Git ignores `.env`, so the address and key stay out of the repository.
 uv run --env-file .env gentrex transcribe
 ```
 
-`uv run` runs Gentrex in the environment that step 1 created, and
-`--env-file .env` passes it the values from `.env`. Gentrex reads the PDFs in
-`data/raw/` and writes a new folder named after the time the run started, such
-as `results/transcribe/20261014-123000/`.
+`uv run` runs Gentrex in the environment from step 1, and `--env-file .env`
+passes it the values from `.env`. The command reads the PDFs in `data/raw/`
+and writes a new folder named after its start time, like
+`results/transcribe/20261014-123000/`. `results/transcribe/latest` points to
+the newest finished run ([Runs and results](../../README.md#runs-and-results)).
 
 To read PDFs from another folder:
 
@@ -151,26 +142,24 @@ To skip OCR, which leaves scanned pages empty:
 uv run gentrex transcribe --no-ocr
 ```
 
-To send to OCR only the pages that failed in an earlier run, name that run
-with `--retry`, as [Redo failed files](../../README.md#redo-failed-files)
-explains. `--retry` can't be combined with `--no-ocr`.
+To send only the pages that failed in an earlier run to OCR again, name that
+run with `--retry` ([Redo failed files](../../README.md#redo-failed-files)).
+It can't be combined with `--no-ocr`.
 
 ```bash
 uv run --env-file .env gentrex transcribe --retry results/transcribe/latest
 ```
 
-While it runs, Gentrex prints one line per PDF. The last line counts the pages
-and gives the speed:
+Gentrex prints one line per PDF as it goes. The last line counts the pages and
+shows the speed:
 
 ```text
 wrote 1450 pages (1210 scanned) in 785 s: 110.8 pages per minute
 ```
 
-The time runs from reading the first PDF to writing the last page.
-
 ## Check the result
 
-The run folder holds three files:
+The run folder has three files:
 
 | File | Contents |
 | --- | --- |
@@ -178,12 +167,7 @@ The run folder holds three files:
 | `run.yaml` | The command, the input folder and the settings the run used. |
 | `log.txt` | What Gentrex printed during the run. |
 
-`gentrex select` reads the newest finished run, `results/transcribe/latest`,
-unless you name another. [Runs and results](../../README.md#runs-and-results)
-explains run folders and `latest`.
-
-`pages.jsonl` is a JSONL file, with one JSON object per
-line and one line per page:
+`pages.jsonl` has one line per page, each a JSON object:
 
 ```json
 {"file": "report-01.pdf", "page": 1, "source": "native", "text": "Hereditary Cancer Panel ...", "error": null}
@@ -214,8 +198,11 @@ grep -v '"error": null' results/transcribe/latest/pages.jsonl
 To compare runs, give grep all of them. It prints one count per run:
 
 ```bash
-grep -c '"source": "scanned"' results/transcribe/*/pages.jsonl
+grep -c '"source": "scanned"' results/transcribe/2*/pages.jsonl
 ```
+
+`2*` matches the run folders, whose names start with the year, and skips the
+`latest` link, which would count the newest run twice.
 
 To see what changed between two runs, compare their `run.yaml`:
 
@@ -225,47 +212,42 @@ diff results/transcribe/20261014-123000/run.yaml results/transcribe/20261015-090
 
 ## How it works
 
-Gentrex reads the text stored in each page of a PDF, and sorts the pages into
-native and scanned by the 20-character rule at the top of this page
-(`transcribe.native_min_chars`).
+Each scanned page is drawn as an image at 400 dots per inch
+(`transcribe.ocr.render_dpi`) and then shrunk until its longer side is 2,048
+pixels (`transcribe.ocr.longest_dim`), the size LightOnOCR is trained on.
+Drawing the page large and shrinking it keeps small print smooth. The image
+goes to the server with no other text, and the answer becomes the page's text.
 
-The OCR model reads images, so Gentrex draws each scanned page as an image at
-400 dots per inch (`transcribe.ocr.render_dpi`). It then shrinks the image so
-its longer side is 2,048 pixels (`transcribe.ocr.longest_dim`), the size
-LightOnOCR is trained on. Drawing the page large and then shrinking it keeps
-small print smooth. Gentrex sends the image to the OCR server with no other
-text, and writes the answer as the page's text.
-
-Gentrex sends up to 8 pages to the server at the same time, across PDFs
+Up to 8 pages go to the server at the same time, across PDFs
 (`transcribe.ocr.concurrency`), because vLLM processes requests together
-faster than one by one. It still writes the pages of each PDF together and in
-order.
+faster than one by one. The pages of each PDF are still written together and
+in order.
 
 ## Settings
 
-The model, the prompt and the image settings are under `transcribe` in
+To change the model, the prompt, the image settings or the 20-character limit
+(`transcribe.native_min_chars`), edit them under `transcribe` in
 [`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml).
-A comment above each value explains it. Edit that file to change one.
+A comment above each value explains it.
 
 ## When something goes wrong
 
 | Exit code | Meaning | What to do |
 | --- | --- | --- |
 | 0 | Every page was transcribed. | Nothing. |
-| 1 | No PDFs were found (`no PDFs in data/raw`), some files failed, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
+| 1 | No PDFs were found (`no PDFs in data/raw`), [`--retry`](../../README.md#redo-failed-files) refused the earlier run, some files failed, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
 | 2 | `GENTREX_OCR_BASE_URL` is not set. | Do step 4, or add `--no-ocr`. |
 
 A file is listed as failed in two cases:
 
 - **OCR failed on one of its pages.** The other pages are still written, and
-  the failed page has an `error`. If the error is a connection error or a
-  timeout, the server was down or busy, even after Gentrex's
-  [retries](../../README.md#runs-and-results). Check that the server is running,
-  then run `gentrex transcribe --retry results/transcribe/latest`, which
-  sends only the failed pages to OCR again.
-- **The PDF could not be opened.** Nothing is written for it. The error is in
-  the output. The file is usually damaged or not a real PDF.
+  the failed page has an `error`. A connection error or a timeout means the
+  server was down or busy, even after Gentrex's
+  [retries](../../README.md#runs-and-results). Check that the server is
+  running, then run `gentrex transcribe --retry results/transcribe/latest`.
+- **The PDF could not be opened.** Nothing is written for it, and the error is
+  in the output. The file is usually damaged or not a real PDF.
 
 A traceback means the run stopped early, most often because of a wrong API key
-or model name. [Runs and results](../../README.md#runs-and-results) explains the
+or model name. [Runs and results](../../README.md#runs-and-results) lists the
 causes.
