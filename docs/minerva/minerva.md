@@ -8,7 +8,8 @@ batch job on a GPU node. The job runs the command's model in
 [Minerva's AI service](#use-minervas-ai-service-instead-of-a-job), which runs
 the model for you. `gentrex normalize`, `gentrex load`,
 `gentrex export phenopackets` and `gentrex export fhir` need no GPU and run in
-an interactive session.
+an interactive session. The generator of the benchmark,
+[gentrex-bench](#generate-benchmark-reports), also runs as a batch job.
 
 Minerva schedules jobs with LSF. You write a job script and submit it with
 `bsub`, and LSF starts the job when a node with the GPUs you asked for is
@@ -645,6 +646,147 @@ file. Then follow
 [Export report data into an OMOP database](../user-guide/export-omop.md), with
 `--input` set to the copied run. `gentrex export omop-extended` works the same
 way.
+
+## Generate benchmark reports
+
+The generator of [gentrex-bench](../../gentrex-bench/README.md) makes
+synthetic reports whose true content is known. Its writing model runs in
+vLLM in a batch job, like the models of Gentrex. The reports hold no patient
+data, so they can be stored anywhere.
+
+### Prepare in an interactive session
+
+Start a session, which can reach the internet:
+
+```bash
+bsub -P acc_xxx -q interactive -n 2 -W 1:00 -R "rusage[mem=8000]" -Is /bin/bash
+```
+
+In the session, go to the `gentrex` folder and follow steps 1 and 2 of
+[gentrex-bench](../../gentrex-bench/README.md#step-1-download-the-reference-files).
+They download the reference files and sample the cases into
+`data/gentrex-bench/v1/cases/`. Sampling takes about half a minute.
+
+Then download Chrome, which prints the reports to PDF. Compute nodes have
+no Chrome, so this is Google's Chrome for Testing, which runs from its folder
+without an installation or a display. The version is fixed, so every report
+is printed by the same Chrome:
+
+```bash
+cd /path/to/serving
+curl -f -L -O https://storage.googleapis.com/chrome-for-testing-public/157.0.8103.38/linux64/chrome-headless-shell-linux64.zip
+unzip -q chrome-headless-shell-linux64.zip && rm chrome-headless-shell-linux64.zip
+chrome-headless-shell-linux64/chrome-headless-shell --version
+```
+
+The last line should print `Google Chrome for Testing 157.0.8103.38`. If it
+names a missing library instead, or the job's log later shows a sandbox
+error, see [When the job fails](#when-the-job-fails).
+
+### Download the writing model
+
+Once, on a login node, download the model that `build.model` in
+`gentrex-bench/generator/settings.yaml` names into the serving folder:
+
+```bash
+cd /path/to/serving
+uvx --from huggingface_hub hf download openai/gpt-oss-120b \
+  --local-dir models/gpt-oss-120b
+```
+
+Its weights take about 65 GB, which fits on one GPU with 80 GB.
+
+### Write the job script
+
+Save this as `gentrex-bench.lsf` in the `gentrex` folder. Change the three
+marked lines.
+
+```bash
+#!/bin/bash
+#BSUB -J gentrex-bench
+#BSUB -P acc_xxx                       # <-- your allocation
+#BSUB -q gpu
+#BSUB -n 8
+#BSUB -W 1:00
+#BSUB -gpu num=1
+#BSUB -R "select[h100nvl] rusage[mem=4000] span[hosts=1]"
+#BSUB -oo gentrex-bench.%J.log
+
+SERVING=/path/to/serving               # <-- the serving folder
+GENTREX=/path/to/gentrex               # <-- this repository
+
+module load apptainer
+mkdir -p "$SERVING/home"
+port=$((10000 + LSB_JOBID % 20000))
+
+apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
+  -B "$SERVING/models:/models" "$SERVING/vllm.sif" \
+  vllm serve /models/gpt-oss-120b \
+    --served-model-name openai/gpt-oss-120b \
+    --port "$port" \
+    --max-model-len 40960 &
+server=$!
+
+until curl -sf "http://localhost:$port/v1/models" > /dev/null; do
+  kill -0 "$server" || { echo "vLLM stopped; see the log above"; exit 1; }
+  sleep 5
+done
+
+cd "$GENTREX"
+GENTREX_BENCH_BASE_URL=http://localhost:$port/v1 .venv/bin/python \
+  gentrex-bench/generator/generate.py --version v1 build \
+  --chrome "$SERVING/chrome-headless-shell-linux64/chrome-headless-shell" $CASES
+status=$?
+
+kill "$server"
+exit $status
+```
+
+The script works like the one of
+[`gentrex transcribe`](#write-the-job-script), with three differences:
+
+- It serves gpt-oss-120b. `--max-model-len 40960` gives room for the prompt
+  and an answer of up to 32,768 tokens (`build.max_tokens`).
+- `-n 8` asks for 8 CPU cores. Chrome and the scans run on the CPU while
+  vLLM writes the next reports, up to `build.concurrency` (8) at a time.
+- `$CASES` passes the case IDs that you give at submission. Without them, the
+  job builds every case that has no truth file yet.
+
+### Submit the job
+
+Build two cases first, and look at their PDFs before you build the rest:
+
+```bash
+cd /path/to/gentrex
+CASES="SYN-0001 SYN-0002" bsub < gentrex-bench.lsf
+```
+
+LSF passes your environment to the job, so `CASES` reaches the script.
+Follow the job with `bjobs` and `tail -f gentrex-bench.*.log`. Each
+case logs `passed on attempt 1` or the values that the model left out. The
+PDFs go to `data/gentrex-bench/v1/pdf/`, and
+[Check the result](../../gentrex-bench/README.md#check-the-result) lists
+what else the folder holds.
+
+Then raise `-W`, for example to `-W 8:00`, and submit without `CASES`:
+
+```bash
+bsub < gentrex-bench.lsf
+```
+
+A case that already has a truth file is skipped. If the job ends in
+`TERM_RUNLIMIT`, submit it again and it goes on where it stopped. The log of
+the two test cases shows how long a case takes. The full build writes several
+cases at once, so it needs less time per case than the test did.
+
+### When the job fails
+
+| Problem | What to do |
+| --- | --- |
+| `chrome-headless-shell --version` names a missing library, such as `libnss3.so` | The node lacks a library that Chrome needs. Ask Minerva's support to install it. |
+| The log shows `No usable sandbox!` or another sandbox error | Start Chrome without its sandbox. Save `exec /path/to/serving/chrome-headless-shell-linux64/chrome-headless-shell --no-sandbox "$@"` after a `#!/bin/bash` line in `chrome.sh`, run `chmod +x chrome.sh`, and give the path of `chrome.sh` to `--chrome` in the job script. The sandbox guards against harmful web pages, which these reports aren't. |
+| `vLLM stopped; see the log above` | vLLM couldn't start, often because the model doesn't fit. Check that `models/gpt-oss-120b` is complete and that the job got an 80 GB GPU. |
+| A case fails all attempts | The log names the values that the model didn't print. Submit the job again with that case in `CASES`, or leave the case out. |
 
 HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
 Health Level Seven International and their use does not constitute

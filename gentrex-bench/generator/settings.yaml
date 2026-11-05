@@ -1,0 +1,36 @@
+# Settings of the synthetic report generator (generate.py). The endpoint and
+# API key of the writing model come from the environment, never from this file
+# (GENTREX_BENCH_BASE_URL and GENTREX_BENCH_API_KEY in .env.example).
+
+# `generate.py sample`: Sample the cases.
+sample:
+  # The same seed and reference files always give the same cases.
+  seed: gentrex-synthetic-1
+  # Cases for tuning Gentrex, and frozen cases for scoring it.
+  dev: 100
+  test: 200
+  # The reference files the cases are sampled from (gentrex-bench/README.md, step 1).
+  clinvar: data/clinvar/variant_summary_2026-11.txt.gz
+  hpo: data/ontology/hp-base.json
+  hpoa: data/ontology/phenotype-v2026-09-01.hpoa
+  mondo: data/ontology/mondo-base.json
+  hgnc: data/ontology/hgnc_complete_set_2026-10-06.txt
+
+# `generate.py build`: Write, print, check and scan the reports.
+build:
+  # Name of the model that writes the reports, as listed at
+  # GENTREX_BENCH_BASE_URL/models. It must not be a Gemma model, because
+  # Gentrex extracts with Gemma and would then read text its own model family
+  # wrote.
+  model: openai/gpt-oss-120b
+  # Longest answer allowed, in tokens. A report is about 5,000 tokens of HTML,
+  # and a model that thinks before it answers needs room for that too. An
+  # answer cut off here counts as a failed attempt.
+  max_tokens: 32768
+  # Time allowed for one answer before it counts as failed.
+  timeout_seconds: 900
+  # How often a report is written again when it fails the check.
+  attempts: 3
+  # How many reports are written at the same time. A server such as vLLM
+  # processes them together, which is faster than one by one.
+  concurrency: 8

@@ -84,6 +84,7 @@ venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
+extraPaths = ["gentrex-bench/generator"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

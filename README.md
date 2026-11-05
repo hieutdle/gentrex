@@ -165,6 +165,8 @@ Working on Gentrex itself:
 - [Contributing](docs/development/contributing.md)
 - [Release a new version](docs/development/release.md)
 - [Evaluate HPO matching](evaluation/README.md)
+- [Benchmark design](docs/development/benchmark.md)
+- [Run the benchmark (gentrex-bench)](gentrex-bench/README.md)
 
 The [changelog](docs/CHANGELOG.md) lists what changed in each version.
 
