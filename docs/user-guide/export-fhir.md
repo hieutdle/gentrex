@@ -1,8 +1,9 @@
 # Export report data as FHIR Bundles
 
 `gentrex export fhir` writes one FHIR Bundle per report, so an EHR or a FHIR
-server can take in the results as structured data instead of PDFs. FHIR is
-HL7's standard for exchanging health data. Its data comes in resources, like
+server can take in the results as structured data instead of PDFs. The HL7®
+FHIR® standard describes how systems exchange health data. FHIR data comes in
+resources, like
 a Patient or an Observation, and a Bundle is a file with several of them. The
 Bundles follow version 3.0.0 of HL7's Genomics Reporting Implementation Guide
 (IG), the rules for genetic test results in FHIR R4. R4 is the FHIR release
@@ -63,7 +64,7 @@ The run folder contains:
 | `log.txt` | Everything the run printed. |
 
 `results/export/fhir/latest` points to the newest finished run
-([Runs and results](../../README.md#runs-and-results)).
+([Runs and results](runs-and-results.md#run-folders)).
 
 The Bundles contain patient identifiers. Each Patient has the MRN, the date of
 birth and the sex, because an EHR needs the MRN to file the results with the
@@ -326,3 +327,7 @@ If a FHIR server other than HAPI rejects the Bundles, check whether it lets
 clients choose the IDs of new resources. Some servers allow only IDs that they
 assign, and every entry brings Gentrex's fixed ID. If yours is one of them,
 ask the server's team to allow client IDs for Gentrex's Bundles.
+
+HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
+Health Level Seven International and their use does not constitute
+endorsement by HL7.

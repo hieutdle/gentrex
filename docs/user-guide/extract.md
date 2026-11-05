@@ -98,7 +98,7 @@ uv run --env-file .env gentrex extract --input results/select/20261014-131500
 ```
 
 To extract again only the reports that failed in an earlier run, name that run
-with `--retry` ([Redo failed files](../../README.md#redo-failed-files)):
+with `--retry` ([Redo failed files](runs-and-results.md#redo-failed-files)):
 
 ```bash
 uv run --env-file .env gentrex extract --retry results/extract/latest
@@ -257,7 +257,7 @@ diff results/extract/20261014-150000/run.yaml results/extract/20261015-090000/ru
 | Exit code | Meaning | What to do |
 | --- | --- | --- |
 | 0 | Every report has a complete record. | Nothing. |
-| 1 | No finished run of `gentrex select` was found (`pages.jsonl not found; run gentrex select first`), [`--retry`](../../README.md#redo-failed-files) refused the earlier run, some reports have an error, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
+| 1 | No finished run of `gentrex select` was found (`pages.jsonl not found; run gentrex select first`), [`--retry`](runs-and-results.md#redo-failed-files) refused the earlier run, some reports have an error, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
 | 2 | `GENTREX_LLM_BASE_URL` is not set. | Do step 2. |
 
 A report is listed as failed in two cases:
@@ -266,10 +266,10 @@ A report is listed as failed in two cases:
   written from the other pages, and `error` starts with `page N: transcribe:`.
   Run `gentrex transcribe`, `gentrex select` and `gentrex extract` again, each
   with `--retry`. Only this report then goes to the models again
-  ([Redo failed files](../../README.md#redo-failed-files)).
+  ([Redo failed files](runs-and-results.md#redo-failed-files)).
 - **The request failed.** `data` is `null`, and `error` says why. A connection
   error means the server was down or busy, even after Gentrex's
-  [retries](../../README.md#runs-and-results). Check that the server is
+  [retries](runs-and-results.md#failed-requests). Check that the server is
   running, then run `gentrex extract --retry results/extract/latest`.
 
 Three errors come from the report rather than the server:
@@ -296,4 +296,4 @@ supports structured output with a JSON schema (`response_format`), as vLLM
 does.
 
 A traceback means the run stopped early.
-[Runs and results](../../README.md#runs-and-results) lists the common causes.
+[Runs and results](runs-and-results.md#failed-requests) lists the common causes.

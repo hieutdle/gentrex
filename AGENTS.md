@@ -63,7 +63,8 @@ Good docs = what the reader needs for the task − what they already know.
   works and how to run each command go in docs/user-guide/, pages about
   running Gentrex on Minerva in docs/minerva/, and pages about working on
   Gentrex itself, such as contributing and releasing, in docs/development/.
-  CHANGELOG.md stays directly in docs/, because users read it too.
+  CHANGELOG.md stays directly in docs/, because users read it too. Images
+  go in docs/images/.
   .github/CONTRIBUTING.md only points to docs/development/contributing.md,
   because GitHub links contributors to a guide only in the repository's
   root, docs/ or .github/.
@@ -78,7 +79,8 @@ Good docs = what the reader needs for the task − what they already know.
   schema order, GPU memory) go in "How it works", after the steps.
 - Title pages and sections by what the reader does or gets, verb first
   ("Extract report data"), not with a slogan ("One record per report").
-- Describe behavior shared by all commands once, in README.md, and link to it.
+- Describe behavior that all commands share once, in
+  docs/user-guide/runs-and-results.md, and link to it.
 
 #### Explain, Don't Compress
 

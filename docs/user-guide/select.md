@@ -107,7 +107,7 @@ uv run --env-file .env gentrex select --input results/transcribe/20261014-123000
 ```
 
 To ask again only about the pages that failed in an earlier run, name that run
-with `--retry` ([Redo failed files](../../README.md#redo-failed-files)):
+with `--retry` ([Redo failed files](runs-and-results.md#redo-failed-files)):
 
 ```bash
 uv run --env-file .env gentrex select --retry results/select/latest
@@ -256,7 +256,7 @@ Lower `keep_threshold` to keep more pages. Fewer result pages are missed, but
 | Exit code | Meaning | What to do |
 | --- | --- | --- |
 | 0 | Every page was decided. | Nothing. |
-| 1 | No finished run of `gentrex transcribe` was found (`pages.jsonl not found; run gentrex transcribe first`), [`--retry`](../../README.md#redo-failed-files) refused the earlier run, some files had errors, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
+| 1 | No finished run of `gentrex transcribe` was found (`pages.jsonl not found; run gentrex transcribe first`), [`--retry`](runs-and-results.md#redo-failed-files) refused the earlier run, some files had errors, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
 | 2 | `GENTREX_LLM_BASE_URL` is not set. | Do step 2. |
 
 A file is listed as failed in two cases:
@@ -264,7 +264,7 @@ A file is listed as failed in two cases:
 - **A question failed on one of its pages.** The page is kept with its other
   answers, and `error` says which question failed. A connection error or a
   timeout means the server was down or busy, even after Gentrex's
-  [retries](../../README.md#runs-and-results). Check that the server is
+  [retries](runs-and-results.md#failed-requests). Check that the server is
   running, then run `gentrex select --retry results/select/latest`.
 - **One of its pages has an error from `gentrex transcribe`.** The page is
   kept, and its `error` starts with `transcribe:`. Run `gentrex transcribe`
@@ -280,6 +280,6 @@ that turns thinking off. vLLM uses the model's own template unless you start
 it with `--chat-template`.
 
 A traceback means the run stopped early.
-[Runs and results](../../README.md#runs-and-results) lists the common causes.
+[Runs and results](runs-and-results.md#failed-requests) lists the common causes.
 `MissingLogprobsError: the server sent no logprobs` also stops the run. Use
 vLLM, or another server that returns logprobs.

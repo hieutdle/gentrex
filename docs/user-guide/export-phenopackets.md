@@ -57,7 +57,7 @@ The run folder contains:
 | `log.txt` | Everything the run printed. |
 
 `results/export/phenopackets/latest` points to the newest finished run
-([Runs and results](../../README.md#runs-and-results)).
+([Runs and results](runs-and-results.md#run-folders)).
 
 The Phenopackets contain patient identifiers. Each `id` is the patient's key,
 such as `mrn:SYN-MRN-0001`, so it includes the MRN. The subject has the date of

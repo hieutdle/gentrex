@@ -18,9 +18,13 @@ The first release.
   keyed pseudonyms, for sharing.
 - `gentrex export omop` writes the records into an OMOP CDM database.
   `gentrex export omop-extended` does the same and adds extension tables.
-- `gentrex export fhir` writes one FHIR Bundle per report, following HL7's
+- `gentrex export fhir` writes one FHIR® Bundle per report, following HL7's
   Genomics Reporting Implementation Guide.
 - `--retry` makes `gentrex transcribe`, `gentrex select` and
   `gentrex extract` redo only the pages and reports that failed in an earlier
   run.
 - Each run folder's `run.yaml` contains the Gentrex version and git commit.
+
+HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
+Health Level Seven International and their use does not constitute
+endorsement by HL7.

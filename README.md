@@ -1,16 +1,19 @@
 # Gentrex
 
-Gentrex (Genetic Test Report eXtraction) reads clinical genetic test reports
-in PDF form and writes one structured record per report. A record holds the
-patient's identifiers, the specimen, the test, the overall result, the
-clinical features and every reported variant with its gene, HGVS changes,
-classification and zygosity.
+Gentrex (Genetic Test Report eXtraction) turns clinical genetic test reports
+into structured data. Labs like GeneDx and Invitae send these reports as
+PDFs, and only a few of their pages hold the findings. Gentrex finds those
+pages and writes one record per report, with the patient's details, the
+overall result, the clinical features and each reported variant. It adds
+standard IDs from HGNC, MONDO and HPO, so reports from different labs can be
+compared.
 
-You can query the records with SQL after `gentrex load`, or export them as
-GA4GH Phenopackets, into an OMOP CDM or as HL7 FHIR Bundles. The language
-models run in [vLLM](https://docs.vllm.ai) on GPUs that you control.
+You can then load the records into a SQL database, or export them as
+Phenopackets, into an OMOP CDM or as FHIR® Bundles.
 
-## How it works
+![One report through Gentrex. transcribe reads the text of its 8 pages, with OCR for the 2 scanned ones. select keeps 3 pages. extract turns them into one record with the values as printed, like SCN1A and Dravet syndrome. normalize adds IDs like HGNC:10585 and MONDO:0100135. The records then load into SQLite, PostgreSQL or MySQL, or export as Phenopackets, into an OMOP CDM or as FHIR Bundles.](docs/images/gentrex-arch.svg)
+
+## Running Gentrex
 
 Four commands turn the PDFs into records. Run them in this order:
 
@@ -30,7 +33,7 @@ only the ones you need:
 | [`gentrex export phenopackets`](docs/user-guide/export-phenopackets.md) | One Phenopacket per patient, for rare-disease tools and other centers |
 | [`gentrex export omop`](docs/user-guide/export-omop.md) | Rows in the standard tables of an OMOP CDM in PostgreSQL, for OHDSI tools like ATLAS |
 | [`gentrex export omop-extended`](docs/user-guide/export-omop-extended.md) | The same rows, plus extension tables for what the CDM can't hold |
-| [`gentrex export fhir`](docs/user-guide/export-fhir.md) | One FHIR Bundle per report, in HL7's Genomics Reporting format, for an EHR or a FHIR server |
+| [`gentrex export fhir`](docs/user-guide/export-fhir.md) | One FHIR Bundle per report, in the HL7® Genomics Reporting format, for an EHR or a FHIR server |
 
 None of these needs a GPU.
 
@@ -114,72 +117,9 @@ On Mount Sinai's Minerva cluster, the three GPU commands run as batch jobs and
 the rest in an interactive session. [Running on Minerva](docs/minerva/minerva.md)
 walks you through it.
 
-## Runs and results
-
-Every run gets a new folder named after its start time, for example
-`results/transcribe/20261014-123000/`. A second run in the same second gets
-`-2` added to the name. Old runs stay, so you can compare them.
-
-Next to its output, each run folder has two files. `run.yaml` records the
-command, the Gentrex version and git commit, the run it read and the
-settings, so you can always trace a result back to what made it. It says
-`modified: true` when the code in `src/gentrex/` had changes that weren't
-committed. `log.txt` holds everything the run printed.
-`uv run gentrex --version` prints the version.
-
-`latest` in each command's folder, as in `results/transcribe/latest`, points
-to the newest finished run. The next command reads it unless you name another
-run with `--input`. A run that finished with some failed files still becomes
-`latest`. A run that crashed doesn't.
-
-When a request to the model server fails or times out, Gentrex tries it again
-after 5, 20 and 60 seconds. After the fourth failure it records the error for
-that page or report and moves on to the next. A wrong API key or model name
-stops the run straight away, since every request would fail. A traceback that
-ends in `openai.AuthenticationError` means the API key in `.env` is wrong.
-`openai.NotFoundError` means the server runs a different model than
-settings.yaml names, or the address in `.env` doesn't end in `/v1`.
-
-The exit code, which `echo $?` prints right after a run, tells you how it
-went. 0 means every file went through. 1 means some files failed, the input
-was missing or the run crashed, and the last lines of the output say which. 2
-means a value the command needs from `.env` isn't set, or the command line
-has a mistake. Each command's page lists what to do.
-
-### Redo failed files
-
-If some pages or reports fail in `gentrex transcribe`, `gentrex select` or
-`gentrex extract`, or a job hits its time limit, run the command again with
-`--retry` and the earlier run's folder:
-
-```bash
-uv run --env-file .env gentrex extract --retry results/extract/latest
-```
-
-Every record that came through without an error is reused, and only the rest
-go to the model. The log tells you how many, as in
-`reusing 497 of 500 reports from results/extract/latest`. The new run still
-writes a complete set of records, and its `run.yaml` names the earlier run
-under `retry`.
-
-A record is reused only if its input hasn't changed. This lets retries build
-on each other. Once `gentrex transcribe --retry` has read a page that failed,
-`gentrex select --retry` and `gentrex extract --retry` send just that report
-to the model again. For a PDF, unchanged means the same pages, each scanned
-or native as before, with the same text on the native ones.
-
-The settings have to match the earlier run, except for `timeout_seconds`,
-`concurrency` and `max_tokens`. Raising those is how most failures get fixed.
-After any other change, such as a different model, run without `--retry`.
-
-A run that crashed, like a job that hit its time limit, never becomes
-`latest`. Name its folder instead, as in
-`--retry results/extract/20261019-030000`.
-
-Gentrex refuses the earlier run, with exit code 1, if the folder isn't a run
-of the same command, if that run used other settings, or if the input it read
-no longer exists. The message says which. In the last two cases, run the
-command without `--retry`.
+Each run writes a new folder in `results/`.
+[Runs and results](docs/user-guide/runs-and-results.md) explains what's in
+it, what the exit codes mean and how to redo only the files that failed.
 
 ## Patient data
 
@@ -200,7 +140,8 @@ data.
 
 ## Documentation
 
-The user guide in `docs/user-guide/` has a page for each command:
+The user guide in `docs/user-guide/` has a page for each command, and one
+for what they have in common:
 
 - [Transcribe PDF pages](docs/user-guide/transcribe.md)
 - [Select the pages to keep](docs/user-guide/select.md)
@@ -212,6 +153,7 @@ The user guide in `docs/user-guide/` has a page for each command:
 - [Export report data into an OMOP database](docs/user-guide/export-omop.md)
   - [With extension tables](docs/user-guide/export-omop-extended.md)
 - [Export report data as FHIR Bundles](docs/user-guide/export-fhir.md)
+- [Runs and results](docs/user-guide/runs-and-results.md)
 
 Running Gentrex on Minerva:
 
@@ -225,3 +167,7 @@ Working on Gentrex itself:
 - [Evaluate HPO matching](evaluation/README.md)
 
 The [changelog](docs/CHANGELOG.md) lists what changed in each version.
+
+HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
+Health Level Seven International and their use does not constitute
+endorsement by HL7.

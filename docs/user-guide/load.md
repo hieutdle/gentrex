@@ -199,7 +199,7 @@ The records are in the database. The run folder has two files:
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/load/latest` points to the newest finished run
-([Runs and results](../../README.md#runs-and-results)).
+([Runs and results](runs-and-results.md#run-folders)).
 
 ### Open the database
 

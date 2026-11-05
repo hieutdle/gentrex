@@ -128,7 +128,7 @@ uv run --env-file .env gentrex transcribe
 passes it the values from `.env`. The command reads the PDFs in `data/raw/`
 and writes a new folder named after its start time, like
 `results/transcribe/20261014-123000/`. `results/transcribe/latest` points to
-the newest finished run ([Runs and results](../../README.md#runs-and-results)).
+the newest finished run ([Runs and results](runs-and-results.md#run-folders)).
 
 To read PDFs from another folder:
 
@@ -143,7 +143,7 @@ uv run gentrex transcribe --no-ocr
 ```
 
 To send only the pages that failed in an earlier run to OCR again, name that
-run with `--retry` ([Redo failed files](../../README.md#redo-failed-files)).
+run with `--retry` ([Redo failed files](runs-and-results.md#redo-failed-files)).
 It can't be combined with `--no-ocr`.
 
 ```bash
@@ -235,7 +235,7 @@ A comment above each value explains it.
 | Exit code | Meaning | What to do |
 | --- | --- | --- |
 | 0 | Every page was transcribed. | Nothing. |
-| 1 | No PDFs were found (`no PDFs in data/raw`), [`--retry`](../../README.md#redo-failed-files) refused the earlier run, some files failed, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
+| 1 | No PDFs were found (`no PDFs in data/raw`), [`--retry`](runs-and-results.md#redo-failed-files) refused the earlier run, some files failed, or the run stopped with a traceback. The end of the output lists the failed files. | See below. |
 | 2 | `GENTREX_OCR_BASE_URL` is not set. | Do step 4, or add `--no-ocr`. |
 
 A file is listed as failed in two cases:
@@ -243,11 +243,11 @@ A file is listed as failed in two cases:
 - **OCR failed on one of its pages.** The other pages are still written, and
   the failed page has an `error`. A connection error or a timeout means the
   server was down or busy, even after Gentrex's
-  [retries](../../README.md#runs-and-results). Check that the server is
+  [retries](runs-and-results.md#failed-requests). Check that the server is
   running, then run `gentrex transcribe --retry results/transcribe/latest`.
 - **The PDF could not be opened.** Nothing is written for it, and the error is
   in the output. The file is usually damaged or not a real PDF.
 
 A traceback means the run stopped early, most often because of a wrong API key
-or model name. [Runs and results](../../README.md#runs-and-results) lists the
+or model name. [Runs and results](runs-and-results.md#failed-requests) lists the
 causes.

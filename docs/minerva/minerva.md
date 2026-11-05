@@ -189,7 +189,7 @@ GENTREX_OCR_BASE_URL=http://localhost:$port/v1 .venv/bin/gentrex transcribe --re
 ```
 
 Submit the job again, and it reuses the pages that the stopped job read
-([Redo failed files](../../README.md#redo-failed-files)). To set `-W` for the
+([Redo failed files](../user-guide/runs-and-results.md#redo-failed-files)). To set `-W` for the
 next batch, use the speed in pages per minute that the run prints at its
 end.
 
@@ -513,7 +513,7 @@ To run `gentrex extract` on the service:
    requests. `-W 4:00` gives the run four hours. How fast the service answers
    depends on how many others use it. If the session ends before the run
    does, start a new session and continue the stopped run with `--retry`
-   ([Redo failed files](../../README.md#redo-failed-files)).
+   ([Redo failed files](../user-guide/runs-and-results.md#redo-failed-files)).
    [Normalize report data](#normalize-report-data) explains the other options.
 5. In the session, go to the `gentrex` folder and run `gentrex extract`:
 
@@ -620,7 +620,7 @@ finished:
 uv run gentrex export fhir
 ```
 
-Within a second, it writes one FHIR Bundle per report to
+Within a second, it writes one FHIR® Bundle per report to
 `results/export/fhir/latest/bundles/`. Continue on the page of
 `gentrex export fhir`:
 
@@ -645,3 +645,7 @@ file. Then follow
 [Export report data into an OMOP database](../user-guide/export-omop.md), with
 `--input` set to the copied run. `gentrex export omop-extended` works the same
 way.
+
+HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
+Health Level Seven International and their use does not constitute
+endorsement by HL7.

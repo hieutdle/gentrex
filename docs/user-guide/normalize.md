@@ -13,7 +13,7 @@ writes `normalized.jsonl` to `results/normalize/`. It runs on the CPU without
 a model server and takes a minute or two for a few hundred reports. Then you
 can [load the records into a database](load.md), or export them as
 [Phenopackets](export-phenopackets.md), into
-[an OMOP database](export-omop.md) or as [FHIR Bundles](export-fhir.md).
+[an OMOP database](export-omop.md) or as [FHIR® Bundles](export-fhir.md).
 
 ## Before you start
 
@@ -142,7 +142,7 @@ Each run folder has three files:
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/normalize/latest` points to the newest finished run
-([Runs and results](../../README.md#runs-and-results)).
+([Runs and results](runs-and-results.md#run-folders)).
 
 `normalized.jsonl` has one line per report, in the order of the records from
 `gentrex extract`. Each line is the record from `gentrex extract`, unchanged,
@@ -438,3 +438,7 @@ wrong:
   the record from `gentrex extract` has no data, `normalized` is `null`.
 - If normalizing failed, the error contains `normalize:` and the reason. Then
   `normalized` is `null`, and `data` is kept for you to check.
+
+HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
+Health Level Seven International and their use does not constitute
+endorsement by HL7.
