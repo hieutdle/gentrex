@@ -653,4 +653,4 @@ CDM, such as a workstation approved for patient data. Copy the run folder of
 [Load report data into a database](#load-report-data-into-a-database). The
 export needs no other file. Then follow
 [Export report data into an OMOP database](export-omop.md), and name the
-copied run with `--input`.
+copied run with `--input`. The same goes for `gentrex export omop-extended`.

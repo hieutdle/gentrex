@@ -46,6 +46,7 @@ need, in any order.
 | [`gentrex load`](docs/load.md) | Writes the records into tables of a SQLite, PostgreSQL or MySQL database, with the HPO terms and their hierarchy, so that you can query them with SQL. | The database, and `results/load/` | No model and no GPU |
 | [`gentrex export phenopackets`](docs/export-phenopackets.md) | Writes one Phenopacket per patient, the GA4GH format that rare-disease tools read and other centers can import. | `results/export/phenopackets/` | No model and no GPU |
 | [`gentrex export omop`](docs/export-omop.md) | Writes the records into the standard tables of an OMOP CDM database in PostgreSQL, so that OHDSI's tools, such as ATLAS, can select patients by gene, ACMG class and zygosity. | The CDM database, and `results/export/omop/` | No model and no GPU |
+| [`gentrex export omop-extended`](docs/export-omop-extended.md) | Writes the same rows, and adds extension tables, outside the CDM's schema, with what the CDM can't hold, such as parental origin and full-length HGVS changes. | The CDM database, and `results/export/omop-extended/` | No model and no GPU |
 
 Each record is one line of `extractions.jsonl`. Shortened and spread over
 several lines, a record looks like this:
@@ -137,7 +138,8 @@ Then use the records in one or both of these ways:
 
 - [Load report data into a database](docs/load.md)
 - [Export report data as Phenopackets](docs/export-phenopackets.md)
-- [Export report data into an OMOP database](docs/export-omop.md)
+- [Export report data into an OMOP database](docs/export-omop.md), or
+  [with extension tables](docs/export-omop-extended.md)
 
 `gentrex normalize`, `gentrex load`, `gentrex export phenopackets` and
 `gentrex export omop` need no model server.
@@ -209,6 +211,7 @@ Reports, and everything Gentrex writes from them, may contain patient data.
   - [Database tables](docs/database-tables.md)
 - [Export report data as Phenopackets](docs/export-phenopackets.md)
 - [Export report data into an OMOP database](docs/export-omop.md)
+  - [With extension tables](docs/export-omop-extended.md)
 - [Running on Minerva (Mount Sinai)](docs/minerva.md)
 - [Development](docs/development.md)
 - [Evaluate HPO matching](evaluation/README.md)

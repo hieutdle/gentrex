@@ -161,3 +161,8 @@ export:
     # Gentrex add a person for each patient, for a CDM that holds only
     # Gentrex's records.
     person_map: null
+    # Schema of the extension tables that `gentrex export omop-extended` adds:
+    # genomic_test, genomic_variant, phenotype_feature and phenotype_candidate.
+    # They hold at full length what the CDM tables can't. Gentrex creates the
+    # schema if it doesn't exist, and it must differ from cdm_schema.
+    extension_schema: omop_extension

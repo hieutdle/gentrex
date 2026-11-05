@@ -31,7 +31,18 @@ _SCN1A_CONCEPT = 4001
 def cdm(engine):
     """A CDM with the tables of the export and the test vocabulary."""
     found = omop.tables(_SCHEMAS)
-    found["concept"].metadata.create_all(engine)
+    cdm_tables = [
+        "person",
+        "observation_period",
+        "procedure_occurrence",
+        "specimen",
+        "measurement",
+        "observation",
+        "concept",
+    ]
+    found["concept"].metadata.create_all(
+        engine, tables=[found[name] for name in cdm_tables]
+    )
     day = datetime.date(1970, 1, 1)
     end = datetime.date(2099, 12, 31)
     rows = [
@@ -117,12 +128,13 @@ def _export(
     tmp_path: pathlib.Path,
     reports: list[records.NormalizedReport],
     person_map: dict[str, int] | None = None,
+    extended: bool = False,
 ) -> list[str]:
     """Writes `reports` as `gentrex normalize` does, and exports them."""
     path = tmp_path / "normalized.jsonl"
     path.write_text("".join(report.to_json() + "\n" for report in reports))
-    omop.prepare(engine, _SCHEMAS, person_map)
-    return omop.run(path, engine, _SCHEMAS, person_map)
+    omop.prepare(engine, _SCHEMAS, person_map, extended)
+    return omop.run(path, engine, _SCHEMAS, person_map, extended)
 
 
 def _rows(engine: sa.Engine, table: str, *columns: str) -> list[tuple[Any, ...]]:
@@ -273,3 +285,47 @@ def test_persons_are_not_created_in_a_cdm_with_other_persons(cdm, tmp_path):
 
     with pytest.raises(omop.SetupError, match="persons that Gentrex didn't create"):
         omop.prepare(cdm, _SCHEMAS, None)
+
+
+def test_the_extended_export_keeps_what_omop_cannot_hold(cdm, tmp_path):
+    """Source values stop at 50 characters, and OMOP has no parental origin."""
+    report = _report()
+    deletion = "Deletion of exons 1 to 26 of SCN1A, including the promoter region"
+    report.data["variants"][0].update(
+        dna_change_raw=deletion, parental_origin="de_novo"
+    )
+
+    _export(cdm, tmp_path, [report], extended=True)
+
+    [variant] = _rows(cdm, "measurement", "measurement_id")[:1]
+    found = omop.tables(_SCHEMAS)["genomic_variant"]
+    with cdm.connect() as conn:
+        rows = conn.execute(
+            sa.select(
+                found.c.cdm_table,
+                found.c.cdm_row_id,
+                found.c.dna_change_raw,
+                found.c.parental_origin,
+            )
+        ).all()
+    assert [tuple(row) for row in rows] == [
+        ("measurement", variant[0], deletion, "de_novo")
+    ]
+
+
+def test_exporting_again_replaces_the_extension_rows(cdm, tmp_path):
+    _export(cdm, tmp_path, [_report()], extended=True)
+
+    _export(cdm, tmp_path, [_report()], extended=True)
+
+    found = omop.tables(_SCHEMAS)["phenotype_feature"]
+    with cdm.connect() as conn:
+        count = conn.execute(sa.select(sa.func.count()).select_from(found)).scalar()
+    assert count == 2
+
+
+def test_the_plain_export_creates_no_extension_tables(cdm, tmp_path):
+    """`gentrex export omop` must leave the database to the standard tables."""
+    _export(cdm, tmp_path, [_report()])
+
+    assert not sa.inspect(cdm).has_table("genomic_variant")

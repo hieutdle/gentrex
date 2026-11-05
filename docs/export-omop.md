@@ -284,6 +284,9 @@ rows have concept 0`.
   secondary finding have no row, because LOINC codes for them couldn't be
   checked.
 
+[`gentrex export omop-extended`](export-omop-extended.md) keeps all of this in
+extension tables, outside the CDM's schema.
+
 ### Create or map persons
 
 With a person map, each report gets the `person_id` that the map gives its
@@ -324,6 +327,7 @@ under `export.omop`:
 | `vocabulary_schema` | `null` | The schema of the vocabulary tables. `null` is the same as `cdm_schema`, where most CDMs keep them. |
 | `gentrex_schema` | `gentrex` | The schema of Gentrex's tables `omop_rows` and `omop_persons`. Gentrex creates it if it doesn't exist. It must differ from `cdm_schema`, so that the CDM schema holds only CDM tables. |
 | `person_map` | `null` | The CSV file that gives the `person_id` of each patient. `null` makes Gentrex add a person for each patient. |
+| `extension_schema` | `omop_extension` | Used only by [`gentrex export omop-extended`](export-omop-extended.md#settings). |
 
 The address of the database is `GENTREX_OMOP_DATABASE_URL` in `.env`, as in
 step 2.
@@ -345,6 +349,7 @@ If the CDM can't take the export, Gentrex stops before it writes anything:
 | `the database has no table person` | The address names a database without CDM tables, or `cdm_schema` names the wrong schema. Create the CDM as in step 1, or correct the setting. |
 | `the CDM holds ... persons that Gentrex didn't create` | The CDM belongs to someone else. Set `person_map` to the file that its team gave you, as in step 2. |
 | `export.omop.gentrex_schema must differ from cdm_schema` | Choose another schema for Gentrex's tables. |
+| `can't create Gentrex's tables: permission denied for database` | The database user may not create `gentrex_schema`. Ask the CDM's team to create it, or to grant the right. |
 | `... lacks the columns patient_key, person_id` | The person map needs these two columns, with a header line. |
 | `... has a person_id that is not a number` | Every `person_id` in the person map must be a whole number. |
 

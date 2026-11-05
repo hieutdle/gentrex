@@ -260,6 +260,7 @@ def _run_export_phenopackets(args: argparse.Namespace) -> int:
 
 
 def _run_export_omop(args: argparse.Namespace) -> int:
+    extended = args.format == "omop-extended"
     normalized_path = args.input / "normalized.jsonl"
     if not normalized_path.is_file():
         _logger.error("%s not found; run gentrex normalize first", normalized_path)
@@ -274,13 +275,19 @@ def _run_export_omop(args: argparse.Namespace) -> int:
         cdm=settings["cdm_schema"],
         vocabulary=settings["vocabulary_schema"] or settings["cdm_schema"],
         gentrex=settings["gentrex_schema"],
+        extension=settings["extension_schema"] if extended else None,
     )
-    if schemas.gentrex == schemas.cdm:
-        _logger.error(
-            "export.omop.gentrex_schema must differ from cdm_schema, so that the"
-            " CDM schema holds only CDM tables"
-        )
-        return 1
+    own = {"gentrex_schema": schemas.gentrex}
+    if extended:
+        own["extension_schema"] = schemas.extension
+    for name, schema in own.items():
+        if schema == schemas.cdm:
+            _logger.error(
+                "export.omop.%s must differ from cdm_schema, so that the CDM schema"
+                " holds only CDM tables",
+                name,
+            )
+            return 1
     try:
         engine = load_run.make_engine(database_url)
         if engine.url.get_backend_name() != "postgresql":
@@ -304,13 +311,16 @@ def _run_export_omop(args: argparse.Namespace) -> int:
             _logger.error("%s", exc)
             return 1
     try:
-        omop.prepare(engine, schemas, person_map)
+        omop.prepare(engine, schemas, person_map, extended)
     except omop.SetupError as exc:
         _logger.error("%s", exc)
         return 1
+    except sa.exc.DBAPIError as exc:
+        _logger.error("can't create Gentrex's tables: %s", exc.orig)
+        return 1
 
-    with runs.new_run("export/omop", args.input, settings):
-        failed = omop.run(normalized_path, engine, schemas, person_map)
+    with runs.new_run(f"export/{args.format}", args.input, settings):
+        failed = omop.run(normalized_path, engine, schemas, person_map, extended)
         if failed:
             _logger.error("failed files: %s", ", ".join(failed))
             return 1
@@ -398,6 +408,17 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Run folder of gentrex normalize to read.",
     )
     to_omop.set_defaults(func=_run_export_omop)
+    extended = formats.add_parser(
+        "omop-extended",
+        help="Export report data into an OMOP CDM database, with extension tables.",
+    )
+    extended.add_argument(
+        "--input",
+        type=pathlib.Path,
+        default=runs.latest("normalize"),
+        help="Run folder of gentrex normalize to read.",
+    )
+    extended.set_defaults(func=_run_export_omop)
     return parser
 
 

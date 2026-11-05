@@ -104,6 +104,47 @@ _KEYS = {
     "observation": "observation_id",
 }
 
+_EXTENSION = (
+    "genomic_test",
+    "genomic_variant",
+    "phenotype_feature",
+    "phenotype_candidate",
+)
+_TEST_FIELDS = (
+    "test_name",
+    "test_type",
+    "overall_result",
+    "overall_result_basis",
+    "overall_result_raw",
+    "clinical_indication",
+    "lab_name",
+    "lab_accession_number",
+)
+_VARIANT_TEXT = (
+    "gene_symbol",
+    "gene_symbol_raw",
+    "hgnc_id",
+    "gene_status",
+    "transcript",
+    "hgvs_c",
+    "hgvs_p",
+    "dna_change_raw",
+    "chromosomal_position",
+    "classification",
+    "classification_raw",
+    "zygosity",
+    "zygosity_raw",
+    "parental_origin",
+    "parental_origin_raw",
+    "associated_phenotype",
+    "disease_id",
+    "disease_label",
+    "disease_status",
+    "mode_of_inheritance",
+    "mode_of_inheritance_raw",
+    "variant_type_raw",
+)
+
 _logger = logging.getLogger(__name__)
 
 
@@ -119,18 +160,22 @@ class Schemas:
         cdm: The CDM tables.
         vocabulary: The vocabulary tables, such as CONCEPT.
         gentrex: Gentrex's two tables, which record what it wrote.
+        extension: The extension tables of `gentrex export omop-extended`.
     """
 
     cdm: str | None
     vocabulary: str | None
     gentrex: str | None
+    extension: str | None = None
 
 
 def tables(schemas: Schemas) -> dict[str, sa.Table]:
     """Returns the tables that the export reads and writes, by name.
 
     The CDM tables have the columns that the export uses, as OMOP CDM 5.4
-    defines them. Gentrex's own tables are omop_rows and omop_persons.
+    defines them. Gentrex's own tables are omop_rows and omop_persons. The
+    extension tables hold what the CDM can't, at full length, and each row
+    names the CDM row it extends by cdm_table and cdm_row_id.
     """
     metadata = sa.MetaData()
 
@@ -246,6 +291,49 @@ def tables(schemas: Schemas) -> dict[str, sa.Table]:
             schema=schemas.gentrex,
         ),
     ]
+
+    def extension(name: str, *columns: sa.Column) -> sa.Table:
+        return sa.Table(
+            name,
+            metadata,
+            sa.Column("cdm_table", sa.String(30), primary_key=True),
+            sa.Column("cdm_row_id", sa.Integer, primary_key=True, autoincrement=False),
+            *columns,
+            sa.Column("file", sa.String(255), nullable=False, index=True),
+            required("person_id"),
+            schema=schemas.extension,
+        )
+
+    found += [
+        extension(
+            "genomic_test",
+            *(sa.Column(f, sa.Text) for f in _TEST_FIELDS),
+            sa.Column("overall_result_conflict", sa.Boolean),
+        ),
+        extension(
+            "genomic_variant",
+            sa.Column("variant_number", sa.Integer),
+            sa.Column("page", sa.Integer),
+            *(sa.Column(f, sa.Text) for f in _VARIANT_TEXT),
+            sa.Column("is_secondary_finding", sa.Boolean),
+        ),
+        extension(
+            "phenotype_feature",
+            sa.Column("phenotype_number", sa.Integer),
+            sa.Column("text", sa.Text),
+            sa.Column("present", sa.Boolean),
+            sa.Column("hpo_id", sa.String(32)),
+            sa.Column("hpo_label", sa.Text),
+            sa.Column("models_agree", sa.Boolean),
+        ),
+        extension(
+            "phenotype_candidate",
+            sa.Column("rank", sa.Integer, primary_key=True, autoincrement=False),
+            sa.Column("hpo_id", sa.String(32)),
+            sa.Column("hpo_label", sa.Text),
+            sa.Column("models", sa.JSON),
+        ),
+    ]
     return {table.name: table for table in found}
 
 
@@ -268,9 +356,14 @@ def read_person_map(path: pathlib.Path) -> dict[str, int]:
 
 
 def prepare(
-    engine: sa.Engine, schemas: Schemas, person_map: dict[str, int] | None
+    engine: sa.Engine,
+    schemas: Schemas,
+    person_map: dict[str, int] | None,
+    extended: bool = False,
 ) -> None:
     """Creates Gentrex's own tables, and checks that the CDM can take the export.
+
+    With `extended`, it also creates the extension tables.
 
     Raises:
         SetupError: A CDM or vocabulary table is missing, or the CDM holds
@@ -286,9 +379,12 @@ def prepare(
                 " docs/export-omop.md shows"
             )
     own = [found["omop_rows"], found["omop_persons"]]
+    if extended:
+        own += [found[name] for name in _EXTENSION]
     with engine.begin() as conn:
-        if schemas.gentrex:
-            conn.execute(sa.schema.CreateSchema(schemas.gentrex, if_not_exists=True))
+        for schema in {schemas.gentrex, schemas.extension if extended else None}:
+            if schema:
+                conn.execute(sa.schema.CreateSchema(schema, if_not_exists=True))
         own[0].metadata.create_all(conn, tables=own)
         if person_map is None:
             person, created = found["person"], found["omop_persons"]
@@ -372,11 +468,27 @@ def _date(value: str | None) -> datetime.date | None:
 class _Report:
     """The rows of one report, as they are built, by table."""
 
-    def __init__(self, person_id: int, day: datetime.date, ids: _Ids) -> None:
+    def __init__(
+        self, file: str, person_id: int, day: datetime.date, ids: _Ids
+    ) -> None:
+        self.file = file
         self.person_id = person_id
         self.day = day
         self.ids = ids
         self.rows: dict[str, list[dict[str, Any]]] = {}
+        self.extension: dict[str, list[dict[str, Any]]] = {}
+
+    def extend(self, table: str, key: tuple[str, int], **values: Any) -> None:
+        """Adds one row to an extension table, for the CDM row `key`."""
+        self.extension.setdefault(table, []).append(
+            {
+                "cdm_table": key[0],
+                "cdm_row_id": key[1],
+                "file": self.file,
+                "person_id": self.person_id,
+                **values,
+            }
+        )
 
     def fact(
         self,
@@ -440,12 +552,18 @@ def _rows(
     day: datetime.date,
     concepts: _Concepts,
     ids: _Ids,
-) -> dict[str, list[dict[str, Any]]]:
-    """Returns the CDM rows of one report, by table."""
+) -> _Report:
+    """Returns the CDM rows and extension rows of one report."""
     data = report.data or {}
     normalized = report.normalized or {}
-    out = _Report(person_id, day, ids)
+    out = _Report(report.file, person_id, day, ids)
     test = out.fact(concepts.get(_TEST), "procedure_occurrence", data.get("test_name"))
+    out.extend(
+        "genomic_test",
+        test,
+        **{f: normalized.get(f, data.get(f)) for f in _TEST_FIELDS},
+        overall_result_conflict=normalized.get("overall_result_conflict"),
+    )
     category = normalized.get("specimen_type")
     if category or data.get("specimen_type"):
         concept_id, domain = concepts.get(("SNOMED", _SPECIMENS.get(category, "")))
@@ -462,14 +580,26 @@ def _rows(
         ]
     variants = data.get("variants") or []
     genes = normalized.get("variants") or [{}] * len(variants)
-    for variant, gene in zip(variants, genes, strict=True):
-        _variant(out, variant, gene, test, concepts)
+    for number, (variant, gene) in enumerate(zip(variants, genes, strict=True), 1):
+        anchor = _variant(out, variant, gene, test, concepts)
+        values = {f: variant.get(f) for f in _VARIANT_TEXT}
+        values.update({f: gene[f] for f in _VARIANT_TEXT if f in gene})
+        values["gene_symbol_raw"] = variant.get("gene_symbol")
+        out.extend(
+            "genomic_variant",
+            anchor,
+            variant_number=number,
+            page=variant.get("page"),
+            is_secondary_finding=variant.get("is_secondary_finding"),
+            **values,
+        )
     matches = normalized.get("patient_phenotypes") or []
     features = data.get("patient_phenotypes") or []
-    for feature, match in zip(features, matches or [{}] * len(features), strict=True):
+    pairs = zip(features, matches or [{}] * len(features), strict=True)
+    for number, (feature, match) in enumerate(pairs, 1):
         if feature.get("present") is None:
             continue
-        out.fact(
+        key = out.fact(
             (0, None),
             "observation",
             match.get("hpo_id") or feature.get("text"),
@@ -478,7 +608,26 @@ def _rows(
             test,
             match.get("label"),
         )
-    return out.rows
+        out.extend(
+            "phenotype_feature",
+            key,
+            phenotype_number=number,
+            text=feature.get("text"),
+            present=feature.get("present"),
+            hpo_id=match.get("hpo_id"),
+            hpo_label=match.get("label"),
+            models_agree=match.get("models_agree"),
+        )
+        for rank, candidate in enumerate(match.get("candidates") or [], 1):
+            out.extend(
+                "phenotype_candidate",
+                key,
+                rank=rank,
+                hpo_id=candidate["hpo_id"],
+                hpo_label=candidate["label"],
+                models=candidate["models"],
+            )
+    return out
 
 
 def _variant(
@@ -487,8 +636,8 @@ def _variant(
     gene: dict[str, Any],
     test: tuple[str, int],
     concepts: _Concepts,
-) -> None:
-    """Adds the rows of one variant, which point to the row of the test."""
+) -> tuple[str, int]:
+    """Adds the rows of one variant, and returns the key of the variant's row."""
     hgvs_c = variant.get("hgvs_c")
     transcript = variant.get("transcript")
     if hgvs_c and transcript and ":" not in hgvs_c:
@@ -531,6 +680,7 @@ def _variant(
             value = (0, None)
         label = gene.get("disease_label") if code == _PHENOTYPE else None
         out.fact(concepts.get(code), "measurement", code[1], value, text, anchor, label)
+    return anchor
 
 
 def _replace(
@@ -538,8 +688,17 @@ def _replace(
     found: dict[str, sa.Table],
     file: str,
     rows: dict[str, list[dict[str, Any]]],
+    extension: dict[str, list[dict[str, Any]]] | None = None,
 ) -> None:
-    """Replaces the rows that an earlier export wrote for the file."""
+    """Replaces the rows that an earlier export wrote for the file.
+
+    With `extension`, it replaces the file's extension rows too.
+    """
+    if extension is not None:
+        for name in _EXTENSION:
+            conn.execute(found[name].delete().where(found[name].c.file == file))
+        for name, table_rows in extension.items():
+            conn.execute(found[name].insert(), table_rows)
     written = found["omop_rows"]
     earlier: dict[str, list[int]] = {}
     for table, row_id in conn.execute(
@@ -681,6 +840,7 @@ def run(
     engine: sa.Engine,
     schemas: Schemas,
     person_map: dict[str, int] | None,
+    extended: bool = False,
 ) -> list[str]:
     """Inserts every report of a run of `gentrex normalize` into the CDM.
 
@@ -693,6 +853,8 @@ def run(
         schemas: Where the CDM, vocabulary and Gentrex tables are.
         person_map: The person_id of each patient_key, or None to create a
             person for each patient, in a CDM that holds only Gentrex's records.
+        extended: Whether to fill the extension tables too, as
+            `gentrex export omop-extended` does.
 
     Returns:
         Names of the files that were left out or have an error from
@@ -730,12 +892,14 @@ def run(
             failed.append(report.file)
             continue
         try:
+            built = _rows(report, person_id, day, concepts, ids)
             with engine.begin() as conn:
                 _replace(
                     conn,
                     found,
                     report.file,
-                    _rows(report, person_id, day, concepts, ids),
+                    built.rows,
+                    built.extension if extended else None,
                 )
         except Exception as exc:  # One report's failure must not cost the others.
             _logger.error("failed %s: %s: %s", report.file, type(exc).__name__, exc)
