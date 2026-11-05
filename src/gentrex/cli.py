@@ -259,6 +259,20 @@ def _run_export_phenopackets(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_export_fhir(args: argparse.Namespace) -> int:
+    normalized_path = args.input / "normalized.jsonl"
+    if not normalized_path.is_file():
+        _logger.error("%s not found; run gentrex normalize first", normalized_path)
+        return 1
+
+    with runs.new_run("export/fhir", args.input, {}) as run_dir:
+        failed = export_run.run_fhir(normalized_path, run_dir / "bundles")
+        if failed:
+            _logger.error("failed files: %s", ", ".join(failed))
+            return 1
+    return 0
+
+
 def _run_export_omop(args: argparse.Namespace) -> int:
     extended = args.format == "omop-extended"
     normalized_path = args.input / "normalized.jsonl"
@@ -419,6 +433,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Run folder of gentrex normalize to read.",
     )
     extended.set_defaults(func=_run_export_omop)
+    to_fhir = formats.add_parser(
+        "fhir", help="Export report data as FHIR Genomics Reporting Bundles."
+    )
+    to_fhir.add_argument(
+        "--input",
+        type=pathlib.Path,
+        default=runs.latest("normalize"),
+        help="Run folder of gentrex normalize to read.",
+    )
+    to_fhir.set_defaults(func=_run_export_fhir)
     return parser
 
 

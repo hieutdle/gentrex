@@ -1,7 +1,5 @@
 """The Phenopacket of one patient, GA4GH's JSON format, from their reports."""
 
-import logging
-from collections.abc import Callable
 from typing import Any
 
 from gentrex import records
@@ -31,8 +29,6 @@ _ALLELIC_STATES = {
 # without one.
 _ANY_DISEASE = {"id": "MONDO:0000001", "label": "disease"}
 
-_logger = logging.getLogger(__name__)
-
 
 def build(
     patient_key: str,
@@ -52,10 +48,12 @@ def build(
         created: When the Phenopacket was made, as an ISO 8601 time in UTC.
     """
     subject: dict[str, Any] = {"id": patient_key}
-    birth = _agreed(reports, patients.date_of_birth, "dates of birth")
+    birth = patients.agreed(
+        reports, patients.date_of_birth, "dates of birth", "Phenopacket"
+    )
     if birth:
         subject["dateOfBirth"] = f"{birth}T00:00:00Z"
-    sex = _agreed(reports, patients.sex, "sexes")
+    sex = patients.agreed(reports, patients.sex, "sexes", "Phenopacket")
     if sex:
         subject["sex"] = sex
     packet: dict[str, Any] = {"id": patient_key, "subject": subject}
@@ -73,23 +71,6 @@ def build(
         "phenopacketSchemaVersion": _SCHEMA_VERSION,
     }
     return packet
-
-
-def _agreed(
-    reports: list[records.NormalizedReport],
-    value: Callable[[records.NormalizedReport], str | None],
-    what: str,
-) -> str | None:
-    """Returns the value that all reports giving one agree on, else None."""
-    values = patients.given(reports, value)
-    if len(values) > 1:
-        _logger.warning(
-            "%s give different %s, so the Phenopacket leaves them out",
-            ", ".join(report.file for report in reports),
-            what,
-        )
-        return None
-    return next(iter(values), None)
 
 
 def _features(reports: list[records.NormalizedReport]) -> list[dict[str, Any]]:

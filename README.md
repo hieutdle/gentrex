@@ -9,7 +9,8 @@ Gentrex can then load the records into a database, so that you can count
 and compare reports with SQL. It can also export them as Phenopackets, the GA4GH
 format for sharing a patient's clinical features and genetic findings, and
 into an OMOP CDM database, where OHDSI's tools can study them together with
-EHR data.
+EHR data. As FHIR Bundles, HL7's format for genetic test results, the reports
+can go into an EHR or a FHIR server.
 
 Gentrex is a command-line program. `gentrex transcribe`, `gentrex select` and
 `gentrex extract` use models that run in a separate model server,
@@ -18,8 +19,8 @@ page or report to that server and writes what comes back. `gentrex normalize`
 needs no server, because its models run inside Gentrex on the CPU.
 `gentrex load` writes the records into one of three databases. A SQLite file
 needs no server, and PostgreSQL and MySQL run as servers in Docker on your
-workstation. `gentrex export phenopackets` writes files and needs no server
-either.
+workstation. `gentrex export phenopackets` and `gentrex export fhir` write
+files and need no server either.
 
 ## How it works
 
@@ -37,9 +38,9 @@ Many pages of a report only describe the test. `gentrex select` drops them,
 so `gentrex extract` has less to read.
 
 Then you can load the records into a database, export them as Phenopackets
-and export them into an OMOP database, in any combination. Each of these
-commands reads the output of `gentrex normalize`, so you run only what you
-need, in any order.
+or FHIR Bundles and export them into an OMOP database, in any combination.
+Each of these commands reads the output of `gentrex normalize`, so you run
+only what you need, in any order.
 
 | Command | What it does | Writes to | Model and GPU |
 | --- | --- | --- | --- |
@@ -47,6 +48,7 @@ need, in any order.
 | [`gentrex export phenopackets`](docs/export-phenopackets.md) | Writes one Phenopacket per patient, the GA4GH format that rare-disease tools read and other centers can import. | `results/export/phenopackets/` | No model and no GPU |
 | [`gentrex export omop`](docs/export-omop.md) | Writes the records into the standard tables of an OMOP CDM database in PostgreSQL, so that OHDSI's tools, such as ATLAS, can select patients by gene, ACMG class and zygosity. | The CDM database, and `results/export/omop/` | No model and no GPU |
 | [`gentrex export omop-extended`](docs/export-omop-extended.md) | Writes the same rows, and adds extension tables, outside the CDM's schema, with what the CDM can't hold, such as parental origin and full-length HGVS changes. | The CDM database, and `results/export/omop-extended/` | No model and no GPU |
+| [`gentrex export fhir`](docs/export-fhir.md) | Writes one FHIR Bundle per report, following HL7's Genomics Reporting Implementation Guide, so that an EHR or a FHIR server can take in the results. | `results/export/fhir/` | No model and no GPU |
 
 Each record is one line of `extractions.jsonl`. Shortened and spread over
 several lines, a record looks like this:
@@ -91,7 +93,9 @@ database, and
 [`gentrex export phenopackets`](docs/export-phenopackets.md#check-the-result)
 writes them as Phenopackets.
 [`gentrex export omop`](docs/export-omop.md#check-the-result) writes them into
-an OMOP CDM database.
+an OMOP CDM database, and
+[`gentrex export fhir`](docs/export-fhir.md#check-the-result) writes them as
+FHIR Bundles.
 
 ## What you need
 
@@ -134,15 +138,15 @@ the server before the next command starts its own.
 3. [Extract report data](docs/extract.md)
 4. [Normalize report data](docs/normalize.md)
 
-Then use the records in one or both of these ways:
+Then use the records in one or more of these ways:
 
 - [Load report data into a database](docs/load.md)
 - [Export report data as Phenopackets](docs/export-phenopackets.md)
 - [Export report data into an OMOP database](docs/export-omop.md), or
   [with extension tables](docs/export-omop-extended.md)
+- [Export report data as FHIR Bundles](docs/export-fhir.md)
 
-`gentrex normalize`, `gentrex load`, `gentrex export phenopackets` and
-`gentrex export omop` need no model server.
+`gentrex normalize`, `gentrex load` and the exports need no model server.
 
 On Mount Sinai's Minerva cluster, `gentrex transcribe`, `gentrex select` and
 `gentrex extract` run as batch jobs, and the other commands run in an
@@ -212,6 +216,7 @@ Reports, and everything Gentrex writes from them, may contain patient data.
 - [Export report data as Phenopackets](docs/export-phenopackets.md)
 - [Export report data into an OMOP database](docs/export-omop.md)
   - [With extension tables](docs/export-omop-extended.md)
+- [Export report data as FHIR Bundles](docs/export-fhir.md)
 - [Running on Minerva (Mount Sinai)](docs/minerva.md)
 - [Development](docs/development.md)
 - [Evaluate HPO matching](evaluation/README.md)

@@ -7,9 +7,9 @@ batch job on a GPU node. The job starts the command's model with
 Gentrex is done. `gentrex extract` can instead use Minerva's AI service,
 which runs the model for you, as
 [Use Minerva's AI service instead of a job](#use-minervas-ai-service-instead-of-a-job)
-explains. `gentrex normalize`, `gentrex load` and
-`gentrex export phenopackets` need no GPU, so you run them yourself in an
-interactive session. Each command has a page that explains what it does,
+explains. `gentrex normalize`, `gentrex load`,
+`gentrex export phenopackets` and `gentrex export fhir` need no GPU, so you
+run them yourself in an interactive session. Each command has a page that explains what it does,
 what it writes and how to change its settings.
 
 Minerva schedules jobs with LSF. You describe a job in a script, submit the
@@ -583,7 +583,7 @@ Python packages that `gentrex normalize` uses to find HPO terms. They take
 about 1 GB in the `.venv` folder of `gentrex`, and about as much in uv's cache
 in your home folder. The two embedding models, about 1.8 GB, go to Hugging
 Face's cache in your home folder, `~/.cache/huggingface/`. Keep the session
-open if you go on to load or export the records, as the next two sections
+open if you go on to load or export the records, as the next three sections
 show.
 
 The result is in `results/normalize/latest/`. Continue on the page of
@@ -641,6 +641,26 @@ no server. Continue on the page of `gentrex export phenopackets`:
 
 - [Check the result](export-phenopackets.md#check-the-result)
 - [When something goes wrong](export-phenopackets.md#when-something-goes-wrong)
+
+## Export report data as FHIR Bundles
+
+Run `gentrex export fhir` in the same interactive session, after
+`gentrex normalize` has finished:
+
+```bash
+uv run gentrex export fhir
+```
+
+`gentrex export fhir` writes one FHIR Bundle per report to
+`results/export/fhir/latest/bundles/` in a second, and it needs no server.
+Continue on the page of `gentrex export fhir`:
+
+- [Check the result](export-fhir.md#check-the-result)
+- [When something goes wrong](export-fhir.md#when-something-goes-wrong)
+
+The test FHIR server of [Search the Bundles](export-fhir.md#search-the-bundles)
+needs Docker, which Minerva doesn't offer. For that step, copy the run folder
+of `gentrex export fhir` to a workstation approved for patient data.
 
 When you are done, type `exit` to end the session.
 
