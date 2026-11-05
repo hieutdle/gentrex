@@ -643,3 +643,14 @@ no server. Continue on the page of `gentrex export phenopackets`:
 - [When something goes wrong](export-phenopackets.md#when-something-goes-wrong)
 
 When you are done, type `exit` to end the session.
+
+## Export report data into an OMOP database
+
+`gentrex export omop` writes into an OMOP CDM database in PostgreSQL, and
+Minerva runs no PostgreSQL server. So run it on a machine that can reach the
+CDM, such as a workstation approved for patient data. Copy the run folder of
+`gentrex normalize` there, as for
+[Load report data into a database](#load-report-data-into-a-database). The
+export needs no other file. Then follow
+[Export report data into an OMOP database](export-omop.md), and name the
+copied run with `--input`.

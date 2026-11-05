@@ -12,6 +12,7 @@ import yaml
 from gentrex import config
 from gentrex import llm
 from gentrex import runs
+from gentrex.export import omop
 from gentrex.export import run as export_run
 from gentrex.extract import extractor
 from gentrex.extract import run as extract_run
@@ -33,6 +34,7 @@ _OCR_API_KEY_ENV = "GENTREX_OCR_API_KEY"
 _LLM_BASE_URL_ENV = "GENTREX_LLM_BASE_URL"
 _LLM_API_KEY_ENV = "GENTREX_LLM_API_KEY"
 _DATABASE_URL_ENV = "GENTREX_DATABASE_URL"
+_OMOP_DATABASE_URL_ENV = "GENTREX_OMOP_DATABASE_URL"
 
 
 def _run_transcribe(args: argparse.Namespace) -> int:
@@ -257,6 +259,64 @@ def _run_export_phenopackets(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_export_omop(args: argparse.Namespace) -> int:
+    normalized_path = args.input / "normalized.jsonl"
+    if not normalized_path.is_file():
+        _logger.error("%s not found; run gentrex normalize first", normalized_path)
+        return 1
+    database_url = os.environ.get(_OMOP_DATABASE_URL_ENV)
+    if not database_url:
+        _logger.error("%s is not set (see .env.example)", _OMOP_DATABASE_URL_ENV)
+        return 2
+
+    settings = config.load_settings()["export"]["omop"]
+    schemas = omop.Schemas(
+        cdm=settings["cdm_schema"],
+        vocabulary=settings["vocabulary_schema"] or settings["cdm_schema"],
+        gentrex=settings["gentrex_schema"],
+    )
+    if schemas.gentrex == schemas.cdm:
+        _logger.error(
+            "export.omop.gentrex_schema must differ from cdm_schema, so that the"
+            " CDM schema holds only CDM tables"
+        )
+        return 1
+    try:
+        engine = load_run.make_engine(database_url)
+        if engine.url.get_backend_name() != "postgresql":
+            raise ValueError(
+                "the OMOP export writes only to PostgreSQL, because OHDSI's tools"
+                " store dates in SQLite as numbers"
+            )
+        with engine.connect():
+            pass
+    except ValueError as exc:
+        _logger.error("%s: %s (see docs/export-omop.md)", _OMOP_DATABASE_URL_ENV, exc)
+        return 1
+    except sa.exc.OperationalError as exc:
+        _logger.error("can't connect to the database: %s", exc.orig)
+        return 1
+    person_map = None
+    if settings["person_map"]:
+        try:
+            person_map = omop.read_person_map(pathlib.Path(settings["person_map"]))
+        except (OSError, ValueError) as exc:
+            _logger.error("%s", exc)
+            return 1
+    try:
+        omop.prepare(engine, schemas, person_map)
+    except omop.SetupError as exc:
+        _logger.error("%s", exc)
+        return 1
+
+    with runs.new_run("export/omop", args.input, settings):
+        failed = omop.run(normalized_path, engine, schemas, person_map)
+        if failed:
+            _logger.error("failed files: %s", ", ".join(failed))
+            return 1
+    return 0
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="gentrex", description=__doc__)
     # In the order you run them, so that --help lists them that way.
@@ -328,6 +388,16 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Run folder of gentrex normalize to read.",
     )
     phenopackets.set_defaults(func=_run_export_phenopackets)
+    to_omop = formats.add_parser(
+        "omop", help="Export report data into an OMOP CDM database."
+    )
+    to_omop.add_argument(
+        "--input",
+        type=pathlib.Path,
+        default=runs.latest("normalize"),
+        help="Run folder of gentrex normalize to read.",
+    )
+    to_omop.set_defaults(func=_run_export_omop)
     return parser
 
 

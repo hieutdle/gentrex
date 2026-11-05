@@ -5,6 +5,7 @@ from collections.abc import Callable
 from typing import Any
 
 from gentrex import records
+from gentrex.export import patients
 
 _SCHEMA_VERSION = "2.0"
 
@@ -25,7 +26,6 @@ _ALLELIC_STATES = {
     "heteroplasmic": {"id": "GENO:0000603", "label": "heteroplasmic"},
     "homoplasmic": {"id": "GENO:0000602", "label": "homoplasmic"},
 }
-_SEXES = {"f": "FEMALE", "female": "FEMALE", "m": "MALE", "male": "MALE"}
 # MONDO's root term, for variants whose associated phenotype names no MONDO
 # disease. A diagnosis needs a disease, and the variants would be lost
 # without one.
@@ -52,12 +52,10 @@ def build(
         created: When the Phenopacket was made, as an ISO 8601 time in UTC.
     """
     subject: dict[str, Any] = {"id": patient_key}
-    birth = _agreed(
-        reports, lambda r: (r.normalized or {}).get("date_of_birth"), "dates of birth"
-    )
+    birth = _agreed(reports, patients.date_of_birth, "dates of birth")
     if birth:
         subject["dateOfBirth"] = f"{birth}T00:00:00Z"
-    sex = _agreed(reports, _sex, "sexes")
+    sex = _agreed(reports, patients.sex, "sexes")
     if sex:
         subject["sex"] = sex
     packet: dict[str, Any] = {"id": patient_key, "subject": subject}
@@ -77,17 +75,13 @@ def build(
     return packet
 
 
-def _sex(report: records.NormalizedReport) -> str | None:
-    return _SEXES.get(((report.data or {}).get("sex") or "").strip().casefold())
-
-
 def _agreed(
     reports: list[records.NormalizedReport],
     value: Callable[[records.NormalizedReport], str | None],
     what: str,
 ) -> str | None:
     """Returns the value that all reports giving one agree on, else None."""
-    values = {v for report in reports if (v := value(report)) is not None}
+    values = patients.given(reports, value)
     if len(values) > 1:
         _logger.warning(
             "%s give different %s, so the Phenopacket leaves them out",

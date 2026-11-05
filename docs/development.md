@@ -18,8 +18,8 @@ Run the tests:
 uv run pytest
 ```
 
-The tests of `gentrex load` run on SQLite, which needs no server. To run them
-on PostgreSQL and MySQL too, start the servers of step 1 in
+The database tests, of `gentrex load` and `gentrex export omop`, run on
+SQLite, which needs no server. To run them on PostgreSQL and MySQL too, start the servers of step 1 in
 [Load report data into a database](load.md#step-1-choose-a-database), list
 their addresses in `GENTREX_TEST_DATABASE_URLS`, separated by spaces, and add
 the extras that install their drivers:

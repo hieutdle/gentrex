@@ -8,8 +8,8 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
-    # The tests of `gentrex load` run on SQLite, and on each server listed in
-    # GENTREX_TEST_DATABASE_URLS.
+    # The database tests, of `gentrex load` and `gentrex export omop`, run on
+    # SQLite, and on each server listed in GENTREX_TEST_DATABASE_URLS.
     services:
       postgres:
         image: postgres:18

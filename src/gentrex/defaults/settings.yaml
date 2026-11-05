@@ -139,3 +139,25 @@ load:
   # Use the release that built the HPO index (docs/normalize.md, step 2), so
   # that every matched term is in it.
   hpo_release: data/ontology/hp-base.json
+
+# `gentrex export`: Export report data in a standard format.
+export:
+  # `gentrex export omop`: Export report data into the OMOP CDM 5.4 database
+  # that GENTREX_OMOP_DATABASE_URL names (see .env.example).
+  omop:
+    # Schema of the CDM tables. null is the database's default schema, which
+    # is public in PostgreSQL.
+    cdm_schema: null
+    # Schema of the vocabulary tables, such as concept. null is the same
+    # schema as cdm_schema, where most CDMs keep them.
+    vocabulary_schema: null
+    # Schema of Gentrex's two tables, which record the rows and persons that
+    # it wrote, so that a later run replaces them. Gentrex creates the schema
+    # if it doesn't exist. It must differ from cdm_schema, so that the CDM
+    # schema holds only CDM tables.
+    gentrex_schema: gentrex
+    # CSV file with the columns patient_key and person_id, which gives the
+    # person of each patient in a CDM that already holds persons. null makes
+    # Gentrex add a person for each patient, for a CDM that holds only
+    # Gentrex's records.
+    person_map: null

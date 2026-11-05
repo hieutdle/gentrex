@@ -7,7 +7,9 @@ the test, the overall result, the patient's clinical features and every
 variant reported, with its gene, HGVS changes, classification and zygosity.
 Gentrex can then load the records into a database, so that you can count
 and compare reports with SQL. It can also export them as Phenopackets, the GA4GH
-format for sharing a patient's clinical features and genetic findings.
+format for sharing a patient's clinical features and genetic findings, and
+into an OMOP CDM database, where OHDSI's tools can study them together with
+EHR data.
 
 Gentrex is a command-line program. `gentrex transcribe`, `gentrex select` and
 `gentrex extract` use models that run in a separate model server,
@@ -34,14 +36,16 @@ order, because each one reads the output of the one before it.
 Many pages of a report only describe the test. `gentrex select` drops them,
 so `gentrex extract` has less to read.
 
-Then you can load the records into a database, export them as Phenopackets,
-or do both. The two commands each read the output of `gentrex normalize`, so
-you run only what you need, in any order.
+Then you can load the records into a database, export them as Phenopackets
+and export them into an OMOP database, in any combination. Each of these
+commands reads the output of `gentrex normalize`, so you run only what you
+need, in any order.
 
 | Command | What it does | Writes to | Model and GPU |
 | --- | --- | --- | --- |
 | [`gentrex load`](docs/load.md) | Writes the records into tables of a SQLite, PostgreSQL or MySQL database, with the HPO terms and their hierarchy, so that you can query them with SQL. | The database, and `results/load/` | No model and no GPU |
 | [`gentrex export phenopackets`](docs/export-phenopackets.md) | Writes one Phenopacket per patient, the GA4GH format that rare-disease tools read and other centers can import. | `results/export/phenopackets/` | No model and no GPU |
+| [`gentrex export omop`](docs/export-omop.md) | Writes the records into the standard tables of an OMOP CDM database in PostgreSQL, so that OHDSI's tools, such as ATLAS, can select patients by gene, ACMG class and zygosity. | The CDM database, and `results/export/omop/` | No model and no GPU |
 
 Each record is one line of `extractions.jsonl`. Shortened and spread over
 several lines, a record looks like this:
@@ -85,6 +89,8 @@ the standard values next to them, in a field named `normalized`.
 database, and
 [`gentrex export phenopackets`](docs/export-phenopackets.md#check-the-result)
 writes them as Phenopackets.
+[`gentrex export omop`](docs/export-omop.md#check-the-result) writes them into
+an OMOP CDM database.
 
 ## What you need
 
@@ -106,9 +112,13 @@ writes them as Phenopackets.
   that `gentrex load` is tested with, and it refuses the address of any other
   database. [Supported databases](docs/load.md#supported-databases) says what
   the tests check and how to add a database.
+- An OMOP CDM database in PostgreSQL with OHDSI's vocabularies, if you export
+  the records into OMOP. [Get a CDM database](docs/export-omop.md#step-1-get-a-cdm-database)
+  says how to get one.
 - [Docker](https://docs.docker.com/get-started/get-docker/), if you load the
-  records into PostgreSQL or MySQL. It runs the server in a container, which
-  takes 1 to 2 GB of disk with the database. SQLite needs neither.
+  records into PostgreSQL or MySQL, or create a CDM database of your own. It
+  runs the server in a container, which takes 1 to 2 GB of disk with the
+  database. SQLite needs neither.
 - Storage approved for patient data, for the reports and everything Gentrex
   writes from them.
 
@@ -127,9 +137,10 @@ Then use the records in one or both of these ways:
 
 - [Load report data into a database](docs/load.md)
 - [Export report data as Phenopackets](docs/export-phenopackets.md)
+- [Export report data into an OMOP database](docs/export-omop.md)
 
-`gentrex normalize`, `gentrex load` and `gentrex export phenopackets` need no
-model server.
+`gentrex normalize`, `gentrex load`, `gentrex export phenopackets` and
+`gentrex export omop` need no model server.
 
 On Mount Sinai's Minerva cluster, `gentrex transcribe`, `gentrex select` and
 `gentrex extract` run as batch jobs, and the other commands run in an
@@ -170,8 +181,8 @@ model than settings.yaml names, or the address in `.env` doesn't end in
 Gentrex ends with an exit code, which `echo $?` shows right after a run. 0
 means every file went through. 1 means that some files failed, the input was
 missing or the run stopped with an error. The end of the output says which. 2
-means the model server's address, or for `gentrex load` the database's
-address, is not set. 2 also means a mistake on the command line, such as a
+means the model server's address, or for `gentrex load` and
+`gentrex export omop` the database's address, is not set. 2 also means a mistake on the command line, such as a
 command or option that doesn't exist, and the message says which. Each
 command's page says what to do for each code.
 
@@ -184,9 +195,9 @@ Reports, and everything Gentrex writes from them, may contain patient data.
   ignores both folders, and reports and results must never be committed.
 - Gentrex sends page images and page text to the model servers set in `.env`.
   Run those servers on machines approved for patient data.
-- `gentrex load` writes the records into the database set in `.env`. Keep a
-  SQLite file, or run a database server, only on a machine approved for
-  patient data.
+- `gentrex load` and `gentrex export omop` write the records into the
+  databases set in `.env`. Keep a SQLite file, or run a database server, only
+  on a machine approved for patient data.
 
 ## Documentation
 
@@ -197,6 +208,7 @@ Reports, and everything Gentrex writes from them, may contain patient data.
 - [Load report data into a database](docs/load.md)
   - [Database tables](docs/database-tables.md)
 - [Export report data as Phenopackets](docs/export-phenopackets.md)
+- [Export report data into an OMOP database](docs/export-omop.md)
 - [Running on Minerva (Mount Sinai)](docs/minerva.md)
 - [Development](docs/development.md)
 - [Evaluate HPO matching](evaluation/README.md)
