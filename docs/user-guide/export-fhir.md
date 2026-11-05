@@ -70,7 +70,7 @@ The run folder holds:
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/export/fhir/latest` points to the newest finished run.
-[Runs and results](../README.md#runs-and-results) explains run folders and
+[Runs and results](../../README.md#runs-and-results) explains run folders and
 `latest`.
 
 The Bundles hold patient identifiers. Each Patient has the MRN, the date of

@@ -2,7 +2,7 @@
 
 `gentrex load` stores each run of `gentrex normalize` in eight tables. They
 are the same in SQLite, PostgreSQL and MySQL, and
-[`tables.py`](../src/gentrex/load/tables.py) defines them. To open the
+[`tables.py`](../../src/gentrex/load/tables.py) defines them. To open the
 database, see [Load report data into a database](load.md#check-the-result).
 
 ## How the tables link
@@ -65,7 +65,7 @@ Columns ending in `_raw` hold the text as the report printed it. The column
 with the same name minus `_raw` holds the standard value from
 `gentrex normalize` or the category that `gentrex extract` picked, such as
 `date_of_birth` next to `date_of_birth_raw`. The categories listed are those
-of the default [`schema.yaml`](../src/gentrex/defaults/schema.yaml). If
+of the default [`schema.yaml`](../../src/gentrex/defaults/schema.yaml). If
 `gentrex normalize` failed on a report, its standard values are null and
 `error` says why.
 

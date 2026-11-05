@@ -41,7 +41,7 @@ like an HPO label or synonym.
 **Combining the models' similarities works.** The two models score on
 different scales, so `gentrex normalize` turns each model's scores into
 z-scores before it adds them, as
-[Normalize report data](../docs/normalize.md#hpo-terms) describes. An earlier
+[Normalize report data](../docs/user-guide/normalize.md#hpo-terms) describes. An earlier
 version of `gentrex normalize` combined the models' ranks instead. It got
 65.7% for the first term and 84.2% for the 5 candidates, no better than
 SapBERT alone.

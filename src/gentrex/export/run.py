@@ -11,6 +11,7 @@ from typing import Any
 from gentrex import records
 from gentrex.export import fhir
 from gentrex.export import phenopacket
+from gentrex.export import pseudonyms as pseudonyms_lib
 from gentrex.load import run as load_run
 
 _logger = logging.getLogger(__name__)
@@ -67,6 +68,7 @@ def run(
     input_path: pathlib.Path,
     output_dir: pathlib.Path,
     versions: dict[str, str | None],
+    pseudonyms: pseudonyms_lib.Pseudonyms | None = None,
 ) -> list[str]:
     """Writes one Phenopacket per patient of a run of `gentrex normalize`.
 
@@ -76,6 +78,8 @@ def run(
             patient.
         versions: The HPO and MONDO releases that `gentrex normalize` used,
             under "hpo" and "mondo".
+        pseudonyms: Pseudonyms that replace patient keys and file names, in
+            the Phenopackets and their file names, for --pseudonymize.
 
     Returns:
         Names of the files that have no data or have an error from
@@ -88,8 +92,8 @@ def run(
     created = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
     taken: set[str] = set()
     for key, patient_reports in by_patient.items():
-        packet = phenopacket.build(key, patient_reports, versions, created)
-        name = _file_name(key, taken)
+        packet = phenopacket.build(key, patient_reports, versions, created, pseudonyms)
+        name = _file_name(packet["id"], taken)
         _write(output_dir / name, packet)
         _logger.info(
             "wrote %s from %s", name, ", ".join(r.file for r in patient_reports)

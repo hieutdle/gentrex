@@ -376,7 +376,7 @@ def prepare(
         if not inspector.has_table(table.name, schema=table.schema):
             raise SetupError(
                 f"the database has no table {table.fullname}; create the CDM as"
-                " docs/export-omop.md shows"
+                " docs/user-guide/export-omop.md shows"
             )
     own = [found["omop_rows"], found["omop_persons"]]
     if extended:
@@ -566,7 +566,8 @@ def _rows(
     )
     category = normalized.get("specimen_type")
     if category or data.get("specimen_type"):
-        concept_id, domain = concepts.get(("SNOMED", _SPECIMENS.get(category, "")))
+        snomed_code = _SPECIMENS.get(category or "", "")
+        concept_id, domain = concepts.get(("SNOMED", snomed_code))
         out.rows["specimen"] = [
             {
                 "specimen_id": ids.next("specimen"),
@@ -766,7 +767,9 @@ def _persons(
             continue
         birth = datetime.date.fromisoformat(births.pop())
         sexes = patients.given(reports, patients.sex)
-        printed = next((r.data.get("sex") for r in reports if r.data.get("sex")), None)
+        printed = next(
+            (sex for r in reports if (sex := (r.data or {}).get("sex"))), None
+        )
         person_id = ids.next("person")
         conn.execute(
             person.insert(),

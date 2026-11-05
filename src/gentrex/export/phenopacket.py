@@ -4,6 +4,7 @@ from typing import Any
 
 from gentrex import records
 from gentrex.export import patients
+from gentrex.export import pseudonyms as pseudonyms_lib
 
 _SCHEMA_VERSION = "2.0"
 
@@ -35,6 +36,7 @@ def build(
     reports: list[records.NormalizedReport],
     versions: dict[str, str | None],
     created: str,
+    pseudonyms: pseudonyms_lib.Pseudonyms | None = None,
 ) -> dict[str, Any]:
     """Returns the Phenopacket of one patient.
 
@@ -46,23 +48,32 @@ def build(
             under "hpo" and "mondo". "hpo" is None if `gentrex normalize` ran
             with --no-hpo.
         created: When the Phenopacket was made, as an ISO 8601 time in UTC.
+        pseudonyms: Pseudonyms that replace the patient key and the reports'
+            file names, for Phenopackets that are shared. The date of birth is
+            then left out.
     """
-    subject: dict[str, Any] = {"id": patient_key}
-    birth = patients.agreed(
-        reports, patients.date_of_birth, "dates of birth", "Phenopacket"
-    )
-    if birth:
+    subject_id = pseudonyms.patient(patient_key) if pseudonyms else patient_key
+    subject: dict[str, Any] = {"id": subject_id}
+    if not pseudonyms and (
+        birth := patients.agreed(
+            reports, patients.date_of_birth, "dates of birth", "Phenopacket"
+        )
+    ):
         subject["dateOfBirth"] = f"{birth}T00:00:00Z"
     sex = patients.agreed(reports, patients.sex, "sexes", "Phenopacket")
     if sex:
         subject["sex"] = sex
-    packet: dict[str, Any] = {"id": patient_key, "subject": subject}
+    packet: dict[str, Any] = {"id": subject_id, "subject": subject}
     if features := _features(reports):
         packet["phenotypicFeatures"] = features
     packet["interpretations"] = [
         interpretation
         for report in reports
-        for interpretation in _interpretations(patient_key, report)
+        for interpretation in _interpretations(
+            subject_id,
+            pseudonyms.report(report.file) if pseudonyms else report.file,
+            report,
+        )
     ]
     packet["metaData"] = {
         "created": created,
@@ -103,11 +114,12 @@ def _features(reports: list[records.NormalizedReport]) -> list[dict[str, Any]]:
 
 
 def _interpretations(
-    patient_key: str, report: records.NormalizedReport
+    subject_id: str, report_id: str, report: records.NormalizedReport
 ) -> list[dict[str, Any]]:
     """Returns one interpretation per disease of the report's variants.
 
     A report without variants gets one interpretation without a diagnosis.
+    The IDs of the interpretations and variants start with `report_id`.
     """
     data = report.data or {}
     normalized = report.normalized or {}
@@ -122,18 +134,16 @@ def _interpretations(
     variants = data.get("variants") or []
     genes = normalized.get("variants") or [{}] * len(variants)
     if not variants:
-        return [{"id": f"{report.file}:1", **common}]
+        return [{"id": f"{report_id}:1", **common}]
     by_disease: dict[tuple[str | None, str | None], list[dict[str, Any]]] = {}
     for number, (variant, gene) in enumerate(zip(variants, genes, strict=True), 1):
         disease = (gene.get("disease_id"), gene.get("disease_label"))
         by_disease.setdefault(disease, []).append(
-            _genomic_interpretation(
-                patient_key, f"{report.file}:{number}", variant, gene
-            )
+            _genomic_interpretation(subject_id, f"{report_id}:{number}", variant, gene)
         )
     return [
         {
-            "id": f"{report.file}:{number}",
+            "id": f"{report_id}:{number}",
             **common,
             "diagnosis": {
                 "disease": {"id": mondo_id, "label": label}

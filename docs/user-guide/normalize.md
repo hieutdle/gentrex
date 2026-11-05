@@ -34,7 +34,7 @@ You need:
   that `gentrex normalize` uses to find HPO terms. Step 2 installs them.
 
 On Mount Sinai's Minerva cluster, start an interactive session first, as
-[Normalize report data on Minerva](minerva.md#normalize-report-data) shows.
+[Normalize report data on Minerva](../minerva/minerva.md#normalize-report-data) shows.
 Then follow the steps below in that session.
 
 ## Step 1: Download the HGNC complete set
@@ -180,7 +180,7 @@ Each run folder holds three files:
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/normalize/latest` points to the newest finished run.
-[Runs and results](../README.md#runs-and-results) explains run folders and
+[Runs and results](../../README.md#runs-and-results) explains run folders and
 `latest`.
 
 `normalized.jsonl` has one line per report, in the order of the records from
@@ -289,7 +289,7 @@ On GSC+, a public test set of 939 phenotype mentions that experts mapped to
 HPO, the match was the experts' term for 67.1% of the mentions. The experts'
 term was among the 5 candidates for 86.0%. Where the models agreed, the match
 was right for 78.5% of the mentions, and where they disagreed, for 36.1%.
-[Evaluation results](../evaluation_results/README.md) has the details.
+[Evaluation results](../../evaluation_results/README.md) has the details.
 
 `gene_status` says how the symbol matched:
 
@@ -440,7 +440,7 @@ in `data.patient_phenotypes`.
 ## Settings
 
 The settings of `gentrex normalize` are in
-[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml),
+[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml),
 under `normalize`:
 
 | Setting | Default | What it does |

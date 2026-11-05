@@ -7,6 +7,7 @@ import time
 from concurrent import futures
 
 from gentrex import records
+from gentrex import runs
 from gentrex.select import score
 
 _logger = logging.getLogger(__name__)
@@ -51,11 +52,39 @@ def _decide(page: records.PageRecord, scorer: score.PageScorer) -> records.PageD
     )
 
 
+def _reusable(
+    earlier: runs.Earlier, pages: list[records.PageRecord]
+) -> dict[tuple[str, int], records.PageDecision]:
+    """Returns the earlier run's decisions to reuse, by file and page.
+
+    A decision is reused if it has no error and its page is the same as when
+    the earlier run read it.
+    """
+    before = {
+        (page.file, page.page): page
+        for page in runs.read_earlier(
+            earlier.input_path / "pages.jsonl", records.PageRecord
+        )
+    }
+    now = {(page.file, page.page): page for page in pages}
+    decisions = runs.read_earlier(
+        earlier.run_dir / "decisions.jsonl", records.PageDecision
+    )
+    return {
+        (decision.file, decision.page): decision
+        for decision in decisions
+        if not decision.error
+        and (key := (decision.file, decision.page)) in now
+        and before.get(key) == now[key]
+    }
+
+
 def run(
     input_path: pathlib.Path,
     decisions_path: pathlib.Path,
     kept_path: pathlib.Path,
     scorer: score.PageScorer,
+    earlier: runs.Earlier | None = None,
 ) -> list[str]:
     """Decides which pages of a file from `gentrex transcribe` to keep.
 
@@ -69,6 +98,8 @@ def run(
         kept_path: JSONL file to copy the kept PageRecords to, unchanged, so
             `gentrex extract` reads its pages from one file.
         scorer: Asks the questions.
+        earlier: An earlier run whose good decisions are reused instead of
+            asked again, for --retry.
 
     Returns:
         Names of the files with a page error (a failed question or an error
@@ -82,6 +113,12 @@ def run(
     start = time.perf_counter()
     with input_path.open(encoding="utf-8") as fh:
         pages = [records.PageRecord(**json.loads(line)) for line in fh]
+    reuse = _reusable(earlier, pages) if earlier else {}
+    if earlier:
+        _logger.info(
+            "reusing %d of %d pages from %s", len(reuse), len(pages), earlier.run_dir
+        )
+    todo = [page for page in pages if (page.file, page.page) not in reuse]
     failed: list[str] = []
     kept = 0
     last_file = None
@@ -91,8 +128,11 @@ def run(
             decisions_path.open("w", encoding="utf-8") as decisions_fh,
             kept_path.open("w", encoding="utf-8") as kept_fh,
         ):
-            decisions = pool.map(lambda page: _decide(page, scorer), pages)
-            for page, decision in zip(pages, decisions, strict=True):
+            decided = pool.map(lambda page: _decide(page, scorer), todo)
+            for page in pages:
+                decision = reuse.get((page.file, page.page))
+                if decision is None:
+                    decision = next(decided)
                 if decision.file != last_file:
                     _logger.info("deciding %s", decision.file)
                     last_file = decision.file
@@ -111,6 +151,6 @@ def run(
         len(pages),
         kept,
         seconds,
-        len(pages) / seconds * 60,
+        len(todo) / seconds * 60,
     )
     return failed

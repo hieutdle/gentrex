@@ -111,7 +111,7 @@ normalize:
     # The sentence-transformers models that embed the HPO names and the
     # clinical features, as named on Hugging Face. Each model scores the HPO
     # terms, and Gentrex combines the scores. After changing a model or a
-    # prompt, build the index again (docs/normalize.md, step 2).
+    # prompt, build the index again (docs/user-guide/normalize.md, step 2).
     # `gentrex normalize` stops if the index was built with other models or
     # prompts, because embeddings from different models can't be compared.
     models:
@@ -136,7 +136,7 @@ normalize:
 load:
   # The HPO release that `gentrex load` takes the HPO terms and their hierarchy
   # from, so that a query can find a term together with the terms under it.
-  # Use the release that built the HPO index (docs/normalize.md, step 2), so
+  # Use the release that built the HPO index (docs/user-guide/normalize.md, step 2), so
   # that every matched term is in it.
   hpo_release: data/ontology/hp-base.json
 

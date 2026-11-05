@@ -2,7 +2,7 @@
 
 A column whose name ends in _raw holds the report's wording, and the column of
 the same name without _raw holds the standard value that `gentrex normalize`
-found for it. docs/database-tables.md describes the columns.
+found for it. docs/user-guide/database-tables.md describes the columns.
 """
 
 import sqlalchemy as sa

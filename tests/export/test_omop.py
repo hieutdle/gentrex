@@ -290,6 +290,7 @@ def test_persons_are_not_created_in_a_cdm_with_other_persons(cdm, tmp_path):
 def test_the_extended_export_keeps_what_omop_cannot_hold(cdm, tmp_path):
     """Source values stop at 50 characters, and OMOP has no parental origin."""
     report = _report()
+    assert report.data is not None
     deletion = "Deletion of exons 1 to 26 of SCN1A, including the promoter region"
     report.data["variants"][0].update(
         dna_change_raw=deletion, parental_origin="de_novo"

@@ -1,7 +1,7 @@
 # Evaluate HPO matching
 
 `gentrex normalize` matches each clinical feature to an HPO term by comparing
-embeddings, as [Normalize report data](../docs/normalize.md#hpo-terms)
+embeddings, as [Normalize report data](../docs/user-guide/normalize.md#hpo-terms)
 describes. The script in this folder
 measures how often that match is right. It also compares the current setup
 with each of its two models alone, and with BM25 added. It reads GSC+, a public test set in which experts
@@ -18,9 +18,9 @@ and what they mean for Gentrex, are in
 You need:
 
 - Gentrex installed, as in step 1 of
-  [Transcribe PDF pages](../docs/transcribe.md#step-1-install).
+  [Transcribe PDF pages](../docs/user-guide/transcribe.md#step-1-install).
 - The HPO release `data/ontology/hp-base.json`, from step 2 of
-  [Normalize report data](../docs/normalize.md#step-2-build-the-hpo-index).
+  [Normalize report data](../docs/user-guide/normalize.md#step-2-build-the-hpo-index).
 - About 3 GB of free disk for the two models that the script downloads from
   Hugging Face and the packages it installs.
 - About 15 minutes. The last run took 10 minutes on a laptop with an

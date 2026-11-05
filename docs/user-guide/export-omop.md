@@ -318,7 +318,7 @@ the export again afterwards.
 ## Settings
 
 The settings of `gentrex export omop` are in
-[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml),
+[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml),
 under `export.omop`:
 
 | Setting | Default | What it does |

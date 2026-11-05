@@ -7,9 +7,10 @@ from google.protobuf import json_format
 from phenopackets import Phenopacket
 
 from gentrex import records
+from gentrex.export import pseudonyms as pseudonyms_lib
 from gentrex.export import run
 
-_VERSIONS = {"hpo": "2026-09-01", "mondo": "2026-11-03"}
+_VERSIONS: dict[str, str | None] = {"hpo": "2026-09-01", "mondo": "2026-11-03"}
 
 _SCN1A = (
     {
@@ -95,17 +96,20 @@ def _report(
 
 
 def _export(
-    tmp_path: pathlib.Path, reports: list[records.NormalizedReport]
+    tmp_path: pathlib.Path,
+    reports: list[records.NormalizedReport],
+    pseudonyms: pseudonyms_lib.Pseudonyms | None = None,
 ) -> tuple[list[str], dict[str, dict[str, Any]]]:
     """Writes `reports` as `gentrex normalize` does and exports them.
 
     Returns:
         The failed files, and each Phenopacket by its file name.
     """
+    tmp_path.mkdir(exist_ok=True)
     path = tmp_path / "normalized.jsonl"
     with path.open("w", encoding="utf-8", errors="backslashreplace") as fh:
         fh.writelines(report.to_json() + "\n" for report in reports)
-    failed = run.run(path, tmp_path / "phenopackets", _VERSIONS)
+    failed = run.run(path, tmp_path / "phenopackets", _VERSIONS, pseudonyms)
     packets = {
         packet.name: json.loads(packet.read_text(encoding="utf-8"))
         for packet in sorted((tmp_path / "phenopackets").glob("*.json"))
@@ -239,3 +243,32 @@ def test_only_primary_findings_are_candidates(
         "genomicInterpretations"
     ]
     assert interpretation["interpretationStatus"] == status
+
+
+def test_pseudonymous_phenopackets_hold_no_mrn_file_name_or_birth_date(tmp_path):
+    """Shared Phenopackets go to people who may not see who the patient is."""
+    report = _report(
+        "report-01.pdf",
+        "SYN-MRN-0001",
+        variants=(_SCN1A,),
+        date_of_birth="2018-05-14",
+    )
+
+    _, packets = _export(tmp_path, [report], pseudonyms_lib.Pseudonyms("secret"))
+
+    [(name, packet)] = packets.items()
+    text = json.dumps(packet)
+    assert name == f"{packet['id']}.json"
+    assert "SYN-MRN-0001" not in text
+    assert "report-01" not in text
+    assert "dateOfBirth" not in packet["subject"]
+
+
+def test_the_same_key_gives_the_same_pseudonyms_in_every_run(tmp_path):
+    """Phenopackets shared later must match the ones shared before."""
+    report = _report("report-01.pdf", "SYN-MRN-0001", variants=(_SCN1A,))
+
+    _, first = _export(tmp_path / "first", [report], pseudonyms_lib.Pseudonyms("key"))
+    _, second = _export(tmp_path / "second", [report], pseudonyms_lib.Pseudonyms("key"))
+
+    assert list(first) == list(second)

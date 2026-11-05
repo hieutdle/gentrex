@@ -52,11 +52,20 @@ Good docs = what the reader needs for the task − what they already know.
 - Name things exactly: the file and key (`extract.max_tokens` in
   settings.yaml), not "the settings". Use one name per thing. A command's
   name, page title, page file, results folder and settings key share a word,
-  as `gentrex extract`, "Extract report data", docs/extract.md,
+  as `gentrex extract`, "Extract report data", docs/user-guide/extract.md,
   results/extract/ and the settings key `extract` do. Commands have no
   numbers, so that adding or removing a command renumbers nothing. A new
   export format becomes `gentrex export <format>`, with the page
-  docs/export-<format>.md and the results folder results/export/<format>/.
+  docs/user-guide/export-<format>.md and the results folder
+  results/export/<format>/.
+- Put each page in the folder for its use. Pages that explain how Gentrex
+  works and how to run each command go in docs/user-guide/, pages about
+  running Gentrex on Minerva in docs/minerva/, and pages about working on
+  Gentrex itself, such as contributing and releasing, in docs/development/.
+  CHANGELOG.md stays directly in docs/, because users read it too.
+  .github/CONTRIBUTING.md only points to docs/development/contributing.md,
+  because GitHub links contributors to a guide only in the repository's
+  root, docs/ or .github/.
 
 #### Big Picture First
 

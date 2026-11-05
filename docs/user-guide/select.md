@@ -35,7 +35,7 @@ You need:
   you to log in.
 
 On Mount Sinai's Minerva cluster, follow
-[Select the pages to keep on Minerva](minerva.md#select-the-pages-to-keep)
+[Select the pages to keep on Minerva](../minerva/minerva.md#select-the-pages-to-keep)
 instead of the steps below. Then come back to
 [Check the result](#check-the-result).
 
@@ -125,6 +125,14 @@ of `gentrex transcribe`:
 uv run --env-file .env gentrex select --input results/transcribe/20261014-123000
 ```
 
+To ask again only about the pages that failed in an earlier run, name that
+run with `--retry`, as [Redo failed files](../../README.md#redo-failed-files)
+explains:
+
+```bash
+uv run --env-file .env gentrex select --retry results/select/latest
+```
+
 While it runs, Gentrex prints one line per PDF. The last line counts the pages
 and the kept pages, and gives the speed in pages per minute.
 
@@ -140,7 +148,7 @@ The run folder holds four files:
 | `log.txt` | What Gentrex printed during the run. |
 
 `gentrex extract` reads the newest finished run, `results/select/latest`,
-unless you name another. [Runs and results](../README.md#runs-and-results)
+unless you name another. [Runs and results](../../README.md#runs-and-results)
 explains run folders and `latest`.
 
 `decisions.jsonl` has one line per page, in the order of the input. Each line
@@ -219,7 +227,9 @@ whether it matters:
 
 - OCR failed on the page in `gentrex transcribe`, so there is no text to ask
   about. The page and its error go on to `gentrex extract`, and the report is
-  listed as failed. Run `gentrex transcribe` again to read the page.
+  listed as failed. Run `gentrex transcribe` and then `gentrex select`
+  again, each with `--retry`, to read the page, as
+  [Redo failed files](../../README.md#redo-failed-files) explains.
 - A question got no usable answer. The server still failed after its retries,
   rejected the page (for example because it is longer than `--max-model-len`
   allows), or the model's first token was neither Yes nor No.
@@ -241,7 +251,7 @@ model. This includes scanned pages when `gentrex transcribe` ran with
 ## Settings
 
 The questions are under `select` in
-[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml),
+[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml),
 with the model, the threshold and the other settings for `gentrex select`. A
 comment above each value explains it.
 
@@ -285,8 +295,8 @@ A file is listed as failed in two cases:
 - **A question failed on one of its pages.** The page is kept with its other
   answers, and `error` names the question. If the error is a connection error
   or a timeout, the server was down or busy, even after Gentrex's
-  [retries](../README.md#runs-and-results). Check that the server is running,
-  then run `gentrex select` again.
+  [retries](../../README.md#runs-and-results). Check that the server is running,
+  then run `gentrex select --retry results/select/latest`.
 - **One of its pages has an error from `gentrex transcribe`.** The page is
   kept, and its `error` starts with `transcribe:`. Run `gentrex transcribe`
   again, then `gentrex select`.
@@ -302,7 +312,7 @@ switch that turns thinking off. vLLM uses the model's own template unless you
 start it with `--chat-template`.
 
 A traceback means the run stopped early.
-[Runs and results](../README.md#runs-and-results) explains the common causes.
+[Runs and results](../../README.md#runs-and-results) explains the common causes.
 `gentrex select` also stops with
 `MissingLogprobsError: the server sent no logprobs` when the server returns no
 logprobs. vLLM returns them, so use vLLM or another server that does.

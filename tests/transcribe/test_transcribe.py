@@ -11,6 +11,8 @@ from unittest import mock
 import openai
 import pytest
 
+from gentrex import records
+from gentrex import runs
 from gentrex.transcribe import ocr
 from gentrex.transcribe import run
 
@@ -138,6 +140,35 @@ def test_failed_ocr_call_costs_only_that_page(make_pdf, tmp_path):
     assert (first["text"], first["error"]) == ("400", None)
     assert broken["text"] == "" and "server unavailable" in broken["error"]
     assert (other_pdf["text"], other_pdf["error"]) == ("420", None)
+
+
+def test_retry_sends_only_failed_pages_and_changed_pdfs_to_ocr(make_pdf, tmp_path):
+    """OCR is the slow part, so pages read without an error keep their text."""
+    pdfs = [make_pdf("a.pdf", [400, 410]), make_pdf("b.pdf", [420])]
+    earlier_dir = tmp_path / "transcribe-run"
+    earlier_dir.mkdir()
+    (earlier_dir / "pages.jsonl").write_text(
+        records.PageRecord("a.pdf", 1, "scanned", "earlier").to_json()
+        + "\n"
+        + records.PageRecord("a.pdf", 2, "scanned", "", "OCR failed").to_json()
+        + "\n"
+        + records.PageRecord("b.pdf", 1, "native", "An older b.pdf").to_json()
+        + "\n"
+    )
+    heights: list[int] = []
+    output = tmp_path / "pages.jsonl"
+
+    failed = run.run(
+        pdfs,
+        output,
+        20,
+        _FakeOcr(2, heights.append),
+        runs.Earlier(earlier_dir, tmp_path),
+    )
+
+    assert failed == []
+    assert sorted(heights) == [410, 420]
+    assert [page["text"] for page in _read_pages(output)] == ["earlier", "410", "420"]
 
 
 def test_misconfigured_endpoint_stops_the_run(make_pdf, tmp_path):

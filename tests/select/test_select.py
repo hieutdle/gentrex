@@ -10,6 +10,7 @@ from openai.types.chat import chat_completion
 from openai.types.chat import chat_completion_token_logprob as token_logprob
 
 from gentrex import records
+from gentrex import runs
 from gentrex.select import run
 from gentrex.select import score
 
@@ -65,9 +66,12 @@ def _client(
 
 
 def _run(
-    tmp_path: pathlib.Path, client: mock.Mock, *pages: records.PageRecord
+    tmp_path: pathlib.Path,
+    client: mock.Mock,
+    *pages: records.PageRecord,
+    earlier: runs.Earlier | None = None,
 ) -> tuple[list[str], list[dict]]:
-    """Runs `gentrex select` on `pages`.
+    """Runs `gentrex select` on `pages`, reusing decisions of `earlier` if set.
 
     The kept pages are written to tmp_path / "kept.jsonl".
 
@@ -82,6 +86,7 @@ def _run(
         decisions_path,
         tmp_path / "kept.jsonl",
         score.PageScorer(_CONFIG, client),
+        earlier,
     )
     lines = decisions_path.read_text().splitlines()
     return failed, [json.loads(line) for line in lines]
@@ -124,6 +129,45 @@ def test_page_comes_before_the_question():
     prompt = _request("PAGE TEXT", "Is there a result?")["messages"][0]["content"]
 
     assert prompt.index("PAGE TEXT") < prompt.index("Is there a result?")
+
+
+def test_retry_asks_only_about_failed_and_changed_pages(tmp_path):
+    """Good decisions are reused, so a retry spends GPU time only where needed."""
+    earlier_input = tmp_path / "transcribe-run"
+    earlier_input.mkdir()
+    (earlier_input / "pages.jsonl").write_text(
+        records.PageRecord("a.pdf", 1, "native", "Result: positive").to_json()
+        + "\n"
+        + records.PageRecord("a.pdf", 2, "native", "Methods").to_json()
+        + "\n"
+        + records.PageRecord("b.pdf", 1, "native", "Old text").to_json()
+        + "\n"
+    )
+    earlier_dir = tmp_path / "select-run"
+    earlier_dir.mkdir()
+    answered: dict[str, float | None] = dict.fromkeys(_CONFIG.questions, 0.9)
+    unanswered = dict.fromkeys(_CONFIG.questions)
+    (earlier_dir / "decisions.jsonl").write_text(
+        records.PageDecision("a.pdf", 1, answered, keep=True).to_json()
+        + "\n"
+        + records.PageDecision("a.pdf", 2, unanswered, True, "timeout").to_json()
+        + "\n"
+        + records.PageDecision("b.pdf", 1, answered, keep=True).to_json()
+        + "\n"
+    )
+    client = _client(lambda prompt: _first_token({"Yes": 0.2, "No": 0.8}))
+
+    _, decisions = _run(
+        tmp_path,
+        client,
+        records.PageRecord("a.pdf", 1, "native", "Result: positive"),
+        records.PageRecord("a.pdf", 2, "native", "Methods"),
+        records.PageRecord("b.pdf", 1, "native", "New text"),
+        earlier=runs.Earlier(earlier_dir, earlier_input),
+    )
+
+    assert client.chat.completions.create.call_count == 4
+    assert [decision["keep"] for decision in decisions] == [True, False, False]
 
 
 def test_response_without_logprobs_stops_the_run(tmp_path):

@@ -9,6 +9,7 @@ from openai.types.chat import chat_completion
 from openai.types.chat import chat_completion_message
 
 from gentrex import records
+from gentrex import runs
 from gentrex.extract import extractor
 from gentrex.extract import run
 
@@ -64,9 +65,12 @@ def _client(answer: Callable[[str], tuple[str, str]] = _echo) -> mock.Mock:
 
 
 def _run(
-    tmp_path: pathlib.Path, client: mock.Mock, *pages: records.PageRecord
+    tmp_path: pathlib.Path,
+    client: mock.Mock,
+    *pages: records.PageRecord,
+    earlier: runs.Earlier | None = None,
 ) -> tuple[list[str], list[dict]]:
-    """Runs `gentrex extract` on `pages`.
+    """Runs `gentrex extract` on `pages`, reusing records of `earlier` if set.
 
     Returns:
         The failed files and the records.
@@ -75,7 +79,7 @@ def _run(
     input_path.write_text("".join(page.to_json() + "\n" for page in pages))
     output_path = tmp_path / "extractions.jsonl"
     failed = run.run(
-        input_path, output_path, extractor.ReportExtractor(_CONFIG, client)
+        input_path, output_path, extractor.ReportExtractor(_CONFIG, client), earlier
     )
     lines = output_path.read_text().splitlines()
     return failed, [json.loads(line) for line in lines]
@@ -102,6 +106,48 @@ def test_pages_of_a_report_go_in_one_request_in_page_order(tmp_path):
             "--- PAGE 1 ---\nPatient: A\n\n--- PAGE 3 ---\nResult: positive",
         ),
         ("b.pdf", [2], "--- PAGE 2 ---\nResult: negative"),
+    ]
+
+
+def test_retry_extracts_only_failed_and_changed_reports(tmp_path):
+    """Good records are reused, so a retry spends GPU time only where needed."""
+    earlier_input = tmp_path / "select-run"
+    earlier_input.mkdir()
+    (earlier_input / "pages.jsonl").write_text(
+        records.PageRecord("a.pdf", 1, "native", "Result: positive").to_json()
+        + "\n"
+        + records.PageRecord("b.pdf", 1, "native", "Result: negative").to_json()
+        + "\n"
+        + records.PageRecord("c.pdf", 1, "native", "Result: uncertain").to_json()
+        + "\n"
+    )
+    earlier_dir = tmp_path / "extract-run"
+    earlier_dir.mkdir()
+    (earlier_dir / "extractions.jsonl").write_text(
+        records.ReportExtraction("a.pdf", [1], {"sent": "earlier"}).to_json()
+        + "\n"
+        + records.ReportExtraction("b.pdf", [1], None, "APITimeoutError").to_json()
+        + "\n"
+        + records.ReportExtraction("c.pdf", [1], {"sent": "earlier"}).to_json()
+        + "\n"
+    )
+    client = _client()
+
+    failed, extractions = _run(
+        tmp_path,
+        client,
+        records.PageRecord("a.pdf", 1, "native", "Result: positive"),
+        records.PageRecord("b.pdf", 1, "native", "Result: negative"),
+        records.PageRecord("c.pdf", 1, "native", "Result: positive"),
+        earlier=runs.Earlier(earlier_dir, earlier_input),
+    )
+
+    assert failed == []
+    assert client.chat.completions.create.call_count == 2
+    assert [e["data"]["sent"] for e in extractions] == [
+        "earlier",
+        "--- PAGE 1 ---\nResult: negative",
+        "--- PAGE 1 ---\nResult: positive",
     ]
 
 

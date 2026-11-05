@@ -79,7 +79,7 @@ class MondoIndex:
         diseases), unmapped or missing. Only one disease per name is ever
         returned.
         """
-        if not (name or "").strip():
+        if name is None or not name.strip():
             return _result(None, None, "missing")
         for attempt in dict.fromkeys([_key(name), _key(_PARENTHESES.sub(" ", name))]):
             for status, index in (("label", self._labels), ("synonym", self._synonyms)):

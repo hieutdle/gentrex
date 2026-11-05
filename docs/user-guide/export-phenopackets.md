@@ -49,6 +49,9 @@ another run of `gentrex normalize`:
 uv run gentrex export phenopackets --input results/normalize/20261019-030000
 ```
 
+To share the Phenopackets outside your team, export them with
+`--pseudonymize`, as [Share Phenopackets](#share-phenopackets) shows.
+
 Gentrex prints one line per Phenopacket, such as
 `wrote mrn_SYN-MRN-0001.json from report-01.pdf, report-02.pdf`. The last line
 counts the Phenopackets and the reports they came from, as in
@@ -62,17 +65,19 @@ The run folder holds:
 | --- | --- |
 | `phenopackets/` | One JSON file per patient, named after the patient's key, such as `mrn_SYN-MRN-0001.json`. |
 | `run.yaml` | The command, the run of `gentrex normalize` that was read, and the MONDO and HPO releases that `gentrex normalize` used. |
+| `pseudonyms.csv` | With `--pseudonymize`, each patient key and file name with its pseudonym. |
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/export/phenopackets/latest` points to the newest finished run.
-[Runs and results](../README.md#runs-and-results) explains run folders and
+[Runs and results](../../README.md#runs-and-results) explains run folders and
 `latest`.
 
 The Phenopackets hold patient identifiers. Each one's `id` is the patient's
 key, such as `mrn:SYN-MRN-0001`, so it contains the MRN, and the subject
-holds the date of birth. Before you share Phenopackets with anyone not
-approved to see patient data, replace the IDs and remove the dates, as your
-privacy office requires.
+holds the date of birth. The IDs of the interpretations contain the PDF's
+file name. To share Phenopackets with anyone not approved to see patient
+data, export them with pseudonyms, as [Share Phenopackets](#share-phenopackets)
+shows.
 
 Shortened, a Phenopacket looks like this:
 
@@ -157,6 +162,40 @@ print(len(paths), 'files follow the schema')
 The package stops with an error that names the field if a file breaks the
 schema. Gentrex's tests run this check on every change.
 
+### Share Phenopackets
+
+A pseudonym is a code that stands for a name, such as `P-5a1ccba4f48d478f`
+for the patient key `mrn:SYN-MRN-0001`. With `--pseudonymize`, Gentrex gives
+each patient key and each PDF's file name a pseudonym, and the Phenopackets
+have no date of birth. Gentrex makes each pseudonym from the name and a
+secret key of yours. So the same patient gets the same pseudonym in every
+run, and nobody without the key can tell whose a Phenopacket is.
+
+Make a key once with `openssl rand -hex 32`, which prints 64 random
+characters. Add it to `.env` as `GENTREX_PSEUDONYM_KEY`, as `.env.example`
+shows. Keep the key secret, and keep the same key for later runs, because
+another key gives every patient another pseudonym. Then export:
+
+```bash
+uv run --env-file .env gentrex export phenopackets --pseudonymize
+```
+
+The Phenopackets are then named after their pseudonyms, such as
+`P-5a1ccba4f48d478f.json`. `pseudonyms.csv` in the run folder lists each
+patient key and file name with its pseudonym, so that your team can find the
+patient behind a Phenopacket:
+
+```text
+name,pseudonym
+mrn:SYN-MRN-0001,P-5a1ccba4f48d478f
+report-01.pdf,R-6947a2b0db4251c0
+```
+
+`pseudonyms.csv` holds the MRNs, and `log.txt` names the PDFs, so share only
+the `phenopackets/` folder. The `summary` of each interpretation is the
+report's own wording of its result. Read a few before you share them, in case
+a laboratory wrote the patient's name there.
+
 ## How it works
 
 ### One Phenopacket per patient
@@ -207,6 +246,14 @@ because reports rarely print the protein's reference sequence. A change
 without a c. notation, such as a mitochondrial change or a deletion of whole
 exons, goes into the `label` as printed, in `dna_change_raw`.
 
+### Pseudonyms
+
+Gentrex computes each pseudonym with HMAC-SHA256, a hash that needs the key,
+from `GENTREX_PSEUDONYM_KEY` and the name. It keeps the first 16 hexadecimal
+characters, and puts `P-` before those of a patient key and `R-` before those
+of a file name. The IDs of the interpretations and variants then start with
+the pseudonym of their report, as in `R-6947a2b0db4251c0:1`.
+
 ### Ontology versions
 
 `metaData.resources` names the release of each ontology that the terms come
@@ -225,6 +272,7 @@ uses no HPO terms, so the Phenopackets then don't list HPO.
 | --- | --- | --- |
 | 0 | Every report was exported, and none has an error. | Nothing. |
 | 1 | The run of `gentrex normalize` is missing or too old, some reports have no data or an error, or the run stopped with a traceback. The end of the output says which. | See below. |
+| 2 | `--pseudonymize` was given, but `GENTREX_PSEUDONYM_KEY` is not set. | Add the key to `.env`, as [Share Phenopackets](#share-phenopackets) shows, and run with `uv run --env-file .env`. |
 
 If the run of `gentrex normalize` can't be exported, Gentrex stops before it
 writes anything:

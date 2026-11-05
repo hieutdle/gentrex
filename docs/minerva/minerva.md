@@ -186,7 +186,7 @@ options:
 - `--port "$port"` uses the port from the job ID.
 - `--max-model-len 18000` and `--default-chat-template-kwargs` are explained
   in step 3 of
-  [Transcribe PDF pages](transcribe.md#step-3-start-the-ocr-server).
+  [Transcribe PDF pages](../user-guide/transcribe.md#step-3-start-the-ocr-server).
 - `--limit-mm-per-prompt '{"image": 1}'` allows one image per request. Gentrex
   sends one page image per request, and vLLM sets memory aside for as many
   images as a request may hold.
@@ -200,9 +200,18 @@ options:
 
 `-W 0:30` gives the job 30 minutes, including the few minutes vLLM takes to
 start. A short limit gets the job out of the queue sooner. If the log shows
-`TERM_RUNLIMIT`, LSF stopped the job before it finished. Raise `-W` and submit
-again. The last line of a run gives Gentrex's speed in pages per minute, which
-you can use to set `-W` for the next batch.
+`TERM_RUNLIMIT`, LSF stopped the job before it finished. Raise `-W`, and add
+`--retry` with the stopped run's folder to the `gentrex transcribe` line of
+the job script:
+
+```bash
+GENTREX_OCR_BASE_URL=http://localhost:$port/v1 .venv/bin/gentrex transcribe --retry results/transcribe/20261014-123000
+```
+
+The new job then reuses the pages that the stopped one read, as
+[Redo failed files](../../README.md#redo-failed-files) explains. Submit it
+again. The last line of a run gives Gentrex's speed in pages per minute,
+which you can use to set `-W` for the next batch.
 
 `select[a100]` picks the GPU type. The OCR model's weights take 9 GB, so any of
 these GPUs can hold it. Pick another type if the job waits a long time in the
@@ -246,9 +255,9 @@ Gentrex's exit code, as `Successfully completed.` for 0 or
 `Exited with exit code 1.` for 1. Continue on the page of
 `gentrex transcribe`:
 
-- [Check the result](transcribe.md#check-the-result)
-- [When something goes wrong](transcribe.md#when-something-goes-wrong)
-- [Settings](transcribe.md#settings)
+- [Check the result](../user-guide/transcribe.md#check-the-result)
+- [When something goes wrong](../user-guide/transcribe.md#when-something-goes-wrong)
+- [Settings](../user-guide/transcribe.md#settings)
 
 ## Select the pages to keep
 
@@ -318,7 +327,7 @@ The script works like `transcribe.lsf`. It differs in these ways:
   the choice.
 - vLLM loads `gemma-4-26B-A4B-it` with `--max-model-len 16384`, which is
   explained in step 1 of
-  [Select the pages to keep](select.md#step-1-start-the-model-server).
+  [Select the pages to keep](../user-guide/select.md#step-1-start-the-model-server).
 - It keeps prefix caching on, because Gentrex asks all questions about a page
   one after another. vLLM then reads each page once for all of them.
 - It leaves out the image options of `transcribe.lsf`, because Gentrex sends
@@ -335,7 +344,8 @@ The model's weights take about 50 GB, so the job needs a GPU with 80 GB.
 80 GB. Use one of them if the job waits a long time in the queue.
 
 `-W 0:30` gives the job 30 minutes, as for `gentrex transcribe`. If the log
-shows `TERM_RUNLIMIT`, raise `-W` and submit again.
+shows `TERM_RUNLIMIT`, raise `-W`, add `--retry` with the stopped run's folder
+to the `gentrex select` line, and submit again.
 
 ### Submit the job
 
@@ -349,9 +359,9 @@ Follow it with `bjobs` and `tail -f select.*.log`, as for
 `results/select/latest/`, and the end of the log lists any files that failed.
 Continue on the page of `gentrex select`:
 
-- [Check the result](select.md#check-the-result)
-- [Change the questions or the threshold](select.md#settings)
-- [When something goes wrong](select.md#when-something-goes-wrong)
+- [Check the result](../user-guide/select.md#check-the-result)
+- [Change the questions or the threshold](../user-guide/select.md#settings)
+- [When something goes wrong](../user-guide/select.md#when-something-goes-wrong)
 
 ## Extract report data
 
@@ -424,7 +434,7 @@ The script works like `select.lsf`. It differs in these ways:
 - vLLM loads `gemma-4-31B-it` and splits it across the two GPUs with
   `--tensor-parallel-size 2`. `--max-model-len 32768` and
   `--gpu-memory-utilization 0.95` are explained in step 1 of
-  [Extract report data](extract.md#step-1-start-the-model-server).
+  [Extract report data](../user-guide/extract.md#step-1-start-the-model-server).
 - It keeps prefix caching on, because every request starts with the same
   instruction and schema. vLLM then reads them once.
 - It runs `gentrex extract`, which reads the newest finished run of
@@ -451,7 +461,8 @@ before Gentrex gives up on it, because Gentrex tries it four times for 300
 seconds each (`extract.timeout_seconds`) and waits 5, 20 and 60 seconds
 between the tries.
 One such report can push a 30-minute job into `TERM_RUNLIMIT`. If the log
-shows it, raise `-W` and submit again.
+shows it, raise `-W`, add `--retry` with the stopped run's folder to the
+`gentrex extract` line, and submit again.
 
 ### Submit the job
 
@@ -465,9 +476,9 @@ Follow it with `bjobs` and `tail -f extract.*.log`, as for
 `results/extract/latest/`, and the end of the log lists any files that
 failed. Continue on the page of `gentrex extract`:
 
-- [Check the result](extract.md#check-the-result)
-- [Change the schema](extract.md#settings)
-- [When something goes wrong](extract.md#when-something-goes-wrong)
+- [Check the result](../user-guide/extract.md#check-the-result)
+- [Change the schema](../user-guide/extract.md#settings)
+- [When something goes wrong](../user-guide/extract.md#when-something-goes-wrong)
 
 ### Use Minerva's AI service instead of a job
 
@@ -551,7 +562,7 @@ differently from one run to the next. The service also sets the model's
 context length, and Ollama shortens a request that is longer, so a long
 report can lose pages without an error. Check a few records against their
 PDFs, the longest reports among them, as in
-[Check the result](extract.md#check-the-result).
+[Check the result](../user-guide/extract.md#check-the-result).
 
 ## Normalize report data
 
@@ -577,7 +588,7 @@ bsub -P acc_xxx -q interactive -n 4 -W 1:00 -R "rusage[mem=4000]" -Is /bin/bash
 - `-Is /bin/bash` opens a shell on the node as soon as the session starts.
 
 In the session, go to the `gentrex` folder and follow steps 1 to 4 of
-[Normalize report data](normalize.md#step-1-download-the-hgnc-complete-set).
+[Normalize report data](../user-guide/normalize.md#step-1-download-the-hgnc-complete-set).
 The first `uv run --extra hpo` installs sentence-transformers and PyTorch, the
 Python packages that `gentrex normalize` uses to find HPO terms. They take
 about 1 GB in the `.venv` folder of `gentrex`, and about as much in uv's cache
@@ -589,8 +600,8 @@ show.
 The result is in `results/normalize/latest/`. Continue on the page of
 `gentrex normalize`:
 
-- [Check the result](normalize.md#check-the-result)
-- [When something goes wrong](normalize.md#when-something-goes-wrong)
+- [Check the result](../user-guide/normalize.md#check-the-result)
+- [When something goes wrong](../user-guide/normalize.md#when-something-goes-wrong)
 
 ## Load report data into a database
 
@@ -606,15 +617,15 @@ GENTREX_DATABASE_URL=sqlite:///results/load/gentrex.db uv run gentrex load
 The first run takes a few seconds, because it loads the HPO terms. Continue
 on the page of `gentrex load`:
 
-- [Check the result](load.md#check-the-result)
-- [When something goes wrong](load.md#when-something-goes-wrong)
+- [Check the result](../user-guide/load.md#check-the-result)
+- [When something goes wrong](../user-guide/load.md#when-something-goes-wrong)
 
 To load into a PostgreSQL or MySQL server instead, you need a workstation
 with Docker, because Minerva's
 [database service](https://labs.icahn.mssm.edu/minervalab/documentation/services/)
 runs MariaDB, which `gentrex load` is not tested with. Install Gentrex on a
 workstation approved for patient data, as in step 1 of
-[Transcribe PDF pages](transcribe.md#step-1-install). Copy two things from
+[Transcribe PDF pages](../user-guide/transcribe.md#step-1-install). Copy two things from
 Minerva into the same places of its Gentrex folder:
 
 - The run folder of `gentrex normalize`, such as
@@ -623,7 +634,7 @@ Minerva into the same places of its Gentrex folder:
   to nothing on the workstation.
 - `data/ontology/hp-base.json`, the HPO release that built the HPO index.
 
-Then follow [Load report data into a database](load.md), and name the copied
+Then follow [Load report data into a database](../user-guide/load.md), and name the copied
 run with `--input`, as in `--input results/normalize/20261019-030000`.
 
 ## Export report data as Phenopackets
@@ -639,8 +650,8 @@ uv run gentrex export phenopackets
 `results/export/phenopackets/latest/phenopackets/` in a second, and it needs
 no server. Continue on the page of `gentrex export phenopackets`:
 
-- [Check the result](export-phenopackets.md#check-the-result)
-- [When something goes wrong](export-phenopackets.md#when-something-goes-wrong)
+- [Check the result](../user-guide/export-phenopackets.md#check-the-result)
+- [When something goes wrong](../user-guide/export-phenopackets.md#when-something-goes-wrong)
 
 ## Export report data as FHIR Bundles
 
@@ -655,10 +666,10 @@ uv run gentrex export fhir
 `results/export/fhir/latest/bundles/` in a second, and it needs no server.
 Continue on the page of `gentrex export fhir`:
 
-- [Check the result](export-fhir.md#check-the-result)
-- [When something goes wrong](export-fhir.md#when-something-goes-wrong)
+- [Check the result](../user-guide/export-fhir.md#check-the-result)
+- [When something goes wrong](../user-guide/export-fhir.md#when-something-goes-wrong)
 
-The test FHIR server of [Search the Bundles](export-fhir.md#search-the-bundles)
+The test FHIR server of [Search the Bundles](../user-guide/export-fhir.md#search-the-bundles)
 needs Docker, which Minerva doesn't offer. For that step, copy the run folder
 of `gentrex export fhir` to a workstation approved for patient data.
 
@@ -672,5 +683,5 @@ CDM, such as a workstation approved for patient data. Copy the run folder of
 `gentrex normalize` there, as for
 [Load report data into a database](#load-report-data-into-a-database). The
 export needs no other file. Then follow
-[Export report data into an OMOP database](export-omop.md), and name the
+[Export report data into an OMOP database](../user-guide/export-omop.md), and name the
 copied run with `--input`. The same goes for `gentrex export omop-extended`.

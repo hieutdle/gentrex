@@ -44,7 +44,7 @@ You need:
 
 On Minerva, run `gentrex load` with SQLite in the interactive session in which
 you ran `gentrex normalize`, as
-[Running on Minerva](minerva.md#load-report-data-into-a-database) shows.
+[Running on Minerva](../minerva/minerva.md#load-report-data-into-a-database) shows.
 
 ## Step 1: Choose a database
 
@@ -232,7 +232,7 @@ The run folder holds two files:
 | `log.txt` | What Gentrex printed during the run. |
 
 The records themselves are in the database. `results/load/latest` points to
-the newest finished run. [Runs and results](../README.md#runs-and-results)
+the newest finished run. [Runs and results](../../README.md#runs-and-results)
 explains run folders and `latest`.
 
 ### Open the database
@@ -266,7 +266,7 @@ inside the container.
 
 [Database tables](database-tables.md) lists every column, with its type and
 what it holds.
-[`tables.py`](../src/gentrex/load/tables.py) defines the tables.
+[`tables.py`](../../src/gentrex/load/tables.py) defines the tables.
 
 Most columns have the name of a field of the record from `gentrex normalize`.
 Where `gentrex normalize` found a standard value for a field, the column of
@@ -577,14 +577,14 @@ three things:
 - Gentrex's tests load reports into each of them on every change to the
   code. SQLite needs no server, so the tests always run on it. PostgreSQL
   and MySQL run as servers in Gentrex's continuous integration, and
-  [Development](development.md) shows how to run the tests on them yourself.
+  [Development](../development/development.md) shows how to run the tests on them yourself.
 - The queries on this page were run on each of them.
 - The ways in which they behave differently are handled in the code, so that
   a report loads the same way everywhere.
 
 Gentrex talks to all three through SQLAlchemy, a Python package that writes
 the SQL of each database from one description of the tables, which is
-[`tables.py`](../src/gentrex/load/tables.py). The description uses only
+[`tables.py`](../../src/gentrex/load/tables.py). The description uses only
 types that all three have: text, dates, booleans, integers and JSON.
 SQLAlchemy quotes names, sends the rows in batches and begins and ends
 transactions as each database expects.
@@ -605,7 +605,7 @@ Three differences needed handling of their own:
 
 Other databases that SQLAlchemy knows, such as MariaDB, are not supported,
 and Gentrex refuses their addresses. To add one, add its name and driver to
-`DRIVERS` in [`run.py`](../src/gentrex/load/run.py), add the driver as an
+`DRIVERS` in [`run.py`](../../src/gentrex/load/run.py), add the driver as an
 extra of that name in `pyproject.toml`, list a server for it in
 `GENTREX_TEST_DATABASE_URLS` in `.github/workflows/ci.yml`, and run the
 queries on this page against it.
@@ -613,7 +613,7 @@ queries on this page against it.
 ## Settings
 
 The setting of `gentrex load` is in
-[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml),
+[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml),
 under `load`:
 
 | Setting | Default | What it does |

@@ -225,7 +225,7 @@ def main() -> None:
         "--release",
         type=pathlib.Path,
         default=pathlib.Path("data/ontology/hp-base.json"),
-        help="HPO release in JSON, as step 2 of docs/normalize.md downloads it.",
+        help="HPO release in JSON, as step 2 of docs/user-guide/normalize.md gets it.",
     )
     parser.add_argument(
         "--corpus",
@@ -238,7 +238,9 @@ def main() -> None:
     )
     args = parser.parse_args()
     if not args.release.is_file():
-        parser.error(f"{args.release} not found; see step 2 of docs/normalize.md")
+        parser.error(
+            f"{args.release} not found; see step 2 of docs/user-guide/normalize.md"
+        )
     if not list(args.corpus.glob("GSCplus_*_gold.tsv")):
         parser.error(f"no GSC+ files in {args.corpus}; see evaluation/README.md")
     started = time.perf_counter()

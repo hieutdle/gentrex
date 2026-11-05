@@ -34,7 +34,7 @@ You need:
   model's weights, the numbers it learned in training,
   take about 9 GB of GPU memory.
 
-On Mount Sinai's Minerva cluster, follow [Running on Minerva](minerva.md)
+On Mount Sinai's Minerva cluster, follow [Running on Minerva](../minerva/minerva.md)
 instead of the steps below. Then come back to
 [Check the result](#check-the-result).
 
@@ -62,7 +62,7 @@ subfolders. Every later command identifies a report by its file name, so keep
 names unique.
 
 The reports contain patient data, so keep the repository folder on storage
-approved for it. See [Patient data](../README.md#patient-data).
+approved for it. See [Patient data](../../README.md#patient-data).
 
 ## Step 3: Start the OCR server
 
@@ -151,6 +151,14 @@ To skip OCR, which leaves scanned pages empty:
 uv run gentrex transcribe --no-ocr
 ```
 
+To send to OCR only the pages that failed in an earlier run, name that run
+with `--retry`, as [Redo failed files](../../README.md#redo-failed-files)
+explains. `--retry` can't be combined with `--no-ocr`.
+
+```bash
+uv run --env-file .env gentrex transcribe --retry results/transcribe/latest
+```
+
 While it runs, Gentrex prints one line per PDF. The last line counts the pages
 and gives the speed:
 
@@ -171,7 +179,7 @@ The run folder holds three files:
 | `log.txt` | What Gentrex printed during the run. |
 
 `gentrex select` reads the newest finished run, `results/transcribe/latest`,
-unless you name another. [Runs and results](../README.md#runs-and-results)
+unless you name another. [Runs and results](../../README.md#runs-and-results)
 explains run folders and `latest`.
 
 `pages.jsonl` is a JSONL file, with one JSON object per
@@ -236,7 +244,7 @@ order.
 ## Settings
 
 The model, the prompt and the image settings are under `transcribe` in
-[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml).
+[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml).
 A comment above each value explains it. Edit that file to change one.
 
 ## When something goes wrong
@@ -252,11 +260,12 @@ A file is listed as failed in two cases:
 - **OCR failed on one of its pages.** The other pages are still written, and
   the failed page has an `error`. If the error is a connection error or a
   timeout, the server was down or busy, even after Gentrex's
-  [retries](../README.md#runs-and-results). Check that the server is running,
-  then run `gentrex transcribe` again.
+  [retries](../../README.md#runs-and-results). Check that the server is running,
+  then run `gentrex transcribe --retry results/transcribe/latest`, which
+  sends only the failed pages to OCR again.
 - **The PDF could not be opened.** Nothing is written for it. The error is in
   the output. The file is usually damaged or not a real PDF.
 
 A traceback means the run stopped early, most often because of a wrong API key
-or model name. [Runs and results](../README.md#runs-and-results) explains the
+or model name. [Runs and results](../../README.md#runs-and-results) explains the
 causes.

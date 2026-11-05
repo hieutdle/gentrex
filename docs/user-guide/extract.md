@@ -25,7 +25,7 @@ You need:
   you to log in.
 
 On Mount Sinai's Minerva cluster, follow
-[Extract report data on Minerva](minerva.md#extract-report-data) instead of the
+[Extract report data on Minerva](../minerva/minerva.md#extract-report-data) instead of the
 steps below. Then come back to [Check the result](#check-the-result).
 
 ## Step 1: Start the model server
@@ -104,6 +104,14 @@ started, such as `results/extract/20261014-150000/`. To read another run of
 uv run --env-file .env gentrex extract --input results/select/20261014-131500
 ```
 
+To extract again only the reports that failed in an earlier run, name that
+run with `--retry`, as [Redo failed files](../../README.md#redo-failed-files)
+explains:
+
+```bash
+uv run --env-file .env gentrex extract --retry results/extract/latest
+```
+
 While it runs, Gentrex prints one line per report. The last line counts the
 reports and the failed reports, and gives the speed in reports per minute.
 
@@ -118,7 +126,7 @@ The run folder holds three files:
 | `log.txt` | What Gentrex printed during the run. |
 
 `results/extract/latest` points to the newest finished run.
-[Runs and results](../README.md#runs-and-results) explains run folders and
+[Runs and results](../../README.md#runs-and-results) explains run folders and
 `latest`.
 
 `extractions.jsonl` has one line per report, in the order of the input. Each
@@ -204,7 +212,7 @@ page a variant is on. The model answers with one JSON object for the whole
 report.
 
 The fields of that object are defined in the extraction schema,
-[`schema.yaml`](../src/gentrex/defaults/schema.yaml). Gentrex uses the schema
+[`schema.yaml`](../../src/gentrex/defaults/schema.yaml). Gentrex uses the schema
 in two ways. The model reads it to learn what each field means, because
 Gentrex sends it as JSON after the instruction (`extract.instruction` in
 settings.yaml). And vLLM enforces it as the answer format, which is called
@@ -229,10 +237,10 @@ answer. Gentrex turns it off, so the answer is the record and nothing else.
 ## Settings
 
 The fields to extract are in
-[`src/gentrex/defaults/schema.yaml`](../src/gentrex/defaults/schema.yaml).
+[`src/gentrex/defaults/schema.yaml`](../../src/gentrex/defaults/schema.yaml).
 The instruction, the model and the other settings of `gentrex extract` are
 under `extract` in
-[`src/gentrex/defaults/settings.yaml`](../src/gentrex/defaults/settings.yaml).
+[`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml).
 A comment above each value explains it.
 
 The schema is a [JSON Schema](https://json-schema.org/). The report-level
@@ -279,28 +287,32 @@ A report is listed as failed in two cases:
 
 - **One of its pages has an error from `gentrex transcribe`.** The record is
   written from the other pages, and `error` starts with `page N: transcribe:`.
-  Run `gentrex transcribe` again, then `gentrex select` and `gentrex extract`.
+  Run `gentrex transcribe`, `gentrex select` and `gentrex extract` again,
+  each with `--retry`, so that only this report goes to the models again, as
+  [Redo failed files](../../README.md#redo-failed-files) explains.
 - **The request failed.** `data` is `null`, and `error` says why. If the error
   is a connection error, the server was down or busy, even after Gentrex's
-  [retries](../README.md#runs-and-results). Check that the server is running,
-  then run `gentrex extract` again.
+  [retries](../../README.md#runs-and-results). Check that the server is running,
+  then run `gentrex extract --retry results/extract/latest`.
 
 Three errors come from the report rather than the server:
 
 - `ValueError: answer cut off at max_tokens (4096)` means that the record was
   longer than `extract.max_tokens` allows. Raise `max_tokens` in
   settings.yaml, and raise `timeout_seconds` by the same factor, because a
-  longer answer takes longer to write. Then run again. If the report lists
+  longer answer takes longer to write. Then run again with `--retry`, which
+  extracts only the failed reports. If the report lists
   few variants, the model was more likely stuck repeating itself, for example
   writing spaces without end. Then also start vLLM with
   `--structured-outputs-config '{"disable_any_whitespace": true}'`, which
   leaves no room for spaces between the parts of the JSON.
 - `APITimeoutError: Request timed out.` means that the answer took longer
   than `extract.timeout_seconds` to write, on all four tries. Raise
-  `timeout_seconds` in settings.yaml and run again.
+  `timeout_seconds` in settings.yaml and run again with `--retry`.
 - `BadRequestError: Error code: 400`, with a message about the maximum context
   length, means that the report is longer than `--max-model-len` allows.
-  Start vLLM with a higher `--max-model-len` and run again. vLLM refuses to
+  Start vLLM with a higher `--max-model-len` and run again with `--retry`.
+  vLLM refuses to
   start if the GPUs lack the memory for it.
 
 If every report fails with the same error, the cause is the server. Check that
@@ -309,4 +321,4 @@ supports structured output with a JSON schema (`response_format`), as vLLM
 does.
 
 A traceback means the run stopped early.
-[Runs and results](../README.md#runs-and-results) explains the common causes.
+[Runs and results](../../README.md#runs-and-results) explains the common causes.

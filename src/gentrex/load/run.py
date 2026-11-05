@@ -10,6 +10,8 @@ import time
 from typing import Any
 
 import sqlalchemy as sa
+from sqlalchemy import event
+from sqlalchemy import exc as sa_exc
 
 from gentrex import records
 from gentrex.load import hpo
@@ -86,7 +88,7 @@ def make_engine(url: str) -> sa.Engine:
     """
     try:
         parsed = sa.engine.make_url(url)
-    except sa.exc.ArgumentError as exc:
+    except sa_exc.ArgumentError as exc:
         raise ValueError(f"not a database URL: {exc}") from exc
     backend = parsed.get_backend_name()
     if backend not in DRIVERS:
@@ -105,7 +107,7 @@ def make_engine(url: str) -> sa.Engine:
         ) from exc
     if backend == "sqlite":
         # SQLite ignores ON DELETE CASCADE unless each connection asks for it.
-        sa.event.listen(
+        event.listen(
             engine,
             "connect",
             lambda dbapi_conn, _: dbapi_conn.execute("PRAGMA foreign_keys = ON"),
@@ -281,7 +283,7 @@ def prepare_tables(engine: sa.Engine) -> None:
         raise TableVersionError(
             f"the database holds version {found} of the Gentrex tables, but this"
             f" Gentrex writes version {tables.SCHEMA_VERSION}; delete the database"
-            " and load the records again, as docs/load.md shows"
+            " and load the records again, as docs/user-guide/load.md shows"
         )
 
 
