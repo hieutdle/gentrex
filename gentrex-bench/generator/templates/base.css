@@ -1,0 +1,30 @@
+/* Rules that every template shares. Each lab's file and each template add
+   their own. */
+@page {
+  size: letter;
+  margin: 0.5in 0.55in 0.8in;
+  @bottom-center {
+    white-space: pre-wrap;
+    vertical-align: top;
+    padding-top: 6pt;
+    font: 6.5pt Arial, Helvetica, sans-serif;
+    color: #333;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+body { margin: 0; color: #000; }
+table { border-collapse: collapse; }
+thead { display: table-header-group; }
+tr, .keep { break-inside: avoid; }
+h1, h2, h3, h4, .heading { break-after: avoid; }
+p { margin: 0 0 6pt; orphans: 3; widows: 3; }
+.split, .page-break { break-before: page; }
+.inserted { font: 10pt Arial, Helvetica, sans-serif; }
+.inserted h1 { font-size: 16pt; margin: 0 0 14pt; }
+.inserted h2 { font-size: 13pt; margin: 0 0 10pt; }
+.inserted table { width: 100%; margin: 12pt 0; }
+.inserted th, .inserted td { text-align: left; padding: 5pt 6pt; border-bottom: 1px solid #bbb; vertical-align: top; }
+.inserted th { width: 1.6in; }
+.inserted .lab { font-size: 13pt; font-weight: bold; }
+.inserted .small { font-size: 8.5pt; color: #333; }

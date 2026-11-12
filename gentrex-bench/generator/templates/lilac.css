@@ -1,0 +1,7 @@
+/* Lilac Molecular Laboratory: the type and colors that its three
+   templates share. */
+body { font: 8.6pt Calibri, Carlito, "Segoe UI", Arial, sans-serif; line-height: 1.3; }
+.lilac-logo { font: bold 14pt Arial, Helvetica, sans-serif; color: #1a8a9a; line-height: 1.05; }
+.lilac-logo small { display: block; font: 6.5pt Arial, Helvetica, sans-serif; color: #555; }
+h3 { font-size: 9.5pt; margin: 10pt 0 3pt; }
+.runin { font-weight: bold; }

@@ -1,0 +1,100 @@
+{# Navy's patient-friendly carrier report (public sample NHS01, the
+   user-centred report of Recchia et al. 2020): page 1 is for the patient,
+   with the result in a box and plain-language sections, and page 2 is the
+   technical information for health professionals, with the variant table,
+   the partner whose result was the reason for testing, and the methods.
+   Dates are written day first, as in the UK, and the patient ID is the NHS
+   number. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% set v = variants[0] if variants else None %}
+{% set partner = finding.get("partner") %}
+{% set doctor = "Dr " ~ clinician.split(",")[0].split(" ")[-1] %}
+{% block style %}
+@page {
+  margin: 0.45in 0.55in 0.8in;
+  @bottom-center { text-align: right; color: #0a5fae; }
+}
+.head { display: flex; justify-content: space-between; align-items: center; }
+.cols { display: flex; gap: 16pt; margin: 8pt 0 10pt; padding-bottom: 8pt; border-bottom: 5px solid #0a5fae; font-size: 8.5pt; }
+.cols > div { flex: 1; }
+.cols h4 { color: #0a5fae; font-size: 8.5pt; margin: 0 0 2pt; }
+.cols table td { padding: 0.5pt 6pt 0.5pt 0; vertical-align: top; }
+.reason { text-align: center; color: #0a5fae; font-weight: bold; margin: 10pt 0; }
+.your { display: flex; border: 3px solid #0a5fae; margin: 4pt 0 10pt; }
+.your .label { background: #0a5fae; color: #fff; font-weight: bold; padding: 6pt 8pt; width: 0.8in; line-height: 1.1; }
+.your .text { flex: 1; text-align: center; color: #0a5fae; font-size: 14pt; font-weight: bold; align-self: center; }
+.next p { font-weight: bold; }
+.records { border: 1.5px solid #0a5fae; padding: 6pt 8pt; font-weight: bold; margin: 8pt 0; }
+table.tech { width: 100%; border: 2px solid #0a5fae; margin: 8pt 0; font-size: 8.5pt; }
+table.tech th { background: #a9d4f5; text-align: left; padding: 3pt 4pt; border: 1px solid #0a5fae; font-weight: normal; }
+table.tech td { padding: 3pt 4pt; border: 1px solid #0a5fae; vertical-align: top; }
+{% endblock %}
+{% block footer %}{{ content("Navy Genomic Laboratory, " ~ details.address ~ "   Telephone " ~ details.phone ~ "        Page ", page, " of ", pages, "\n") }}{% endblock %}
+{% block report %}
+<div class="head"><div class="navy-title">GENETIC TEST REPORT</div><div class="navy-badge">{{ lab.name }}</div></div>
+<div class="cols">
+  <div><h4>Patient Details:</h4><table>
+    <tr><td>Name:</td><td>{{ patient.name }}</td></tr>
+    <tr><td>Date of birth:</td><td>{{ val("date_of_birth") }}</td></tr>
+    <tr><td>Sex:</td><td>{{ val("sex") }}</td></tr>
+    {% if val("mrn") %}<tr><td>NHS number:</td><td>{{ val("mrn") }}</td></tr>{% endif %}
+    {% if val("specimen_type") %}<tr><td>Sample type:</td><td>{{ val("specimen_type") }}</td></tr>{% endif %}
+  </table></div>
+  <div><h4>Test ordered by:</h4><table>
+    <tr><td>Name:</td><td>{{ doctor }}</td></tr>
+    <tr><td>Organisation:</td><td>{{ clinic }}</td></tr>
+    <tr><td>Telephone:</td><td>01632 960{{ digits(3) }}</td></tr>
+  </table></div>
+  <div><h4>Test carried out by:</h4><table>
+    <tr><td>Laboratory:</td><td>{{ lab.name }}</td></tr>
+    <tr><td>Telephone:</td><td>{{ details.phone }}</td></tr>
+    {% if val("received_date") %}<tr><td>Date received:</td><td>{{ val("received_date") }}</td></tr>{% endif %}
+    <tr><td>Date reported:</td><td>{{ val("report_date") }}</td></tr>
+    <tr><td>Authorised by:</td><td>{{ signers[0].split(",")[0] }}</td></tr>
+  </table></div>
+</div>
+<p class="reason">Reason for test: {{ val("clinical_indication") }}.</p>
+<div class="your"><div class="label">Your Result</div><div class="text">{{ val("overall_result_raw") }}</div></div>
+<h2>About the test</h2>
+<p>We tested your {{ focus.gene }} gene. People have two copies of it, one inherited from each parent. Some changes in this gene cause {{ focus.condition }}. {{ prose.condition.inheritance }}</p>
+<h2>What this result means for you</h2>
+{{ c.paragraphs(prose.patient_summary) }}
+<h2>Next steps</h2>
+<div class="next">{% for text in prose.recommendations %}<p>&bull; {{ text }}</p>{% endfor %}</div>
+<h2>More information and support</h2>
+<p>Genetic test results can be hard to take in, and some people find them distressing. To talk through your result, contact the doctor who requested the test, or ring the Clinical Genetics Service on {{ details.toll_free }}.</p>
+
+<div class="page-break">
+<div class="head"><div class="navy-title">GENETIC TEST REPORT</div><div class="navy-badge">{{ lab.name }}</div></div>
+<h2>Technical information</h2>
+<div class="cols">
+  <div><table>
+    <tr><td>Name:</td><td>{{ patient.name }}</td></tr>
+    <tr><td>Date of birth:</td><td>{{ val("date_of_birth") }}</td></tr>
+    {% if val("mrn") %}<tr><td>NHS number:</td><td>{{ val("mrn") }}</td></tr>{% endif %}
+    <tr><td>Lab number:</td><td>{{ val("lab_accession_number") }}</td></tr>
+    {% for label, value in other_ids %}<tr><td>{{ label }}:</td><td>{{ value }}</td></tr>{% endfor %}
+    {% if val("collection_date") %}<tr><td>Sample collected:</td><td>{{ val("collection_date") }}</td></tr>{% endif %}
+    {% if val("received_date") %}<tr><td>Sample received:</td><td>{{ val("received_date") }}</td></tr>{% endif %}
+  </table></div>
+  <div class="records">Keep this page for your records. It is written for health professionals, and you do not need to read it.</div>
+</div>
+<p><b>Test:</b> {{ val("test_name") }}</p>
+{% if v %}
+<table class="tech">
+  <tr><th>Gene</th><th>Zygosity</th><th>Inheritance</th><th>HGVS Description</th><th>Location</th><th>Classification</th></tr>
+  <tr><td>{{ v.gene_symbol }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.transcript }}:{{ v.change }}{% if v.hgvs_p %} {{ v.hgvs_p }}{% endif %}</td><td>{{ v.chromosomal_position }}</td><td>{{ v.classification_raw }}</td></tr>
+</table>
+{% else %}
+<p>No pathogenic variant was detected in the {{ focus.gene }} gene ({{ focus.transcript }}).</p>
+{% endif %}
+<h2>Full interpretation</h2>
+{% if partner %}<p>According to the referral, {{ patient.name }}'s partner {{ partner.name }}, born {{ partner.born }}, is a known carrier of {{ focus.condition }}, with the {{ focus.gene }} variant {{ partner.change }} in one copy.</p>{% endif %}
+{{ c.paragraphs(prose.interpretation) }}
+<h2>Test methodology</h2>
+<p>The coding exons and flanking intronic sequence of {{ focus.gene }} were sequenced on a next-generation sequencing platform, with reads aligned to the GRCh38 reference genome. HGVS recommendations are followed for variant names, with {{ focus.transcript }} as the reference sequence. {{ hgvs_example or "" }}</p>
+<p>False positive and false negative rates are each about 0.1%.</p>
+<p>Reported by {{ signers[1].split(",")[0] }}. Authorised by {{ signers[0].split(",")[0] }}.</p>
+</div>
+{% endblock %}

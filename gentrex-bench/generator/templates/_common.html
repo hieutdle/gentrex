@@ -1,0 +1,22 @@
+{# Pieces that several templates print the same way. Import with context. #}
+
+{% macro paragraphs(items) %}
+{% for text in items %}
+<p>{{ text }}</p>
+{% endfor %}
+{% endmacro %}
+
+{# "an autosomal dominant", "a mitochondrial" #}
+{% macro article(word) %}{{ "an" if word[:1].lower() in "aeiox" else "a" }}{% endmacro %}
+
+{% macro feature_list(sep="; ") %}{{ features | map(attribute="printed") | join(sep) }}{% endmacro %}
+
+{# The other IDs of the similar_identifiers tag, as label-value rows. #}
+{% macro other_id_rows(label_tag="th", value_tag="td") %}
+{% for label, value in other_ids %}
+<tr><{{ label_tag }}>{{ label }}</{{ label_tag }}><{{ value_tag }}>{{ value }}</{{ value_tag }}></tr>
+{% endfor %}
+{% endmacro %}
+
+{# A classification in a sentence, as "classified as likely pathogenic". #}
+{% set sentence_class = {"pathogenic": "pathogenic", "likely_pathogenic": "likely pathogenic", "uncertain_significance": "a variant of uncertain significance", "likely_benign": "likely benign", "benign": "benign"} %}

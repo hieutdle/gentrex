@@ -1,0 +1,296 @@
+# Extraction schema. It describes the record that Gentrex extracts from each
+# report, as a JSON Schema. Report-level fields are under `properties`, and
+# the fields of each variant are under `variants.items.properties`.
+#
+# Gentrex uses the schema in two ways. It sends the schema as JSON after the
+# instruction (`extract.instruction` in settings.yaml), so the model reads
+# what each field means. The server also enforces the schema as the answer
+# format (structured output), so the answer is JSON that follows it. Write
+# each description for the model. Say what the field holds and when to fill
+# it.
+#
+# To add a field, add one block. To remove a field, delete its block. Gentrex
+# makes every field required in the answer, so there is no separate list of
+# required fields to update:
+#
+#   my_field:
+#     description: What it is, and when to fill it.
+#     type: [string, "null"]
+#
+# Keep "null" in the type of every field a report may not state, quoted as
+# above. Without it, the model must make up a value when the report states
+# none. Use [boolean, "null"] or [integer, "null"] for other kinds of value.
+#
+# For a field with a fixed list of allowed values, add an `enum` list that
+# ends with null, unquoted, so that the allowed value is null itself and not
+# the text "null". Put a field with the report's own wording, such as
+# <field>_raw, right before it. The server makes the model write the fields
+# in schema order, so the model copies the wording first and then picks the
+# closest allowed value.
+
+type: object
+additionalProperties: false
+properties:
+  mrn:
+    description: >-
+      Patient's medical record number, as printed (e.g. SYN-MRN-0007). A
+      national patient number, such as the UK's NHS number, counts as the
+      MRN when the report gives no hospital number.
+    type: [string, "null"]
+  submitter_patient_id:
+    description: >-
+      Patient identifier from the ordering clinic or submitter, other than the
+      MRN, as printed (e.g. SYN-SUB-0006).
+    type: [string, "null"]
+  lab_accession_number:
+    description: >-
+      The laboratory's accession or order number for this test, as printed
+      (e.g. SYN-ACC-0011).
+    type: [string, "null"]
+  date_of_birth:
+    description: >-
+      Patient's date of birth, as printed (e.g. 23-JAN-2020, 06/19/2001).
+    type: [string, "null"]
+  sex:
+    description: Patient's sex, as printed (e.g. Female, Male, M).
+    type: [string, "null"]
+  specimen_type:
+    description: Specimen tested (e.g. Blood in EDTA, Buccal swab, Saliva).
+    type: [string, "null"]
+  collection_date:
+    description: >-
+      Date the specimen was collected, as printed (e.g. 27-AUG-2026).
+    type: [string, "null"]
+  received_date:
+    description: >-
+      Date the laboratory received the specimen, as printed (e.g. 08/18/2026).
+    type: [string, "null"]
+  test_name:
+    description: >-
+      Name of the test, panel or assay (e.g. Inherited Arrhythmia Panel,
+      Proband Exome with Secondary Findings).
+    type: [string, "null"]
+  test_type:
+    description: >-
+      Kind of test, chosen from test_name and the report's description of the
+      test (e.g. "Proband Exome with Secondary Findings" is exome, "DMD
+      Deletion and Duplication Analysis" is single_gene). genome is whole
+      genome sequencing; microarray is a chromosomal microarray or SNP array;
+      karyotype is a chromosome analysis; a test of the mitochondrial genome
+      alone is other.
+    type: [string, "null"]
+    enum:
+      - panel
+      - exome
+      - genome
+      - single_gene
+      - targeted_variant
+      - microarray
+      - karyotype
+      - other
+      - null
+  test_started_date:
+    description: >-
+      Date the laboratory started the analysis, as printed (e.g. 2026-08-27).
+    type: [string, "null"]
+  report_date:
+    description: Date the report was finalized, as printed (e.g. 18-SEP-2026).
+    type: [string, "null"]
+  overall_result_raw:
+    description: >-
+      The report's overall result, copied verbatim (e.g. "POSITIVE: A
+      pathogenic variant was identified.", "PRIMARY RESULT: NEGATIVE.
+      SECONDARY RESULT: POSITIVE.").
+    type: [string, "null"]
+  karyotype:
+    description: >-
+      The patient's karyotype from a chromosome analysis, copied verbatim in
+      ISCN (e.g. 46,XY, 47,XX,+21, 45,XX,der(13;14)(q10;q10)). Null if the
+      report gives none. An array result written as arr[...] belongs to its
+      variant, not here.
+    type: [string, "null"]
+  clinical_indication:
+    description: >-
+      Why the test was ordered, as printed (e.g. Diagnostic evaluation,
+      Reproductive carrier screening). The patient's own clinical features go
+      in patient_phenotypes, not here.
+    type: [string, "null"]
+  patient_phenotypes:
+    description: >-
+      The patient's own clinical features, one item per feature. Empty if the
+      report gives none, including when the pages only carry boilerplate about
+      interpreting results in the context of family history, or describe a
+      relative rather than this patient.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      properties:
+        text:
+          description: >-
+            One feature, copied verbatim (e.g. "Global developmental delay",
+            "hypotonia").
+          type: string
+        present:
+          description: >-
+            False if the report says the patient does not have the feature,
+            null if the report is unsure of it (e.g. "possible seizure"),
+            otherwise true.
+          type: [boolean, "null"]
+  lab_name:
+    description: >-
+      Name of the testing laboratory (e.g. GeneDx, Invitae, Ambry Genetics).
+    type: [string, "null"]
+  genome_build:
+    description: >-
+      Reference genome of the report's genomic positions and array results
+      (e.g. GRCh37 or hg19 is GRCh37, GRCh38 or hg38 is GRCh38). Null if the
+      report names none.
+    type: [string, "null"]
+    enum:
+      - GRCh37
+      - GRCh38
+      - other
+      - null
+  # No dbSNP or ClinVar IDs and no population frequencies, because a lookup
+  # by gene and HGVS gives them for every variant. No list of the genes in a
+  # copy-number change either, because a lookup by genome build and position
+  # gives them.
+  variants:
+    description: >-
+      One object per variant reported in the patient, listed once even if
+      several pages mention it: a sequence variant, a copy-number change, a
+      repeat expansion or a uniparental disomy. Empty if the report lists
+      none. A karyotype from a chromosome analysis goes in karyotype instead.
+    type: array
+    items:
+      type: object
+      additionalProperties: false
+      properties:
+        page:
+          description: >-
+            Page the variant is reported on, from the "--- PAGE n ---" line
+            before it; the first one if several pages mention it.
+          type: [integer, "null"]
+        gene_symbol:
+          description: >-
+            Gene symbol (e.g. BRCA1). Null for a change that spans several
+            genes, as most array results do.
+          type: [string, "null"]
+        transcript:
+          description: >-
+            Reference transcript of the HGVS change (e.g. NM_007294.4).
+          type: [string, "null"]
+        hgvs_c:
+          description: >-
+            Coding DNA change, copied verbatim (e.g. c.5266dupC,
+            c.(6438+1_6439-1)_(7309+1_7310-1)del).
+          type: [string, "null"]
+        hgvs_p:
+          description: >-
+            Protein change, copied verbatim (e.g. p.(Gln1756Profs*74)).
+          type: [string, "null"]
+        dna_change_raw:
+          description: >-
+            The DNA change, copied verbatim, when it is not given as a
+            separate c. change (e.g. "NC_012920.1:m.3243A>G", "Deletion of
+            exons 45-50", "arr[GRCh37] 17p11.2(16761827_20304681)x3", "30 and
+            56 CGG repeats", "7p22.3q36.3 maternal uniparental disomy").
+          type: [string, "null"]
+        chromosomal_position:
+          description: >-
+            Genomic position or range of the variant, as printed
+            (e.g. chr17:43057062, chr7:1-159345973).
+          type: [string, "null"]
+        copy_number:
+          description: >-
+            Number of copies of the gene or region in the patient, as the
+            report gives it, including the x of an array result (x1 is 1,
+            x3 is 3, "SMN1 copy number: 0" is 0). Null if the report gives
+            no number.
+          type: [integer, "null"]
+        classification_raw:
+          description: >-
+            Classification wording, copied verbatim (e.g. "Pathogenic
+            (Class 5)", "VUS", "Premutation allele").
+          type: [string, "null"]
+        classification:
+          description: Closest allowed value for classification_raw.
+          type: [string, "null"]
+          enum:
+            - pathogenic
+            - likely_pathogenic
+            - uncertain_significance
+            - likely_benign
+            - benign
+            - other
+            - null
+        zygosity_raw:
+          description: >-
+            Zygosity or heteroplasmy wording, copied verbatim
+            (e.g. "Heteroplasmic (28%)").
+          type: [string, "null"]
+        zygosity:
+          description: Closest allowed value for zygosity_raw.
+          type: [string, "null"]
+          enum:
+            - heterozygous
+            - homozygous
+            - hemizygous
+            - heteroplasmic
+            - homoplasmic
+            - other
+            - null
+        parental_origin_raw:
+          description: >-
+            Where the patient's variant came from, as printed (e.g. "De novo",
+            "Maternally inherited"). For a uniparental disomy, the parent both
+            copies came from (e.g. "maternal"). Null if the report does not
+            state it.
+          type: [string, "null"]
+        parental_origin:
+          description: Closest allowed value for parental_origin_raw.
+          type: [string, "null"]
+          enum:
+            - de_novo
+            - maternal
+            - paternal
+            - both_parents
+            - other
+            - null
+        associated_phenotype:
+          description: >-
+            Disease or condition the report ties to the variant (e.g. Cystic
+            fibrosis, Rett syndrome).
+          type: [string, "null"]
+        mode_of_inheritance_raw:
+          description: >-
+            How the condition is inherited, as printed (e.g. "Autosomal
+            recessive", "Mitochondrial inheritance"). This is the condition's
+            pattern, not where the patient's variant came from.
+          type: [string, "null"]
+        mode_of_inheritance:
+          description: >-
+            Closest allowed value for mode_of_inheritance_raw; x_linked for
+            X-linked inheritance not stated as dominant or recessive.
+          type: [string, "null"]
+          enum:
+            - autosomal_dominant
+            - autosomal_recessive
+            - x_linked_dominant
+            - x_linked_recessive
+            - x_linked
+            - mitochondrial
+            - other
+            - null
+        is_secondary_finding:
+          description: >-
+            True if the report flags the variant as a secondary or incidental
+            finding (e.g. under "Secondary Findings"), false if it flags it as
+            a primary finding.
+          type: [boolean, "null"]
+        variant_type_raw:
+          description: >-
+            Kind of variant, as printed (e.g. Missense, Frameshift deletion,
+            Copy-number deletion, GAIN, Uniparental disomy).
+          type: [string, "null"]

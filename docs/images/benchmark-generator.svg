@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="760" height="556" viewBox="0 0 760 556" role="img" aria-labelledby="title desc">
+  <title id="title">The truth is fixed before the LLM writes</title>
+  <desc id="desc">The five steps of the benchmark generator. Code and a seed sample the case, with one of the report templates, and write the truth file. An LLM writes the report's free text, code fills the template's HTML with the truth and that text, and Chrome renders it as a PDF. check.py compares the PDF text with the truth file, and a case that fails is written again. The PDFs that pass are scanned at two levels with Pillow and copied as clean images, so each report comes as a native, scan, fax, mixed or image PDF, all with one truth file.</desc>
+  <defs>
+    <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0 0L10 5L0 10z" fill="#8c8c8c"/>
+    </marker>
+  </defs>
+  <rect width="760" height="556" fill="#ffffff"/>
+  <g font-family="Helvetica, Arial, sans-serif" font-size="12.5" fill="#1a1a1a">
+    <text x="24" y="34" font-size="15" font-weight="700">The truth is fixed before the LLM writes</text>
+
+    <!-- Connectors -->
+    <g fill="none" stroke="#8c8c8c" stroke-width="1.25">
+      <path d="M218 132V164" marker-end="url(#arrow)"/>
+      <path d="M218 236V268" marker-end="url(#arrow)"/>
+      <path d="M218 324V356" marker-end="url(#arrow)"/>
+      <path d="M218 428V460" marker-end="url(#arrow)"/>
+      <path d="M380 96H420" marker-end="url(#arrow)"/>
+      <path d="M578 132V392H380" marker-end="url(#arrow)"/>
+      <path d="M380 496H420" marker-end="url(#arrow)"/>
+      <path d="M56 392H36V200H56" marker-end="url(#arrow)"/>
+    </g>
+    <g font-size="11.5" fill="#555555">
+      <text x="44" y="344">write again if it fails</text>
+      <text x="226" y="448">passes</text>
+      <text x="586" y="256">compared with</text>
+      <text x="586" y="272">the PDF text</text>
+    </g>
+
+    <!-- Steps -->
+    <g fill="none" stroke="#a6a6a6" stroke-width="1.25">
+      <rect x="56" y="60" width="324" height="72" rx="8"/>
+      <rect x="56" y="164" width="324" height="72" rx="8"/>
+      <rect x="56" y="268" width="324" height="56" rx="8"/>
+      <rect x="56" y="356" width="324" height="72" rx="8"/>
+      <rect x="56" y="460" width="324" height="72" rx="8"/>
+      <rect x="420" y="460" width="316" height="72" rx="8"/>
+    </g>
+    <rect x="420" y="60" width="316" height="72" rx="8" fill="#2f6db5" fill-opacity="0.12" stroke="#2f6db5" stroke-width="2"/>
+
+    <text x="72" y="84" font-size="13" font-weight="700">1. Sample the case</text>
+    <text x="72" y="100">Code and a seed pick ClinVar variants, HPO</text>
+    <text x="72" y="116">features, IDs, dates and a template</text>
+
+    <text x="72" y="188" font-size="13" font-weight="700">2. Write the report</text>
+    <text x="72" y="204">An LLM writes the free text, and code fills</text>
+    <text x="72" y="220">the template with it and the truth</text>
+
+    <text x="72" y="292" font-size="13" font-weight="700">3. Render the PDF</text>
+    <text x="72" y="308">Chrome prints the HTML, as render.py does</text>
+
+    <text x="72" y="380" font-size="13" font-weight="700">4. Check against the truth</text>
+    <text x="72" y="396">check.py finds every value on its page</text>
+    <text x="72" y="412">and every distractor in the text</text>
+
+    <text x="72" y="484" font-size="13" font-weight="700">5. Scan</text>
+    <text x="72" y="500">Scan and fax levels from a seed, plus</text>
+    <text x="72" y="516">mixed PDFs and clean image copies</text>
+
+    <text x="436" y="84" font-size="13" font-weight="700">Truth file, one JSON per report</text>
+    <text x="436" y="100">What each command should write</text>
+    <text x="436" y="116">Read by check.py and later the scorer</text>
+
+    <text x="436" y="484" font-size="13" font-weight="700">PDFs in the benchmark</text>
+    <text x="436" y="500">Native, scan, fax, mixed and image</text>
+    <text x="436" y="516">All versions share one truth file</text>
+  </g>
+</svg>

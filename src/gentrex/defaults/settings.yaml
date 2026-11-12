@@ -1,0 +1,178 @@
+# Gentrex settings. Endpoints and API keys come from the environment, never
+# from this file (see .env.example).
+
+# `gentrex transcribe`: Transcribe PDF pages.
+transcribe:
+  # A page whose embedded text has fewer than this many non-whitespace
+  # characters is "scanned" and sent to OCR. Any other page is "native" and
+  # read directly, unless it is mostly images or curves
+  # (docs/user-guide/transcribe.md, "How it works").
+  native_min_chars: 20
+
+  ocr:
+    # Name of the vision model, as listed at GENTREX_OCR_BASE_URL/models.
+    model: lightonai/LightOnOCR-3-4B
+    # Text sent after every page image. Empty sends the image alone, which is
+    # how LightOnOCR is trained to transcribe a page. Other instructions are
+    # unfamiliar to it and can make the transcription worse.
+    prompt: ""
+    # The model reads images, so each scanned page is first drawn as a picture.
+    # render_dpi sets how detailed it is. At 400 dots per inch, a Letter page
+    # is about 3400 x 4400 pixels.
+    render_dpi: 400
+    # The picture is then shrunk so its longer side is this many pixels (about
+    # 1580 x 2048 for a Letter page), the size LightOnOCR-3-4B is trained on.
+    # Drawing big and shrinking keeps small print smooth, while drawing small
+    # directly leaves it jagged. 0 skips the shrinking.
+    longest_dim: 2048
+    # Longest answer allowed for one page, in tokens (8192 tokens are about
+    # 6000 words). It stops a model stuck repeating itself on a blank or
+    # noisy page. A page with more text than this would be cut off.
+    max_tokens: 8192
+    # Randomness of the output. At 0, the model always picks the most likely
+    # next token. 0.2 is the value LightOn's model card uses.
+    temperature: 0.2
+    # Time allowed for one OCR request before it counts as failed.
+    timeout_seconds: 300
+    # How many OCR requests Gentrex sends at the same time, across all PDFs.
+    # A server such as vLLM processes them together, which is faster than one
+    # by one.
+    concurrency: 8
+
+# `gentrex select`: Select the pages to keep, from yes/no questions about each
+# page.
+select:
+  # Name of the text model, as listed at GENTREX_LLM_BASE_URL/models.
+  model: google/gemma-4-26B-A4B-it
+  # Text sent before every page.
+  instruction: >-
+    Below is one page of a clinical genetic test report. Its text comes from a
+    PDF and may contain OCR errors.
+  # Questions asked about every page. The name before the colon labels the
+  # answer in the output. "Answer with Yes or No." is added after each
+  # question. To ask another question, add a name and its text. Each
+  # question adds one request for every page.
+  questions:
+    has_result: >-
+      Does this page state the patient's test result or list the variants
+      found in the patient? Answer No if the page only explains the result,
+      recommends next steps or describes the test.
+    has_phenotype: >-
+      Does this page describe the patient's own symptoms, clinical features or
+      reason for testing?
+  # A page is kept when, for at least one question, the probability of "yes"
+  # is at least this. Lower keeps more pages.
+  keep_threshold: 0.5
+  # Time allowed for one request before it counts as failed.
+  timeout_seconds: 60
+  # How many pages Gentrex works on at the same time, across all PDFs. A
+  # page's questions are asked one after another, so the server can reuse
+  # the page it has just read instead of reading it again for each question.
+  concurrency: 16
+
+# `gentrex extract`: Extract report data. Gentrex writes one record per report,
+# from the pages that `gentrex select` kept. The fields to extract are in
+# schema.yaml, next to this file.
+extract:
+  # Name of the text model, as listed at GENTREX_LLM_BASE_URL/models.
+  model: google/gemma-4-31B-it
+  # System message of every request. The schema follows it, as JSON.
+  instruction: >-
+    You extract structured data from one clinical genetic test report. You are
+    given selected pages of the report in page order, each after a line such
+    as "--- PAGE 2 ---"; pages in between may be missing. Return one JSON
+    object that follows the schema below and covers all the pages. Fill a
+    field only if the report states it; otherwise use null. Never guess. Copy
+    every field ending in _raw verbatim from the report. A field with allowed
+    values follows the field holding the report's wording; choose the value
+    closest to that wording.
+  # Longest answer allowed for one report, in tokens. It stops a model stuck
+  # repeating itself. An answer cut off here is lost and the report fails.
+  # Raise it if reports with many variants are cut off, and raise
+  # timeout_seconds by the same factor.
+  max_tokens: 4096
+  # Time allowed for one request. The whole answer is written within it.
+  timeout_seconds: 300
+  # How many reports Gentrex sends at the same time. A server such as vLLM
+  # processes them together, which is faster than one by one.
+  concurrency: 4
+
+# `gentrex normalize`: Normalize report data. Gentrex turns the dates,
+# specimen, result, gene symbols and clinical features of each record from
+# `gentrex extract` into standard values.
+normalize:
+  # How to read a date with slashes that fits both ways, such as 03/04/2020.
+  # false reads the month first, as US laboratories print it (March 4). true
+  # reads the day first, as British laboratories do (April 3). A date that
+  # fits only one way, such as 25/03/2020, is read that way under both.
+  day_first: false
+  # The HGNC complete set, a tab-separated file from genenames.org. Gentrex
+  # looks up each gene symbol in it to find the approved symbol and HGNC ID.
+  hgnc_path: data/ontology/hgnc_complete_set_2026-10-06.txt
+  # The MONDO release, from github.com/monarch-initiative/mondo. Gentrex looks
+  # up the disease that each variant's associated_phenotype names in it, by
+  # the diseases' labels and exact synonyms.
+  mondo_path: data/ontology/mondo-base.json
+  hpo:
+    # The sentence-transformers models that embed the HPO names and the
+    # clinical features, as named on Hugging Face. Each model scores the HPO
+    # terms, and Gentrex combines the scores. After changing a model or a
+    # prompt, build the index again (docs/user-guide/normalize.md, step 2).
+    # `gentrex normalize` stops if the index was built with other models or
+    # prompts, because embeddings from different models can't be compared.
+    models:
+      # A biomedical model, trained to link different names of a concept.
+      - name: cambridgeltl/SapBERT-from-PubMedBERT-fulltext
+      # A general model. It is trained with task prompts, and this prompt
+      # asks for the similarity of two texts.
+      - name: google/embeddinggemma-2
+        prompt: SentenceSimilarity
+    # The HPO index that scripts/build_hpo_index.py writes. It holds all HPO
+    # labels and synonyms, their embeddings from each model, and the models'
+    # names and prompts.
+    path: data/ontology/hpo-v2026-09-01.npz
+    # HPO terms kept per clinical feature, closest first. The first one is the
+    # match. The other four are alternatives for when you check it, because
+    # the right term is sometimes a close second.
+    top_k: 5
+  # ClinVar's variant_summary file, from ftp.ncbi.nlm.nih.gov/pub/clinvar.
+  # Gentrex looks up each variant's gene and c. change in it to find the
+  # variant's ClinVar ID. null skips the lookup.
+  clinvar_path: null
+
+# `gentrex load`: Load report data into a database. Gentrex writes the records
+# of a run of `gentrex normalize` into tables of the database that
+# GENTREX_DATABASE_URL names (see .env.example).
+load:
+  # The HPO release that `gentrex load` takes the HPO terms and their hierarchy
+  # from, so that a query can find a term together with the terms under it.
+  # Use the release that built the HPO index (docs/user-guide/normalize.md, step 2), so
+  # that every matched term is in it.
+  hpo_release: data/ontology/hp-base.json
+
+# `gentrex export`: Export report data in a standard format.
+export:
+  # `gentrex export omop`: Export report data into the OMOP CDM 5.4 database
+  # that GENTREX_OMOP_DATABASE_URL names (see .env.example).
+  omop:
+    # Schema of the CDM tables. null is the database's default schema, which
+    # is public in PostgreSQL.
+    cdm_schema: null
+    # Schema of the vocabulary tables, such as concept. null is the same
+    # schema as cdm_schema, where most CDMs keep them.
+    vocabulary_schema: null
+    # Schema of Gentrex's two tables, which record the rows and persons that
+    # it wrote, so that a later run replaces them. Gentrex creates the schema
+    # if it doesn't exist. It must differ from cdm_schema, so that the CDM
+    # schema holds only CDM tables.
+    gentrex_schema: gentrex
+    # CSV file with the columns patient_key and person_id, which gives the
+    # person of each patient in a CDM that already holds persons. null makes
+    # Gentrex add a person for each patient, for a CDM that holds only
+    # Gentrex's records.
+    person_map: null
+    # Schema of the extension tables that `gentrex export omop-extended` adds:
+    # genomic_test, genomic_variant, phenotype_feature and phenotype_candidate.
+    # They hold at full length what the CDM tables can't. Gentrex creates the
+    # schema if it doesn't exist, and it must differ from cdm_schema.
+    extension_schema: omop_extension

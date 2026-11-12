@@ -1,0 +1,42 @@
+#!/bin/bash
+# Generate the benchmark reports in a Minerva job. Submit it from the gentrex
+# folder, after evaluation/minerva/prepare.sh:
+#
+#   SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/generate_reports.lsf
+#
+# The job serves the writing model and builds the reports of every case that
+# has no truth file yet. CASES names the cases to build instead, as in
+# CASES="SYN-0001 SYN-0002". VERSION names the benchmark version, v1 by
+# default.
+#BSUB -J gentrex-generate
+#BSUB -q gpu
+#BSUB -n 8
+#BSUB -W 1:00
+#BSUB -gpu num=1
+#BSUB -R "select[h100nvl] rusage[mem=4000] span[hosts=1]"
+#BSUB -oo generate-reports.%J.log
+: "${SERVING:?set SERVING to the serving folder}"
+[ -f gentrex-bench/run.py ] || { echo "submit the job from the gentrex folder"; exit 1; }
+
+module load apptainer
+# A port from the job ID, so that the job can't reach another job's vLLM.
+port=$((10000 + LSB_JOBID % 20000))
+model=$(.venv/bin/python -c "
+import yaml
+with open('gentrex-bench/generator/settings.yaml', encoding='utf-8') as fh:
+    print(yaml.safe_load(fh)['build']['model'])")
+
+evaluation/minerva/serve.sh "$model" "$port" &
+server=$!
+until curl -sf "http://localhost:$port/v1/models" > /dev/null; do
+  kill -0 "$server" || { echo "vLLM stopped; see above"; exit 1; }
+  sleep 5
+done
+
+GENTREX_BENCH_BASE_URL=http://localhost:$port/v1 .venv/bin/python \
+  gentrex-bench/generator/generate.py --version "${VERSION:-v1}" build \
+  --chrome "$SERVING/chrome-headless-shell-linux64/chrome-headless-shell" $CASES
+status=$?
+
+kill "$server"
+exit $status

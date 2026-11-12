@@ -1,0 +1,25 @@
+{# Lilac's shared pieces. Import with context. #}
+{% import "_common.html" as c with context %}
+
+{# The interpretation of a result, as the result tables print it. #}
+{% macro interpretation(v) %}
+{% if kind == "carrier" %}Predicted to be {{ "at least " if lab.key == "teal-banner" }}a carrier of {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner.
+{% elif v.classification == "uncertain_significance" %}The significance of this variant for {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner, is uncertain.
+{% else %}Consistent with a diagnosis of {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner.
+{% endif %}
+{% endmacro %}
+
+{% macro negative_interpretation() %}
+{% if kind == "carrier" %}This result lowers the chance of being a carrier but cannot rule it out.{% else %}No pathogenic variant was detected. This result makes a diagnosis of this disorder less likely but does not exclude it.{% endif %}
+{% endmacro %}
+
+{% macro history() %}
+{% if features %}<div><span class="lbl">Clinical History:</span> {{ c.feature_list() }}</div>{% endif %}
+{% if family_history %}<div><span class="lbl">Family History:</span> {{ family_history }}</div>{% endif %}
+{% endmacro %}
+
+{% macro methods() %}
+<p><span class="runin">Next-generation sequencing:</span> {% if kind == "carrier" and lab.key == "carrier-banner" %}The genes of the panel{% else %}The coding exons of the gene{% endif %} and at least 10 base pairs of flanking intronic sequence are enriched with a hybridization capture method and sequenced on a next-generation sequencing platform. Reads are aligned to the human reference genome GRCh38, and single nucleotide variants, small insertions and deletions, and copy number variants are called with a validated pipeline. Variants that do not meet quality thresholds are confirmed by Sanger sequencing or another orthogonal method.</p>
+<p><span class="runin">Reported variants:</span> This report lists pathogenic and likely pathogenic variants{% if kind != "carrier" %} and variants of uncertain significance{% endif %}, but not benign or likely benign ones. Variants are classified with the ACMG standards and guidelines. {{ hgvs_example or "" }}</p>
+<p><span class="runin">Limitations:</span> Germline mosaicism, large structural rearrangements such as inversions, and variants outside the regions the test targets are not detected. The interpretation draws on the clinical details supplied and on present knowledge, which can change. In rare cases a result can be wrong, for example after a sample mix-up, a blood transfusion or a bone marrow transplant.</p>
+{% endmacro %}

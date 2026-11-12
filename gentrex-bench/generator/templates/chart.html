@@ -1,0 +1,84 @@
+{# Apricot's single-test chart report (public samples ARU01, ARU02): a
+   client and patient block between thick rules, the procedure and its value
+   in a monospace face with an abnormal flag, an interpretive paragraph, and
+   background information with a table of dates on page 2. #}
+{% extends "base.html" %}
+{% import "_apricot.html" as apricot with context %}
+{% import "_common.html" as c with context %}
+{% set code = val("test_name").split()[0] | upper %}
+{% block style %}
+@page {
+  margin: 0.95in 0.55in 1.25in;
+  @top-left { content: {{ content(lab.name ~ "\n" ~ details.toll_free ~ " | " ~ details.web ~ "\n" ~ details.address ~ "\n" ~ details.directors[0] ~ ", Medical Director") }}; white-space: pre; vertical-align: bottom; padding-bottom: 10pt; font: 6.5pt Arial, Helvetica, sans-serif; }
+  @top-right { content: "Patient Report | FINAL"; vertical-align: bottom; padding-bottom: 12pt; font: 11pt Georgia, serif; }
+  @bottom-left { content: {{ content("H=High, L=Low, *=Abnormal, C=Critical\n\n" ~ "Performing laboratory:\n" ~ lab.name ~ "\n") }} {{ synthetic }}; white-space: pre-wrap; vertical-align: top; padding-top: 4pt; border-top: 1.5px solid #000; font: 6.3pt "Courier New", monospace; }
+  @bottom-center { content: none; }
+  @bottom-right { content: {{ content("Patient: " ~ patient.listed ~ "\n" ~ lab.name.split()[0] ~ " Accession: " ~ val("lab_accession_number") ~ "\n" ~ "Patient Identifiers: " ~ (val("mrn") or "") ~ "\n" ~ "Visit Number (FIN): " ~ fin ~ "\n" ~ "Page ") }} counter(page) " of " counter(pages) {{ content(" | Printed: " ~ date("report_date", 1)) }}; white-space: pre; text-align: right; vertical-align: top; padding-top: 4pt; border-top: 1.5px solid #000; font: 7pt Georgia, serif; }
+}
+.rule { border-top: 2.5px solid #000; margin: 4pt 0; }
+.blocks { display: flex; justify-content: space-between; padding: 8pt 0; }
+.blocks td { padding: 1pt 10pt 1pt 0; vertical-align: top; }
+.pt { font-size: 11pt; font-weight: bold; }
+.test { font-size: 11pt; font-weight: bold; margin: 12pt 0 2pt; }
+.small { font-size: 7.5pt; }
+.row { display: flex; padding: 8pt 0; border-bottom: 1px solid #ccc; }
+.row .proc { width: 2.7in; }
+.row .val { flex: 1; font-family: "Courier New", Courier, monospace; font-size: 8.5pt; }
+.big { font: bold 12pt "Courier New", Courier, monospace; }
+.flag { margin-left: 30pt; }
+.bg { margin-left: 2.9in; font: 8pt "Courier New", Courier, monospace; }
+.bg p { margin-bottom: 4pt; }
+table.dates { width: 100%; margin-top: 18pt; font-size: 7.5pt; }
+table.dates caption { font-size: 8pt; padding-bottom: 4pt; }
+table.dates th, table.dates td { padding: 3pt; border-bottom: 1px solid #ccc; text-align: center; }
+table.dates td:first-child { text-align: left; }
+.end { text-align: center; margin-top: 18pt; }
+{% endblock %}
+{% set fin = digits(10) %}
+{% block report %}
+<div class="rule"></div>
+<div class="blocks">
+  <table class="small">
+    <tr><td>Client: {{ clinic }} {{ digits(3) }}<br>{{ clinic_address[0] }}<br>{{ clinic_address[1] }}<br>UNITED STATES</td></tr>
+    <tr><td style="padding-top: 8pt">Physician: {{ clinician }}</td></tr>
+  </table>
+  <table>
+    <tr><td colspan="2" class="pt">Patient: {{ patient.listed }}</td></tr>
+    <tr><td><b>DOB</b></td><td>{{ val("date_of_birth") }}</td></tr>
+    <tr><td><b>Gender:</b></td><td>{{ val("sex") }}</td></tr>
+    {% if val("mrn") %}<tr><td><b>Patient Identifiers:</b></td><td>{{ val("mrn") }}</td></tr>{% endif %}
+    <tr><td><b>Visit Number (FIN):</b></td><td>{{ fin }}</td></tr>
+    {% if val("collection_date") %}<tr><td><b>Collection Date:</b></td><td>{{ val("collection_date") }}</td></tr>{% endif %}
+    {% for label, value in other_ids %}<tr><td><b>{{ label }}:</b></td><td>{{ value }}</td></tr>{% endfor %}
+  </table>
+</div>
+<div class="rule"></div>
+<div class="test">{{ val("test_name") }}</div>
+<div class="small">{{ lab.name.split()[0] }} test code {{ digits(7) }}</div>
+{% if val("specimen_type") %}<div class="row"><div class="proc">{{ code }} Specimen</div><div class="val">{{ val("specimen_type") }}</div></div>{% endif %}
+<div class="row">
+  <div class="proc">{{ val("test_name") }}</div>
+  <div class="val">
+    <span class="big">{{ val("overall_result_raw") }}</span>{% if variants %}<span class="big flag">*</span>{% endif %}
+    <p style="margin-top: 8pt">Indication for testing: {{ val("clinical_indication") }}.</p>
+    {% if features %}<p>Clinical history: {{ c.feature_list() }}.</p>{% endif %}
+    {% if family_history %}<p>{{ family_history }}</p>{% endif %}
+    {{ apricot.finding() }}
+    <p>Reviewed and signed out by {{ signers[0] }}.</p>
+  </div>
+</div>
+<div class="page-break">
+  <div class="bg">
+    <p>BACKGROUND INFORMATION: {{ val("test_name") }}</p>
+    {{ apricot.background() }}
+  </div>
+  <table class="dates">
+    <caption>VERIFIED/REPORTED DATES</caption>
+    <tr><th>Procedure</th><th>Accession</th><th>Collected</th><th>Received</th><th>Verified/Reported</th></tr>
+    {% for procedure in ([code ~ " Specimen"] if val("specimen_type") else []) + [val("test_name")] %}
+    <tr><td>{{ procedure }}</td><td>{{ val("lab_accession_number") }}</td><td>{{ val("collection_date") or "" }}</td><td>{{ val("received_date") or "" }}</td><td>{{ val("report_date") }}</td></tr>
+    {% endfor %}
+  </table>
+  <div class="end">END OF CHART</div>
+</div>
+{% endblock %}

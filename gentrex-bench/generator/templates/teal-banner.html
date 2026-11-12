@@ -1,0 +1,108 @@
+{# Lilac's molecular report with a teal banner (public sample LAB01): the
+   test name in a teal bar, a three-column details grid, one ruled table of
+   disorder, result and interpretation, then additional clinical information
+   and methods. Every page ends with the issue date and FINAL REPORT. #}
+{% extends "base.html" %}
+{% import "_lilac.html" as lilac with context %}
+{% import "_common.html" as c with context %}
+{% block style %}
+@page {
+  margin: 0.45in 0.5in 1.15in;
+  @bottom-center { text-align: left; border-top: 5pt solid #1a8a9a; padding-top: 4pt; font-size: 6.5pt; }
+}
+.top { display: flex; align-items: stretch; gap: 12pt; }
+.top .lilac-logo { width: 1.9in; }
+.top .banner { flex: 1; background: #1a8a9a; color: #fff; font: 15pt Cambria, Georgia, "Times New Roman", serif; text-align: right; padding: 5pt 10pt; }
+.idrow { display: flex; justify-content: space-between; margin: 8pt 0 4pt; }
+.idrow .lbl, .details td:first-child, .below .lbl { color: #1a8a9a; font-weight: bold; }
+.pname { font-weight: bold; font-size: 10pt; border-top: 1px solid #1a8a9a; padding-top: 3pt; margin-top: 4pt; width: 3.2in; }
+.details { display: flex; border-left: 6pt solid #1a8a9a; border-bottom: 2px solid #1a8a9a; padding: 4pt 8pt; margin: 10pt 0 8pt; }
+.details > div { flex: 1; }
+.details h4 { margin: 0 0 2pt; font-size: 9pt; }
+.details td { padding: 0 5pt 0 0; vertical-align: top; }
+.below { display: flex; flex-wrap: wrap; row-gap: 2pt; margin-bottom: 8pt; }
+.below > div { width: 33%; }
+.below > div.full { width: 100%; }
+table.results { width: 100%; margin: 6pt 0 8pt; }
+table.results th { background: #cfe6f0; border: 1px solid #000; padding: 2pt 4pt; font-size: 8.5pt; }
+table.results td { border: 1px solid #000; padding: 3pt 4pt; vertical-align: top; width: 33.3%; }
+.tiny { font-size: 6.3pt; display: block; }
+h3 { color: #000; text-transform: none; }
+{% endblock %}
+{% block footer %}{{ content("Under the direction of: " ~ details.directors[0] ~ ", Laboratory Director, " ~ lab.name ~ ", " ~ details.address ~ "\n" ~ "Date Issued: " ~ val("report_date") ~ "                FINAL REPORT                Page ", page, " of ", pages, "\n" ~ "Confidential health information: state and federal privacy laws protect the contents of this report.\n") }}{% endblock %}
+{% block report %}
+<div class="top">
+  <div class="lilac-logo">{{ lab.name }}<small>Specialty testing</small></div>
+  <div class="banner">{{ val("test_name") }}</div>
+</div>
+<div class="idrow">
+  <div>
+    <div><span class="lbl">Specimen ID:</span> {{ val("lab_accession_number") }}</div>
+    {% for label, value in other_ids %}<div><span class="lbl">{{ label }}:</span> {{ value }}</div>{% endfor %}
+    <div><span class="lbl">Control ID:</span> {{ digits(9) }}</div>
+    <div class="pname">{{ patient.listed | upper }}</div>
+  </div>
+  <div style="width: 2.6in">
+    <div><span class="lbl">Acct #:</span> {{ digits(8) }}&emsp;<span class="lbl">Phone:</span> {{ details.phone[:-2] }}{{ 60 + digits(1) | int }}</div>
+    <div>{{ clinic }}</div>
+    <div>{{ clinic_address[0] }}</div>
+    <div>{{ clinic_address[1] }}</div>
+  </div>
+</div>
+<div class="details">
+  <div>
+    <h4>Patient Details</h4>
+    <table>
+      <tr><td>DOB:</td><td>{{ val("date_of_birth") }}</td></tr>
+      <tr><td>Age (yyy/mm/dd):</td><td>{{ "%03d" | format(patient.age_years) }}/{{ "%02d" | format(digits(1) | int) }}/{{ "%02d" | format(digits(2) | int % 28) }}</td></tr>
+      <tr><td>Gender:</td><td>{{ val("sex") }}</td></tr>
+      {% if val("mrn") %}<tr><td>Patient ID:</td><td>{{ val("mrn") }}</td></tr>{% endif %}
+    </table>
+  </div>
+  <div>
+    <h4>Specimen Details</h4>
+    <table>
+      {% if val("collection_date") %}<tr><td>Date collected:</td><td>{{ val("collection_date") }}</td></tr>{% endif %}
+      {% if val("received_date") %}<tr><td>Date received:</td><td>{{ val("received_date") }}</td></tr>{% endif %}
+      <tr><td>Date entered:</td><td>{{ date("received_date", 1) }}</td></tr>
+      <tr><td>Date reported:</td><td>{{ val("report_date") }}</td></tr>
+    </table>
+  </div>
+  <div>
+    <h4>Physician Details</h4>
+    <table>
+      <tr><td>Ordering:</td><td>{{ clinician | upper }}</td></tr>
+      <tr><td>Referring:</td><td></td></tr>
+      <tr><td>ID:</td><td>{{ digits(6) }}</td></tr>
+      <tr><td>NPI:</td><td>00{{ digits(8) }}</td></tr>
+    </table>
+  </div>
+</div>
+<div class="below">
+  <div><span class="lbl">Ethnicity:</span> Not Provided</div>
+  {% if val("specimen_type") %}<div><span class="lbl">Specimen Type:</span> {{ val("specimen_type") }}</div>{% endif %}
+  <div><span class="lbl">Lab ID:</span> {{ digits(2) }}</div>
+  <div class="full"><span class="lbl">Indication:</span> {{ val("clinical_indication") }}</div>
+  <div class="full">{{ lilac.history() }}</div>
+</div>
+<table class="results">
+  <thead><tr><th>DISORDER <i>(GENE)</i></th><th>RESULTS</th><th>INTERPRETATION</th></tr></thead>
+  {% for v in variants %}
+  <tr><td>{{ v.associated_phenotype }} <i>({{ v.gene_symbol }})</i><span class="tiny">{{ v.transcript }}</span></td>
+      <td>{{ val("overall_result_raw") }}. {{ v.zygosity_raw }} for a {{ v.classification_raw }} variant, {{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %}.</td>
+      <td>{{ lilac.interpretation(v) }} See Additional Clinical Information.</td></tr>
+  {% else %}
+  <tr><td>{{ focus.condition }} <i>({{ focus.gene }})</i><span class="tiny">{{ focus.transcript }}</span></td>
+      <td>{{ val("overall_result_raw") }}</td>
+      <td>{{ lilac.negative_interpretation() }}</td></tr>
+  {% endfor %}
+</table>
+<p>Our genetic counselors can discuss this result. To reach one, visit {{ details.web }} or call {{ details.toll_free }}.</p>
+<h3>ADDITIONAL CLINICAL INFORMATION</h3>
+<p><b>{{ variants[0].associated_phenotype if variants else focus.condition }}:</b> {{ prose.condition.characteristics }} {{ prose.condition.cause }} {{ prose.condition.inheritance }}</p>
+<h3>COMMENTS</h3>
+<p>{{ prose.summary }} {{ prose.interpretation | join(" ") }}</p>
+<p>{{ prose.recommendations | join(" ") }}</p>
+<h3>METHOD/LIMITATIONS</h3>
+{{ lilac.methods() }}
+{% endblock %}

@@ -1,0 +1,50 @@
+/* Bronze Clinical Genomics: the masthead, blocks, variant grid and
+   statement that its four templates share. */
+@page {
+  margin: 0.55in 0.6in 0.75in;
+  @top-left { content: ""; border-bottom: 1px solid #222; }
+  @top-center { content: ""; border-bottom: 1px solid #222; }
+  @top-right {
+    content: counter(page) " / " counter(pages);
+    border-bottom: 1px solid #222; vertical-align: bottom; text-align: right;
+    padding-bottom: 2pt; font: 6.5pt Arial, Helvetica, sans-serif;
+  }
+  @bottom-center { text-align: left; font: italic 6pt Arial, Helvetica, sans-serif; border-top: 1px solid #222; }
+}
+body { font: 8.8pt "Arial Narrow", "Helvetica Neue", Arial, sans-serif; line-height: 1.35; }
+.mast { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18pt; }
+.mast .name { font: bold 12pt Arial, Helvetica, sans-serif; color: #44697d; }
+.mast .dashes { display: flex; gap: 3pt; margin-top: 4pt; }
+.mast .dashes span { width: 11pt; height: 3pt; background: #44697d; }
+.mast .dashes span:nth-child(3n+2) { background: #c95a73; }
+.mast .dashes span:nth-child(3n) { background: #8fa7b3; }
+.mast .note { width: 2.6in; font-style: italic; font-size: 6.8pt; color: #44697d; }
+.titlebar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10pt; }
+h1 { font: 17pt Arial, Helvetica, sans-serif; margin: 0; }
+.badge { padding: 4pt 16pt; font: bold 12pt Arial, Helvetica, sans-serif; color: #fff; background: #5f7a88; }
+.badge.neg { color: #5f7a88; background: #fff; border: 2px solid #5f7a88; }
+.block { border-bottom: 1px solid #ccc; padding: 6pt 0 10pt; margin-bottom: 6pt; }
+.block-title { color: #44697d; font-size: 10pt; margin: 4pt 0 6pt; }
+.fields { display: flex; flex-wrap: wrap; row-gap: 8pt; }
+.fields > div { width: 20%; padding-right: 6pt; }
+.fields > div.wide { width: 30%; }
+.lbl { font-weight: bold; font-size: 7.3pt; display: block; }
+.big { font-weight: bold; font-size: 9.5pt; margin: 6pt 0 2pt; }
+.sub-label { font-weight: bold; margin: 6pt 0 2pt; }
+.grid-title { font-weight: bold; font-size: 8.5pt; margin: 12pt 0 4pt; }
+.vgrid { width: 100%; margin: 4pt 0 10pt; border-top: 1px solid #ccc; }
+.vgrid td { vertical-align: top; padding: 3pt 4pt 6pt 0; }
+.vgrid .gene { color: #2546a8; font-weight: bold; }
+table.metrics { width: 100%; margin: 4pt 0 8pt; }
+table.metrics th { font-size: 7.3pt; text-align: left; vertical-align: bottom; padding: 2pt 4pt 2pt 0; }
+table.metrics td { padding: 2pt 4pt 2pt 0; }
+.genes { font-style: italic; }
+.statement h3 { font-size: 8.5pt; margin: 12pt 0 4pt; }
+.steps { width: 100%; margin: 12pt 0; }
+.steps th, .steps td { text-align: left; padding: 5pt 0; border-bottom: 1px solid #ccc; }
+.steps th { font-size: 7.3pt; }
+.sign { margin-top: 24pt; display: flex; gap: 40pt; }
+.sign .script { font: italic 15pt Georgia, "Times New Roman", serif; margin-bottom: 6pt; }
+.appendix h2 { color: #44697d; font-size: 10pt; font-weight: normal; margin: 0 0 6pt; }
+.glossary td { padding: 2pt 8pt 2pt 0; vertical-align: top; }
+.blue-note { color: #2546a8; }

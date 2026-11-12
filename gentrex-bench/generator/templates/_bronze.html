@@ -1,0 +1,123 @@
+{# Bronze's shared pieces. Import with context. #}
+{% import "_common.html" as c with context %}
+
+{% macro masthead(badge=False) %}
+<div class="mast">
+  <div><div class="name">{{ lab.name }}</div><div class="dashes">{% for _ in range(9) %}<span></span>{% endfor %}</div></div>
+  <div class="note">Methods may vary by region. The client portal holds the full, current description of the methods used for this report. Our accreditations and certifications are listed at {{ details.web }}.</div>
+</div>
+<div class="titlebar">
+  <h1>{{ val("test_name") }}</h1>
+  {% if badge %}<div class="badge{% if val('overall_result_raw') == 'NEGATIVE' %} neg{% endif %}">{{ val("overall_result_raw") }}</div>{% endif %}
+</div>
+<div class="block">
+  <div class="block-title">REFERRING HEALTHCARE PROFESSIONAL</div>
+  <div class="fields">
+    <div class="wide"><span class="lbl">NAME</span>{{ clinician }}</div>
+    <div class="wide"><span class="lbl">HOSPITAL</span>{{ clinic }}</div>
+  </div>
+</div>
+{% endmacro %}
+
+{% macro patient_block(title="PATIENT") %}
+<div class="block">
+  <div class="block-title">{{ title }}</div>
+  <div class="fields">
+    <div><span class="lbl">NAME</span>{{ patient.name }}</div>
+    <div><span class="lbl">DOB</span>{{ val("date_of_birth") }}</div>
+    <div><span class="lbl">AGE</span>{{ patient.age_years }}</div>
+    <div><span class="lbl">GENDER</span>{{ val("sex") }}</div>
+    <div><span class="lbl">ORDER ID</span>{{ val("lab_accession_number") }}</div>
+    {% if val("specimen_type") %}<div><span class="lbl">PRIMARY SAMPLE TYPE</span>{{ val("specimen_type") }}</div>{% endif %}
+    {% if val("collection_date") %}<div><span class="lbl">SAMPLE COLLECTION DATE</span>{{ val("collection_date") }}</div>{% endif %}
+    <div><span class="lbl">CUSTOMER SAMPLE ID</span></div>
+    {% for label, value in other_ids %}<div><span class="lbl">{{ label | upper }}</span>{{ value }}</div>{% endfor %}
+  </div>
+</div>
+{% endmacro %}
+
+{# One variant as the borderless grid of three rows. #}
+{% macro grid(v) %}
+<table class="vgrid keep{% if v.split %} split{% endif %}">
+{% if v.dna_change_raw %}
+  {% set level = v.zygosity_raw.split("(")[-1].rstrip("%)") %}
+  <tr><td><span class="lbl">GENE</span><span class="gene"><i>{{ v.gene_symbol }}</i></span></td><td><span class="lbl">POS</span>{{ v.chromosomal_position }}</td><td><span class="lbl">AF</span>{{ "%.3f" | format(level | int / 100) }}</td><td><span class="lbl">LEVEL</span>{{ level }}%</td><td><span class="lbl">GENOTYPE</span>{{ v.zygosity_raw }}</td><td><span class="lbl">TRANSCRIPT</span>{{ v.transcript }}</td><td><span class="lbl">NOMENCLATURE</span>{{ v.dna_change_raw }}</td><td><span class="lbl">CLASSIFICATION</span>{{ v.classification_raw }}</td></tr>
+  <tr><td colspan="3">{% if v.variant_type_raw %}<span class="lbl">CONSEQUENCE</span>{{ v.variant_type_raw }}{% endif %}</td><td colspan="3"><span class="lbl">PHENOTYPE</span>{{ v.associated_phenotype }}</td><td colspan="2"><span class="lbl">INHERITANCE</span>{{ v.mode_of_inheritance_raw }}</td></tr>
+{% else %}
+  <tr><td><span class="lbl">GENE</span><span class="gene"><i>{{ v.gene_symbol }}</i></span></td><td><span class="lbl">TRANSCRIPT</span>{{ v.transcript }}</td><td colspan="2"><span class="lbl">NOMENCLATURE</span>{{ v.hgvs_c }}{% if v.hgvs_p %}, {{ v.hgvs_p }}{% endif %}</td><td><span class="lbl">GENOTYPE</span>{{ v.zygosity_raw }}</td><td><span class="lbl">CONSEQUENCE</span>{{ v.variant_type_raw }}</td><td><span class="lbl">INHERITANCE</span>{{ v.mode_of_inheritance_raw }}</td><td><span class="lbl">CLASSIFICATION</span>{{ v.classification_raw }}</td></tr>
+  <tr><td><span class="lbl">ID</span>N/A</td><td><span class="lbl">ASSEMBLY</span>GRCh38</td><td colspan="2"><span class="lbl">POS</span>{{ v.chromosomal_position }}</td><td colspan="4"></td></tr>
+  <tr><td><span class="lbl">gnomAD AC/AN</span>N/A</td><td><span class="lbl">POLYPHEN</span>N/A</td><td><span class="lbl">SIFT</span>N/A</td><td><span class="lbl">MUTTASTER</span>N/A</td><td colspan="4"><span class="lbl">PHENOTYPE</span>{{ v.associated_phenotype }}</td></tr>
+{% endif %}
+</table>
+{% endmacro %}
+
+{% macro metrics(sample=False) %}
+<div class="grid-title">SEQUENCING PERFORMANCE METRICS</div>
+<table class="metrics">
+{% if sample %}
+  <tr><th>SAMPLE</th><th>MEDIAN COVERAGE</th><th>PERCENT &ge; 20X</th></tr>
+  <tr><td>Index</td><td>1{{ digits(2) }}</td><td>99.{{ digits(2) }}</td></tr>
+{% else %}
+  <tr><th>PANEL</th><th>GENES</th><th>EXONS / REGIONS</th><th>BASES</th><th>BASES &gt; 20X</th><th>MEDIAN COVERAGE</th><th>PERCENT &gt; 20X</th></tr>
+  <tr><td>{{ val("test_name") }}</td><td>{{ gene_count or 37 }}</td><td>{{ (gene_count or 3) * 11 + digits(1) | int }}</td><td>{{ (gene_count or 3) * 3011 + digits(3) | int }}</td><td>{{ (gene_count or 3) * 3009 }}</td><td>1{{ digits(2) }}</td><td>99.{{ digits(2) }}</td></tr>
+{% endif %}
+</table>
+{% endmacro %}
+
+{% macro gene_list() %}
+<div class="grid-title">TARGET REGION AND GENE LIST</div>
+{% if genes %}
+<p>Version {{ digits(1) | int + 1 }} of the {{ lab.name }} {{ val("test_name") }} covers sequencing and copy number analysis of these genes: <span class="genes">{{ genes[:-1] | join(", ") }}</span> and <span class="genes">{{ genes[-1] }}</span>.</p>
+{% else %}
+<p>The genes that the {{ lab.name }} {{ val("test_name") }} sequences and checks for copy number changes are listed in the client portal at {{ details.web }}.</p>
+{% endif %}
+{% endmacro %}
+
+{% macro clinical_report(v) %}
+<p><b><i>{{ v.gene_symbol }}</i> {{ v.change }}{% if v.hgvs_p %}, {{ v.hgvs_p }}{% endif %}</b></p>
+<p>{{ prose.variant_details[variants.index(v)] }}</p>
+{% for cited in literature if v is sameas variants[0] %}
+<p>Other variants in <i>{{ cited.gene }}</i>, such as {{ cited.text }}, have been reported in unrelated individuals with {{ v.associated_phenotype }} in the medical literature. That variant was not found in this patient.</p>
+{% endfor %}
+{% endmacro %}
+
+{% macro history() %}
+<h3>CLINICAL HISTORY</h3>
+<p>Reason for referral: {{ val("clinical_indication") }}.</p>
+<p>Patient is a {{ patient.age_years }}-year-old {{ val("sex") | lower if val("sex") in ("Male", "Female") else "individual" }}.{% if features %} Reported features: {{ c.feature_list() }}.{% endif %} {{ family_history or "" }}</p>
+{% endmacro %}
+
+{% macro steps() %}
+<table class="steps">
+  <tr><th>STEP</th><th>DATE</th></tr>
+  <tr><td>Order date</td><td>{{ date("collection_date", -2) }}</td></tr>
+  {% if val("received_date") %}<tr><td>Sample received</td><td>{{ val("received_date") }}</td></tr>{% endif %}
+  {% if val("test_started_date") %}<tr><td>Sample in analysis</td><td>{{ val("test_started_date") }}</td></tr>{% endif %}
+  <tr><td>Reported</td><td>{{ val("report_date") }}</td></tr>
+</table>
+<p class="small"><i>(Our geneticists and physicians reviewed the sequencing results together and wrote this statement.)</i></p>
+{% endmacro %}
+
+{% macro signatures(n=1) %}
+<div class="sign">
+{% for name in signers[:n] %}
+  <div><div class="script">{{ name.split(",")[0] }}</div><div>{{ name }}</div><div>{{ "Laboratory Director" if loop.first else "Clinical Geneticist" }}</div></div>
+{% endfor %}
+</div>
+{% endmacro %}
+
+{% macro appendix() %}
+<div class="appendix page-break">
+  <h2>APPENDIX 5: SUMMARY OF THE TEST</h2>
+  <p><b>Laboratory process.</b> {% if kind == "exome" %}Exome sequencing is performed on genomic DNA with a hybridization capture kit that targets the coding exons of nearly all human genes and selected non-coding regions.{% elif kind == "mito" %}The whole mitochondrial genome is amplified in two overlapping long-range fragments and sequenced to a median depth above 1000x, so that heteroplasmy down to 5% is detected.{% else %}The coding exons and 20 base pairs of flanking intronic sequence of the genes of the panel are captured and sequenced, together with selected non-coding variants that are known to cause disease.{% endif %} Sequencing is performed on a massively parallel sequencing platform.</p>
+  <p><b>Bioinformatics and quality control.</b> Reads are aligned to the GRCh38 reference sequence. A validated pipeline calls single nucleotide variants and small indels, and read depth is used to detect copy number variants. Any variant below the quality thresholds is confirmed by Sanger sequencing. {{ hgvs_example or "" }}</p>
+  <p><b>Interpretation.</b> Variants are classified with the ACMG/AMP guidelines into five classes. Benign and likely benign variants are not reported. The classification relies on population data, the literature, computational predictions and the clinical information provided.</p>
+  <p><b>Limitations.</b> The test does not detect low-level mosaicism, balanced rearrangements, repeat expansions, or variants in regions of the genome that are not covered with sufficient quality. A negative result does not exclude a genetic cause of the patient's condition.</p>
+  <h2 style="margin-top: 14pt">GLOSSARY</h2>
+  <table class="glossary">
+    <tr><td>HET</td><td>heterozygous</td></tr><tr><td>HOM</td><td>homozygous</td></tr><tr><td>HEM</td><td>hemizygous</td></tr>
+    <tr><td>AD</td><td>autosomal dominant</td></tr><tr><td>AR</td><td>autosomal recessive</td></tr><tr><td>XL</td><td>X-linked</td></tr>
+    <tr><td>VUS</td><td>variant of uncertain significance</td></tr><tr><td>CNV</td><td>copy number variation</td></tr>
+  </table>
+</div>
+{% endmacro %}

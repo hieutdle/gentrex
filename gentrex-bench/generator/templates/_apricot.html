@@ -1,0 +1,26 @@
+{# Apricot's shared pieces. Import with context. #}
+{% import "_common.html" as c with context %}
+
+{# The interpretive paragraph of a targeted or single-gene result. #}
+{% macro finding() %}
+{% for v in variants %}
+<p>{{ v.zygosity_raw | upper }}: The {{ v.classification_raw }} <i>{{ v.gene_symbol }}</i> variant {{ v.change }}{% if v.hgvs_p %}; {{ v.hgvs_p }}{% endif %} was found in one {{ "copy" if v.zygosity_raw | lower == "heterozygous" else "or two copies" }} of the gene. This finding is associated with {{ v.associated_phenotype }}. {{ prose.summary }}</p>
+{% else %}
+<p>NEGATIVE: {% if tested %}The <i>{{ tested.gene }}</i> {{ tested.text }} variant was not detected.{% else %}No pathogenic variant was detected in the <i>{{ focus.gene }}</i> gene.{% endif %} {{ prose.summary }}</p>
+{% endfor %}
+{% endmacro %}
+
+{# The background sections, with the truth's inheritance and transcript. #}
+{% macro background(label_class="") %}
+<p><b class="{{ label_class }}">CHARACTERISTICS:</b> {{ prose.condition.characteristics }}</p>
+<p><b class="{{ label_class }}">INCIDENCE:</b> {{ prose.condition.incidence }}</p>
+<p><b class="{{ label_class }}">INHERITANCE:</b> {% for v in variants %}{{ v.mode_of_inheritance_raw }}. {% endfor %}{{ prose.condition.inheritance }}</p>
+<p><b class="{{ label_class }}">PENETRANCE:</b> {{ prose.condition.penetrance }}</p>
+<p><b class="{{ label_class }}">CAUSE:</b> {{ prose.condition.cause }}</p>
+<p><b class="{{ label_class }}">CLINICAL SENSITIVITY:</b> Depends on the condition and the population tested.</p>
+<p><b class="{{ label_class }}">METHODOLOGY:</b> {% if kind == "targeted" %}Real-time PCR genotyping of the targeted variant with fluorescent probes.{% else %}Bidirectional sequencing of the coding regions and intron-exon boundaries of the gene, and multiplex ligation-dependent probe amplification for large deletions and duplications.{% endif %}{% for v in variants %} Reference sequence: {{ v.transcript }}.{% endfor %} {{ hgvs_example or "" }}</p>
+<p><b class="{{ label_class }}">ANALYTICAL SENSITIVITY AND SPECIFICITY:</b> 99 percent.</p>
+<p><b class="{{ label_class }}">LIMITATIONS:</b> In rare cases, an uncommon sequence variant can interfere with the assay and cause an incorrect result. {% if kind == "targeted" %}The assay detects only the targeted variant, not other variants in the gene.{% else %}Deep intronic variants and regulatory region variants will not be detected.{% endif %}</p>
+<p>This test was developed and its performance characteristics determined by {{ lab.name }}. It has not been cleared or approved by the US Food and Drug Administration.</p>
+{% for text in prose.recommendations %}<p>{{ text }}</p>{% endfor %}
+{% endmacro %}

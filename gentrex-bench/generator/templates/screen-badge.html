@@ -1,0 +1,48 @@
+{# Bronze's carrier screen (public samples SR007, SR008): the result as a
+   badge next to the title, carrier findings as sentences under two
+   subheads, the gene list, a statement page, and the findings in grids on
+   a later page. #}
+{% extends "base.html" %}
+{% import "_bronze.html" as bronze with context %}
+{% import "_common.html" as c with context %}
+{% block footer %}{{ content(lab.name ~ ", " ~ details.address ~ ". CLIA ID Number " ~ details.clia ~ "\n") }}{% endblock %}
+{% block report %}
+{{ bronze.masthead(badge=True) }}
+{{ bronze.patient_block("INDIVIDUAL") }}
+<div class="block-title">SUMMARY OF RESULTS</div>
+<div class="sub-label">REPRODUCTIVE AND/OR PERSONAL RISKS</div>
+<p>No pathogenic or likely pathogenic variants were found that affect the individual's own disease risk or relate to X-linked conditions.</p>
+<div class="sub-label">CARRIERSHIP(S) OF AUTOSOMAL RECESSIVE DISEASE(S)</div>
+{% for v in variants %}
+<p>One copy of <i>{{ v.gene_symbol }}</i> {{ v.change }}{% if v.hgvs_p %}, {{ v.hgvs_p }}{% endif %} was found in this individual, and the variant is classified as {{ c.sentence_class[v.classification] }}.</p>
+{% else %}
+<p>No pathogenic or likely pathogenic variants were found in the genes analyzed.</p>
+{% endfor %}
+{% if variants %}<p>The findings are described in more detail under CARRIERSHIP(S) OF AUTOSOMAL RECESSIVE DISEASE(S) below.</p>{% endif %}
+{{ bronze.metrics() }}
+{{ bronze.gene_list() }}
+
+<div class="statement page-break">
+  <div class="block-title">STATEMENT</div>
+  <h3>TEST INDICATION</h3>
+  <p>{{ val("clinical_indication") }}. {{ family_history or "" }}</p>
+  <h3>CLINICAL REPORT</h3>
+  <p>{{ prose.summary }}</p>
+  {% for text in prose.interpretation %}<p>{{ text }}</p>{% endfor %}
+  {% for text in prose.recommendations %}<p>{{ text }}</p>{% endfor %}
+  {{ bronze.steps() }}
+  {{ bronze.signatures(1) }}
+</div>
+
+{% if variants %}
+<div class="page-break">
+  <div class="block-title">CARRIERSHIP(S) OF AUTOSOMAL RECESSIVE DISEASE(S)</div>
+  {% for v in variants %}{{ bronze.grid(v) }}{% endfor %}
+  <div class="block-title" style="margin-top: 14pt">DETAILS ABOUT THESE FINDINGS</div>
+  {% for v in variants %}{{ bronze.clinical_report(v) }}{% endfor %}
+  <p>{{ prose.condition.characteristics }}</p>
+  <p>{{ prose.condition.inheritance }}</p>
+</div>
+{% endif %}
+{{ bronze.appendix() }}
+{% endblock %}

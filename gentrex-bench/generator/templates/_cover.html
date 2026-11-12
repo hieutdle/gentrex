@@ -1,0 +1,24 @@
+{# Two pages before the report, for the late_page_evidence tag: a cover sheet
+   and a page about the report, so that the variants and the features are on
+   page 3 or later. #}
+<section class="inserted">
+  <div class="lab">{{ lab.name }}</div>
+  <div class="small">{{ details.address }} | Phone {{ details.phone }} | Fax {{ details.fax }}</div>
+  <h1 style="margin-top: 0.6in">Confidential Report Delivery</h1>
+  <table>
+    <tr><th>To</th><td>{{ clinician }}<br>{{ clinic }}<br>{{ clinic_address[0] }}, {{ clinic_address[1] }}</td></tr>
+    <tr><th>From</th><td>{{ lab.name }}, Client Services</td></tr>
+    <tr><th>Patient</th><td>{{ patient.name }}</td></tr>
+    <tr><th>Accession</th><td>{{ val("lab_accession_number") }}</td></tr>
+    <tr><th>Result</th><td>{{ val("overall_result_raw") }}</td></tr>
+  </table>
+  <p>The pages that follow contain confidential health information about the patient named above. They are meant only for the clinician named above. If you received them in error, please call {{ details.phone }} and destroy every copy.</p>
+  <p>Questions about this report can be sent to our genetic counselors at {{ details.toll_free }}. A copy of the report is also available in the client portal at {{ details.web }}.</p>
+</section>
+<section class="inserted page-break">
+  <h1>About This Report</h1>
+  <p>The report that follows begins with the patient and specimen details and the overall result. The results section lists each reportable variant with its classification. The interpretation explains what the result means for the patient and for relatives, and the recommendations suggest next steps.</p>
+  <p>Each variant is assigned to one of the five ACMG classes: pathogenic, likely pathogenic, uncertain significance, likely benign or benign. The report leaves out likely benign and benign variants.</p>
+  <p>Clinical decisions should not be based on a variant of uncertain significance. The laboratory reviews such variants as new evidence appears and issues an amended report when a classification changes.</p>
+  <p>The methods and limitations at the end of the report explain what the test can and cannot detect. A genetic cause of the patient's condition remains possible after a negative result.</p>
+</section>

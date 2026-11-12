@@ -1,0 +1,142 @@
+{# Lilac's two-page report (public samples LAB03-LAB05, LAB08): header
+   fields in three columns, the dates in a pale blue band, a summary with a
+   colored marker, one results table, and on page 2 the performing labs and a
+   closing block that repeats the patient's details. FMR1 repeat sizes and
+   SMN1 and SMN2 copy numbers print in the result column, as in LAB05 and
+   LAB08. #}
+{% extends "base.html" %}
+{% import "_lilac.html" as lilac with context %}
+{% import "_common.html" as c with context %}
+{% block style %}
+@page {
+  margin: 0.45in 0.5in 0.95in;
+  @top-left { content: {{ content(patient.listed | upper ~ "     DOB: " ~ val("date_of_birth") ~ "     Patient ID: " ~ (val("mrn") or "")) }}; white-space: pre; vertical-align: bottom; padding-bottom: 4pt; font: 7.5pt Calibri, Carlito, Arial, sans-serif; }
+  @bottom-center { text-align: left; font-size: 6.5pt; }
+}
+@page :first { @top-left { content: none; } }
+body { font-size: 8pt; }
+.hdr { display: flex; gap: 12pt; align-items: flex-start; }
+.hdr > div { flex: 1; }
+.hdr b { font-weight: bold; }
+.hdr .lilac-logo { flex: 0 0 1.6in; text-align: right; }
+.pname { font-size: 10pt; font-weight: bold; margin-bottom: 4pt; }
+.band { display: flex; justify-content: space-between; background: #dfeaf5; border-top: 1px solid #000; border-bottom: 1px solid #000; padding: 4pt 6pt; margin: 8pt 0 4pt; }
+.lines div { margin: 1pt 0; }
+h1 { font-size: 13pt; margin: 10pt 0 2pt; }
+.summary { font-size: 10pt; font-weight: bold; margin-bottom: 8pt; }
+.dot { display: inline-block; width: 8pt; height: 8pt; border-radius: 50%; background: #2f6db5; margin: 0 3pt 0 6pt; }
+.dot.pos { border-radius: 0; background: #c0262d; }
+table.results { width: 100%; margin: 3pt 0 8pt; }
+table.results th { background: #e8e8e8; text-align: left; padding: 3pt 4pt; font-size: 7.5pt; }
+table.results td { padding: 4pt; vertical-align: top; border-bottom: 1px solid #bbb; }
+table.results td:first-child { width: 24%; }
+table.results td:nth-child(2) { width: 36%; }
+.caption { font-weight: bold; font-size: 8.5pt; margin-top: 6pt; }
+.closing { display: flex; gap: 14pt; border-top: 1px solid #000; padding-top: 6pt; margin-top: 14pt; }
+.closing > div { flex: 1; }
+.closing h4 { margin: 0 0 3pt; font-size: 8.5pt; }
+.labs { width: 100%; margin: 6pt 0; }
+.labs th, .labs td { text-align: left; padding: 3pt 4pt; border-bottom: 1px solid #bbb; }
+{% endblock %}
+{% block footer %}{{ content("Electronically released by " ~ signers[0] ~ "                 Date Created and Stored " ~ date("report_date") ~ "                 Final Report  Page ", page, " of ", pages, "\n" ~ "Confidential health information: state and federal privacy laws protect the contents of this report. " ~ lab.name ~ ", " ~ details.address ~ ".\n") }}{% endblock %}
+{% block report %}
+<div class="hdr">
+  <div class="lines">
+    <div class="pname">{{ patient.listed | upper }}</div>
+    {% if val("mrn") %}<div>Patient ID: <b>{{ val("mrn") }}</b></div>{% endif %}
+    <div>Specimen ID: <b>{{ val("lab_accession_number") }}</b></div>
+    {% for label, value in other_ids %}<div>{{ label }}: <b>{{ value }}</b></div>{% endfor %}
+  </div>
+  <div class="lines">
+    <div>DOB: <b>{{ val("date_of_birth") }}</b></div>
+    <div>Age: <b>{{ patient.age_years }}</b></div>
+    <div>Sex: <b>{{ val("sex") }}</b></div>
+  </div>
+  <div class="lines">
+    <div>Account Number: <b>{{ digits(8) }}</b></div>
+    <div>Ordering Physician: <b>{{ clinician.split(",")[0] | upper }}</b></div>
+  </div>
+  <div class="lilac-logo">{{ lab.name }}</div>
+</div>
+<div class="band">
+  {% if val("collection_date") %}<span>Date Collected: <b>{{ val("collection_date") }}</b></span>{% endif %}
+  {% if val("received_date") %}<span>Date Received: <b>{{ val("received_date") }}</b></span>{% endif %}
+  <span>Date Reported: <b>{{ val("report_date") }}</b></span>
+  <span>Date Entered: <b>{{ date("received_date", 1) }}</b></span>
+</div>
+<div class="lines">
+  {% if val("specimen_type") %}<div>Specimen Type: <b>{{ val("specimen_type") }}</b>&emsp;&emsp;Ethnicity: <b>Not Provided</b></div>{% endif %}
+  <div>Indication: <b>{{ val("clinical_indication") }}</b></div>
+  {{ lilac.history() }}
+</div>
+<h1>{{ val("test_name") }}</h1>
+<div class="summary">Summary:<span class="dot{% if variants %} pos{% endif %}"></span>{{ val("overall_result_raw") }}</div>
+<div class="caption">{{ "Variants Detected" if variants else "Negative Results" }}</div>
+<table class="results">
+  <thead><tr><th>Disorder (Gene)</th><th>Result</th><th>Interpretation</th></tr></thead>
+  {% for v in variants %}
+  <tr><td>{{ v.associated_phenotype }} (<i>{{ v.gene_symbol }}</i>)<br>{{ v.transcript }}</td>
+  {% if kind == "repeat" %}
+      <td>{{ val("overall_result_raw") }}<br>PCR: {{ v.dna_change_raw }}<br>{{ v.classification_raw }}<br>AGG interruption(s): {{ finding.agg }}</td>
+      <td>{{ "Premutation carrier of" if scenario == "carrier" else "Consistent with a diagnosis of" }} {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner. {% if scenario == "carrier" %}The chance that the premutation expands to a full mutation in a child depends on its repeat size.{% endif %}</td></tr>
+  {% elif kind == "sma" %}
+      <td>{{ val("overall_result_raw") }}<br><i>SMN1</i> copy number: {{ v.copy_number }}{% for line in copy_number_lines %}<br>{{ line }}{% endfor %}</td>
+      <td>{{ "Predicted to be a carrier of" if scenario == "carrier" else "Consistent with a diagnosis of" }} {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner. More copies of SMN2 generally mean milder disease.</td></tr>
+  {% else %}
+      <td>{{ v.zygosity_raw }} for {{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %}, {{ v.classification_raw }}, {{ v.chromosomal_position }}.</td>
+      <td>{{ lilac.interpretation(v) }}{% if kind == "carrier" %}<br><b>Risk:</b> AT INCREASED RISK FOR AN AFFECTED PREGNANCY IF THE PARTNER IS ALSO A CARRIER.{% endif %}</td></tr>
+  {% endif %}
+  {% else %}
+  <tr><td>{{ focus.condition }} (<i>{{ focus.gene }}</i>)<br>{{ focus.transcript }}</td>
+      <td>NEGATIVE{% if normal_repeats %}<br>PCR: {{ normal_repeats }}{% endif %}{% for line in copy_number_lines %}<br>{{ line }}{% endfor %}</td>
+      <td>{{ lilac.negative_interpretation() }}{% if kind == "carrier" %}<br><b>Risk:</b> NOT at an increased risk for an affected pregnancy.{% endif %}</td></tr>
+  {% endfor %}
+</table>
+<h3>Recommendations</h3>
+<p>{{ prose.recommendations | join(" ") }}</p>
+<h3>Additional Clinical Information</h3>
+<p>{{ prose.condition.characteristics }} {{ prose.condition.cause }}</p>
+<h3>Comments</h3>
+<p>{{ prose.summary }} {{ prose.interpretation | join(" ") }}</p>
+<h3>Methods/Limitations</h3>
+{% if kind == "repeat" %}
+<p><span class="runin">Fragile X syndrome:</span> The CGG repeat length of each FMR1 allele is measured by PCR. Alleles of 5 to 200 repeats are sized, and longer alleles are reported as &gt;200. Repeat sizes are interpreted as normal (below 45), intermediate (45-54), premutation (55-200) or full mutation (above 200). {{ hgvs_example or "" }}</p>
+{% elif kind == "sma" %}
+<p><span class="runin">Spinal muscular atrophy:</span> Quantitative PCR measures SMN1 exon 7 copy number against internal reference genes, and digital droplet PCR measures SMN2 copy number. Roughly 94% of people with the disease have no copy of SMN1, and people with one copy are predicted carriers. {{ hgvs_example or "" }}</p>
+{% else %}
+{{ lilac.methods() }}
+{% endif %}
+<h3>References</h3>
+<p>Richards S, et al. Standards and guidelines for the interpretation of sequence variants: a joint consensus recommendation of the American College of Medical Genetics and Genomics and the Association for Molecular Pathology. Genet Med. 2015;17(5):405-424.</p>
+<div class="page-break">
+<h3>Performing Labs</h3>
+<table class="labs">
+  <tr><th>Component Type</th><th>Performed at</th><th>Laboratory Director</th></tr>
+  <tr><td>Sequencing</td><td>{{ lab.name }}, {{ details.address }}</td><td>{{ details.directors[0] }}</td></tr>
+  <tr><td>Interpretation</td><td>{{ lab.name }}, {{ details.address }}</td><td>{{ details.directors[1] }}</td></tr>
+</table>
+<div class="closing">
+  <div class="lines">
+    <h4>Patient Details</h4>
+    <div>{{ patient.listed | upper }}</div>
+    <div>DOB: {{ val("date_of_birth") }}</div>
+    <div>Sex: {{ val("sex") }}</div>
+    {% if val("mrn") %}<div>Patient ID: {{ val("mrn") }}</div>{% endif %}
+    {% if val("submitter_patient_id") %}<div>Alternate Patient ID: {{ val("submitter_patient_id") }}</div>{% endif %}
+  </div>
+  <div class="lines">
+    <h4>Physician Details</h4>
+    <div>{{ clinician }}</div>
+    <div>{{ clinic }}</div>
+    <div>{{ clinic_address[0] }}, {{ clinic_address[1] }}</div>
+  </div>
+  <div class="lines">
+    <h4>Specimen Details</h4>
+    <div>Specimen ID: {{ val("lab_accession_number") }}</div>
+    {% if val("collection_date") %}<div>Date Collected: {{ val("collection_date") }}</div>{% endif %}
+    {% if val("received_date") %}<div>Date Received: {{ val("received_date") }}</div>{% endif %}
+    <div>Date Reported: {{ val("report_date") }}</div>
+  </div>
+</div>
+</div>
+{% endblock %}

@@ -1,0 +1,168 @@
+{# Aqua's multigene panel report (public samples AMB01, AMB02, AMB10-AMB12,
+   SR002, SR003): a boxed header, gray section bars for RESULTS, SUMMARY and
+   INTERPRETATION, a gene list, gene details, assay information and a
+   leaflet for the patient. No report date and no signature. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% set word = {"pathogenic": "pathogenic mutation", "likely_pathogenic": "likely pathogenic variant", "uncertain_significance": "variant of unknown significance (VUS)"} %}
+{% block style %}
+@page {
+  margin: 0.5in 0.5in 0.85in;
+  @top-right {
+    content: {{ content("Patient Legal Name: " ~ patient.listed ~ "\n" ~ "MRN #: " ~ (val("mrn") or "N/A") ~ "      Accession #: " ~ val("lab_accession_number")) }};
+    white-space: pre-wrap; text-align: right; vertical-align: bottom; padding-bottom: 8pt;
+    font: 7.5pt Helvetica, Arial, sans-serif;
+  }
+  @bottom-center { font: bold 7pt Helvetica, Arial, sans-serif; text-align: center; border-top: 1.5px solid #000; }
+}
+@page :first { @top-right { content: none; } }
+body { font: 8.5pt Helvetica, Arial, sans-serif; line-height: 1.3; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8pt; }
+.hdr { width: 100%; border-top: 1.5px solid #000; border-bottom: 1.5px solid #000; margin-bottom: 10pt; }
+.hdr > tbody > tr > td { vertical-align: top; padding: 4pt 0; }
+.hdr .ordered { width: 34%; border-right: 1px solid #000; padding-right: 8pt; }
+.hdr .patient { padding-left: 8pt; }
+.kv th { font-weight: normal; text-align: right; white-space: nowrap; padding: 0.5pt 4pt 0.5pt 0; vertical-align: top; }
+.kv td { padding: 0.5pt 0; vertical-align: top; }
+.kv .lead th { font-weight: bold; text-align: left; }
+.cols { display: flex; gap: 10pt; }
+.cols > table { flex: 1; }
+.history { margin: -4pt 0 10pt; }
+h1.title { font: italic 13pt Helvetica, Arial, sans-serif; margin: 6pt 0 8pt; }
+h1.title b { font-weight: bold; }
+.bar { background: #c0c0c0; border: 1px solid #000; font-weight: bold; font-size: 9pt; padding: 1pt 4pt; margin: 6pt 0 4pt; }
+.results td { padding: 2pt 4pt; vertical-align: top; }
+.results .gene { width: 1.9in; font-weight: bold; font-style: italic; }
+.results .none { width: 100%; }
+.results .none td { text-align: right; padding-right: 2.2in; }
+.results .none td + td { text-align: left; padding: 2pt 4pt; }
+.summary { text-align: center; font-size: 13pt; font-weight: bold; margin: 8pt 0; }
+ul.square { list-style: square; padding-left: 14pt; margin: 4pt 0 8pt; }
+ul.square li { margin-bottom: 5pt; }
+.genes { border-top: 1px solid #999; padding-top: 6pt; margin-top: 8pt; }
+.genes b { font-style: italic; }
+h2 { font-size: 9pt; text-decoration: underline; margin: 10pt 0 3pt; }
+h2.section { text-decoration: none; font-size: 10pt; border-bottom: 1px solid #000; }
+.vbar { background: #c0c0c0; border: 1px solid #000; font-weight: bold; padding: 2pt 4pt; margin: 8pt 0 4pt; }
+.leaflet { font-size: 10.5pt; line-height: 1.45; }
+.leaflet h1 { font-size: 18pt; color: #1d5fa0; margin: 0 0 4pt; }
+.leaflet .box { border: 1.5px solid #1d5fa0; border-radius: 6pt; padding: 8pt 10pt; margin-top: 12pt; }
+{% endblock %}
+{% block footer %}{{ content("Toll Free: " ~ details.toll_free ~ "      Ph: " ~ details.phone ~ "      Fax: " ~ details.fax ~ "      " ~ details.web ~ "      " ~ details.address ~ "\n" ~ "Laboratory Director: " ~ details.directors[0] ~ "      CLIA# " ~ details.clia ~ "      Page ", page, "/", pages, "\n") }}{% endblock %}
+{% block report %}
+<div class="top">
+  <div class="logo"><span class="mark"></span><span>{{ lab.name }}<span class="sub">Clinical diagnostic testing</span></span></div>
+</div>
+<table class="hdr">
+<tr>
+  <td class="ordered">
+    <table class="kv">
+      <tr class="lead"><th>Ordered By</th><td></td></tr>
+      <tr><th>Medical Professional:</th><td>{{ clinician }}</td></tr>
+      <tr><th>Client:</th><td>{{ clinic }} ({{ digits(5) }})</td></tr>
+    </table>
+  </td>
+  <td class="patient">
+    <div class="cols">
+      <table class="kv">
+        <tr><th>Patient Legal Name:</th><td><b>{{ patient.listed }}</b></td></tr>
+        <tr><th>Accession #:</th><td><b>{{ val("lab_accession_number") }}</b></td></tr>
+        {{ c.other_id_rows() }}
+        <tr><th>Order #:</th><td>{{ digits(7) }}</td></tr>
+        <tr><th>Birthdate:</th><td>{{ val("date_of_birth") }}</td></tr>
+        {% if val("mrn") %}<tr><th>MRN #:</th><td>{{ val("mrn") }}</td></tr>{% endif %}
+        <tr><th>Indication:</th><td>{{ val("clinical_indication") }}</td></tr>
+      </table>
+      <table class="kv">
+        <tr><th>Specimen #:</th><td></td></tr>
+        {% if val("specimen_type") %}<tr><th>Specimen:</th><td>{{ val("specimen_type") }}</td></tr>{% endif %}
+        <tr><th>Sex assigned at birth:</th><td>{{ val("sex") }}</td></tr>
+        {% if val("collection_date") %}<tr><th>Collected:</th><td>{{ val("collection_date") }}</td></tr>{% endif %}
+        {% if val("received_date") %}<tr><th>Received:</th><td>{{ val("received_date") }}</td></tr>{% endif %}
+        {% if val("test_started_date") %}<tr><th>Test Started:</th><td>{{ val("test_started_date") }}</td></tr>{% endif %}
+      </table>
+    </div>
+  </td>
+</tr>
+</table>
+{% if features or family_history %}
+<p class="history"><b>Clinical History:</b> {% if features %}{{ c.feature_list() }}.{% endif %} {{ family_history or "" }}</p>
+{% endif %}
+
+{% if kind == "panel" %}
+<h1 class="title"><b>{{ val("test_name") }}:</b> Analyses of {{ gene_count }} Genes Associated with {{ area }}</h1>
+{% else %}
+<h1 class="title"><b>{{ val("test_name") }}</b></h1>
+{% endif %}
+
+<div class="bar">RESULTS</div>
+{% if variants %}
+<table class="results">
+{% for v in variants %}
+  <tr><td class="gene">{{ v.gene_symbol }}</td><td><b>{{ v.classification_raw }}:</b>&ensp;<b>{{ v.change }}</b></td></tr>
+{% endfor %}
+</table>
+{% else %}
+<table class="results none">
+  <tr><td>Pathogenic Mutation(s):</td><td>None Detected</td></tr>
+  <tr><td>Variant(s) of Unknown Significance:</td><td>None Detected</td></tr>
+  <tr><td>Gross Deletion(s)/Duplication(s):</td><td>None Detected</td></tr>
+</table>
+{% endif %}
+<div class="bar">SUMMARY</div>
+<div class="summary">{{ val("overall_result_raw") }}</div>
+<div class="bar">INTERPRETATION</div>
+<ul class="square">
+{% for v in variants %}
+  <li>A {{ v.zygosity_raw }} {{ word[v.classification] }}, <b>{{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %}</b>, was found in the <i>{{ v.gene_symbol }}</i> gene of this individual.</li>
+  {% if v.classification == "uncertain_significance" %}
+  <li>This alteration is of unknown clinical significance. More information is given under Variant Details.</li>
+  {% else %}
+  <li>This result is compatible with a diagnosis of {{ v.associated_phenotype }}.</li>
+  {% endif %}
+{% else %}
+  <li>Neither pathogenic mutations nor variants of unknown significance were found, and there were no gross deletions or duplications.</li>
+{% endfor %}
+{% for text in prose.interpretation %}
+  <li>{{ text }}</li>
+{% endfor %}
+{% for text in prose.recommendations %}
+  <li>{{ text }}</li>
+{% endfor %}
+</ul>
+
+<div class="genes">
+{% if kind == "panel" and genes %}
+Genes Analyzed ({{ gene_count }} total): <b>{{ genes | join(", ") }}</b> (each sequenced and tested for deletions and duplications).
+{% elif kind == "panel" %}
+Genes Analyzed ({{ gene_count }} total): the genes and the regions analyzed are listed at {{ details.web }}.
+{% else %}
+Gene Analyzed: sequencing and deletion/duplication analysis of one gene, as named in the test name.
+{% endif %}
+</div>
+
+{% for v in variants if v.classification != "uncertain_significance" %}
+<h2><i>{{ v.gene_symbol }}</i> Additional Information</h2>
+<p>The <b>{{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %}</b> alteration is located in the <i>{{ v.gene_symbol }}</i> gene ({{ v.transcript }}). Alterations in this gene cause {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner.</p>
+<p>{{ prose.variant_details[variants.index(v)] }}</p>
+{% endfor %}
+
+<div class="page-break">
+<h2 class="section">ASSAY INFORMATION</h2>
+{% include "_aqua_assay.html" %}
+</div>
+
+{% for v in variants if v.classification == "uncertain_significance" %}
+{% if loop.first %}<h2 class="section">VARIANT DETAILS</h2>{% endif %}
+<div class="vbar"><i>{{ v.gene_symbol }}</i>&ensp;{{ v.transcript }}&ensp;{{ v.change }}{% if v.hgvs_p %}&ensp;{{ v.hgvs_p }}{% endif %}</div>
+<p>The <i>{{ v.gene_symbol }}</i> gene is associated with {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner.</p>
+<p>{{ prose.variant_details[variants.index(v)] }}</p>
+{% endfor %}
+
+<section class="leaflet page-break">
+  <h1>Understanding Your Result</h1>
+  <p><b>{{ patient.name }}</b>, this page explains your genetic test result in plain words.</p>
+  {{ c.paragraphs(prose.patient_summary) }}
+  <div class="box">Your healthcare provider or a genetic counselor can answer your questions about this result. You can also reach our genetic counselors at {{ details.toll_free }}.</div>
+</section>
+{% endblock %}

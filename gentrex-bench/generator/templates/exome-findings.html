@@ -1,0 +1,53 @@
+{# Bronze's exome report (public sample SR011): primary and secondary
+   findings summarized under sub-labels, the primary grid, coverage per
+   sample, a statement, and the secondary findings in an appendix. #}
+{% extends "base.html" %}
+{% import "_bronze.html" as bronze with context %}
+{% import "_common.html" as c with context %}
+{% block footer %}{{ content(lab.name ~ ", " ~ details.address ~ ". CLIA ID Number " ~ details.clia ~ "\n") }}{% endblock %}
+{% block report %}
+{{ bronze.masthead() }}
+{{ bronze.patient_block() }}
+<div class="block-title">SUMMARY OF RESULTS</div>
+<div class="big">PRIMARY FINDINGS</div>
+<div class="sub-label">Exome sequence variants in genes with an established disease association</div>
+<p>{{ val("overall_result_raw") }}</p>
+<div class="sub-label">Del/Dup (CNV) analysis</div>
+<p>Negative.</p>
+<div class="big">SECONDARY FINDINGS</div>
+{% for v in secondary %}
+<p><i>{{ v.gene_symbol }}</i> {{ v.change }}{% if v.hgvs_p %}, {{ v.hgvs_p }}{% endif %} was found in the {{ v.zygosity }} state and is classified as {{ c.sentence_class[v.classification] }}.</p>
+<p class="blue-note">This finding is described in APPENDIX 3: Secondary Findings.</p>
+{% else %}
+<p>Negative.</p>
+{% endfor %}
+{% if primary %}
+<div class="grid-title">PRIMARY FINDINGS: SEQUENCE ALTERATIONS IN ESTABLISHED DISEASE GENES</div>
+{% for v in primary %}{{ bronze.grid(v) }}{% endfor %}
+{% endif %}
+{{ bronze.metrics(sample=True) }}
+
+<div class="page-break">
+  <div class="block-title">TEST INFORMATION</div>
+  <p>The exome analysis covers about 19,000 genes. Variants are analyzed in about 4,{{ digits(3) }} genes that are established to cause disease, and in the genes of the ACMG secondary findings list when the patient has agreed to receive secondary findings.</p>
+</div>
+<div class="statement">
+  <div class="block-title" style="margin-top: 14pt">STATEMENT</div>
+  {{ bronze.history() }}
+  <h3>CLINICAL REPORT</h3>
+  {% for v in primary %}{{ bronze.clinical_report(v) }}{% endfor %}
+  {% for text in prose.interpretation %}<p>{{ text }}</p>{% endfor %}
+  <h3>CONCLUSION</h3>
+  <p>{{ prose.summary }}</p>
+  {% for text in prose.recommendations %}<p>{{ text }}</p>{% endfor %}
+  {{ bronze.steps() }}
+  {{ bronze.signatures(1) }}
+</div>
+{% if secondary %}
+<div class="page-break">
+  <div class="block-title">APPENDIX 3: SECONDARY FINDINGS</div>
+  {% for v in secondary %}{{ bronze.grid(v) }}{{ bronze.clinical_report(v) }}{% endfor %}
+</div>
+{% endif %}
+{{ bronze.appendix() }}
+{% endblock %}

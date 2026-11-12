@@ -1,0 +1,117 @@
+{# Indigo's carrier screen (public sample SR006): a grid of header cells
+   with hairlines, the test name in a teal banner, a result badge, a summary
+   table of carrier findings, a page per finding, results to note, variant
+   details, a residual risk table, methods and limitations. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% set residual = [("Cystic fibrosis (AR)", "CFTR", "1 in 45", "1 in 4,400"), ("Spinal muscular atrophy (AR)", "SMN1", "1 in 54", "1 in 610"), ("Gaucher disease (AR)", "GBA1", "1 in 120", "1 in 11,900"), ("Familial dysautonomia (AR)", "ELP1", "1 in 300", "1 in 29,900")] %}
+{% block style %}
+@page {
+  margin: 0.5in 0.55in 0.85in;
+  @top-right { content: {{ content("Name                    DOB\n" ~ patient.name ~ "      " ~ val("date_of_birth")) }}; white-space: pre; vertical-align: bottom; padding-bottom: 6pt; font: 7pt "Trebuchet MS", Arial, sans-serif; }
+  @bottom-center { text-align: left; font-size: 6.5pt; }
+  @bottom-right { content: counter(page) " / " counter(pages); font: 7pt "Trebuchet MS", Arial, sans-serif; vertical-align: top; padding-top: 6pt; }
+}
+@page :first { @top-right { content: none; } }
+.head { display: flex; gap: 16pt; align-items: flex-start; }
+.head .mg-logo { flex: 0 0 1.7in; }
+.cells { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); column-gap: 8pt; row-gap: 6pt; }
+.cells div { border-top: 1px solid #555; padding-top: 2pt; font-size: 7.5pt; min-height: 22pt; }
+.cells b { display: block; font-size: 7pt; }
+.tr { display: flex; gap: 20pt; border-top: 1px solid #555; margin-top: 10pt; padding-top: 4pt; font-size: 7.5pt; }
+.tr > div { flex: 1; }
+.banner { background: #0888b2; color: #fff; text-align: center; font: 12pt "Trebuchet MS", Arial, sans-serif; padding: 5pt; margin: 12pt 0 8pt; }
+.about { display: flex; gap: 24pt; }
+.about > div:first-child { flex: 2; }
+.about > div:last-child { flex: 1; }
+h2 { font: 11pt "Trebuchet MS", Arial, sans-serif; color: #0888b2; margin: 10pt 0 4pt; }
+.badge { display: flex; align-items: center; gap: 0; margin-top: 4pt; }
+.badge .sign { background: #0888b2; width: 22pt; height: 22pt; position: relative; }
+.badge .sign::before, .badge .sign::after { content: ""; position: absolute; background: #fff; left: 5pt; top: 10pt; width: 12pt; height: 2px; }
+.badge .sign.plus::after { left: 10pt; top: 5pt; width: 2px; height: 12pt; }
+.badge .word { background: #0888b2; color: #fff; font-weight: bold; padding: 4pt 24pt; margin-left: 3pt; }
+table.summary, table.rr { width: 100%; margin: 4pt 0 8pt; }
+table.summary th, table.rr th { background: #999; color: #fff; text-align: left; font-size: 7.5pt; padding: 3pt 4pt; }
+table.summary td, table.rr td { padding: 3pt 4pt; vertical-align: top; font-size: 7.5pt; }
+table.summary tr:nth-child(even) td, table.rr tr:nth-child(even) td { background: #d0dde8; }
+.callout { border: 1px solid #aaa; border-left: 5pt solid #0888b2; padding: 6pt 8pt; margin-bottom: 10pt; width: 70%; }
+.callout b { display: block; font-size: 9pt; }
+{% endblock %}
+{% block footer %}{{ content("Laboratory Director " ~ details.directors[0] ~ "\n" ~ lab.name ~ " " ~ details.address ~ "\n" ~ "E: clientservices@indigo.example.org P: " ~ details.phone ~ "\n") }}{% endblock %}
+{% block report %}
+<div class="head">
+  <div class="mg-logo"><span class="ring"></span>{{ lab.name }}</div>
+  <div class="cells">
+    <div><b>Patient Name</b>{{ patient.name }}</div>
+    <div><b>DOB</b>{{ val("date_of_birth") }}</div>
+    <div><b>Sex</b>{{ val("sex") }}</div>
+    <div><b>MRN</b>{{ val("mrn") or "" }}</div>
+    <div><b>Lab #</b>{{ val("lab_accession_number") }}</div>
+    <div><b>Clinical Team</b>{{ clinician }}</div>
+    <div><b>Report Date</b>{{ val("report_date") }}</div>
+    <div>{% if val("specimen_type") %}<b>Sample Type</b>{{ val("specimen_type") }}{% endif %}</div>
+    <div>{% if val("collection_date") %}<b>Sample Collection Date</b>{{ val("collection_date") }}{% endif %}</div>
+    <div>{% if val("received_date") %}<b>Sample Accession Date</b>{{ val("received_date") }}{% endif %}</div>
+    {% for label, value in other_ids %}<div><b>{{ label }}</b>{{ value }}</div>{% endfor %}
+  </div>
+</div>
+<div class="tr">
+  <div><b>Test Performed</b><br>Sequencing and deletion/duplication analysis of {{ 280 + digits(2) | int }} genes, as listed in the results below.<ul class="sq"><li>{{ val("test_name") }}</li></ul></div>
+  <div><b>Reason for Testing</b><br>{{ val("clinical_indication") }}{% if family_history %}<br>{{ family_history }}{% endif %}</div>
+</div>
+<div class="banner">{{ lab.name.split()[0] | upper }} {{ val("test_name") | upper }} RESULTS</div>
+<div class="about">
+  <div><h2>About this test</h2><p>This carrier screen checked genes in which variants can raise the chance that a couple's child will have a genetic disorder. Carrier results for these disorders can inform a couple's decisions about having children, and they can help a family prepare for the birth and care of an affected child.</p></div>
+  <div><h2>Result</h2><div class="badge"><span class="sign{% if variants %} plus{% endif %}"></span><span class="word">{{ val("overall_result_raw") }}</span></div></div>
+</div>
+<h2>Summary</h2>
+{% if variants %}
+<p>This individual has clinically significant variant(s) in the gene(s) shown below. None of the other genes on this screen showed a clinically significant change, so no other findings are reported.</p>
+<table class="summary">
+  <thead><tr><th>Results</th><th>Gene</th><th>Variant(s)</th><th>Inheritance</th><th>Partner testing recommended</th></tr></thead>
+  {% for v in variants %}
+  <tr><td><b>CARRIER:</b> {{ v.associated_phenotype }}</td><td>{{ v.gene_symbol }}</td><td>{{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>Yes</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No clinically significant genetic changes were identified in the genes evaluated with this test.</p>
+{% endif %}
+<h2>Next steps</h2>
+<ul class="sq">{% for text in prose.recommendations %}<li>{{ text }}</li>{% endfor %}</ul>
+
+{% for v in variants %}
+<div class="page-break">
+  <div class="callout"><b>CARRIER: {{ v.associated_phenotype }}</b>This individual carries one copy of {{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %} in {{ v.gene_symbol }}. The variant is classified as {{ c.sentence_class[v.classification] }}.</div>
+  <h2>What is {{ v.associated_phenotype }}?</h2>
+  <p>{{ prose.condition.characteristics }} {{ prose.condition.cause }}</p>
+  <h2>Next steps</h2>
+  <p>{{ prose.summary }} {{ prose.interpretation | join(" ") }}</p>
+</div>
+{% endfor %}
+<div class="{% if variants %}page-break{% endif %}">
+<h2>Results to note</h2>
+<ul class="sq">{% for text in results_to_note %}<li>{{ text }}. Negative result.</li>{% endfor %}</ul>
+{% for v in variants %}
+{% if loop.first %}<h2>Variant details</h2>{% endif %}
+<p><b>{{ v.gene_symbol }}, {{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %}, {{ v.zygosity_raw }}, {{ v.classification_raw }}</b></p>
+<p>{{ prose.variant_details[loop.index0] }}</p>
+{% endfor %}
+<h2>Residual risk</h2>
+<p>After a negative screen, a small residual chance of being a carrier remains. The figures below assume that no relative is known to have one of these disorders.</p>
+<table class="rr">
+  <thead><tr><th>Disease (Inheritance)</th><th>Gene</th><th>Ethnicity</th><th>Carrier frequency before screening</th><th>Carrier residual risk after negative result</th></tr></thead>
+  {% for v in variants %}
+  <tr><td>{{ v.associated_phenotype }}<br>{{ v.transcript }}</td><td>{{ v.gene_symbol }}</td><td>Pan-ethnic</td><td>Carrier</td><td>Not applicable</td></tr>
+  {% endfor %}
+  {% for disease, gene, frequency, risk in residual if gene not in variants | map(attribute="gene_symbol") | list %}
+  <tr><td>{{ disease }}</td><td>{{ gene }}</td><td>Pan-ethnic</td><td>{{ frequency }}</td><td>{{ risk }}</td></tr>
+  {% endfor %}
+</table>
+<h2>Technical methods</h2>
+<p>Target regions are captured from the genomic DNA of the submitted sample with hybridization probes and then sequenced on a next-generation sequencing platform. Read depth is used to call deletions and duplications of exons. {{ hgvs_example or "" }}</p>
+<h2>Limitations</h2>
+<p>No test finds every variant, so a pathogenic variant in the genes analyzed is still possible after a negative result. The test may miss variants in regulatory regions, deep in introns or in regions of high homology.</p>
+<h2>Disclaimer</h2>
+<p>This test was developed and its performance characteristics determined by {{ lab.name }}. Results should be interpreted by a qualified healthcare professional.</p>
+</div>
+{% endblock %}

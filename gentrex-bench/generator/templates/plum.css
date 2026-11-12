@@ -1,0 +1,7 @@
+/* Plum Genetics: the type, logo and purple bars that its two templates
+   share. */
+body { font: 8.5pt Arial, Helvetica, sans-serif; line-height: 1.3; color: #111; }
+.plum-logo { font: bold 17pt Arial, Helvetica, sans-serif; letter-spacing: 0.5pt; color: #1f1f3a; }
+.plum-logo::before { content: "\00bb"; color: #5b4a9b; font-size: 22pt; margin-right: 4pt; }
+.plum-logo small { display: block; font: 6.5pt Arial, Helvetica, sans-serif; letter-spacing: 0; color: #555; margin-left: 20pt; }
+.purple { background: #5b4a9b; color: #fff; }

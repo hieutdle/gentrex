@@ -1,0 +1,6 @@
+/* Indigo Genetic Testing: the logo and colors that its two templates share. */
+body { font: 8.5pt "Trebuchet MS", Calibri, Arial, sans-serif; line-height: 1.35; color: #222; }
+.mg-logo { display: inline-flex; align-items: center; gap: 7pt; font: 14pt "Trebuchet MS", Arial, sans-serif; color: #333; }
+.mg-logo .ring { width: 20pt; height: 20pt; border-radius: 50%; border: 4px solid #6dbf73; border-right-color: #2c6baa; }
+ul.sq { list-style: square; padding-left: 14pt; margin: 3pt 0; }
+ul.sq li { margin-bottom: 4pt; }

@@ -1,0 +1,6 @@
+/* Navy Genomic Laboratory: the type and blue of its patient-friendly
+   report. */
+body { font: 9.5pt "Trebuchet MS", "Segoe UI", Arial, sans-serif; line-height: 1.4; color: #1a1a1a; }
+.navy-title { font: bold 26pt "Trebuchet MS", Arial, sans-serif; color: #0a5fae; letter-spacing: 0.5pt; }
+.navy-badge { border: 2px solid #0a5fae; color: #0a5fae; font: bold 9pt Arial, sans-serif; padding: 3pt 6pt; text-align: center; }
+h2 { color: #0a5fae; font-size: 11pt; margin: 10pt 0 3pt; text-transform: uppercase; }

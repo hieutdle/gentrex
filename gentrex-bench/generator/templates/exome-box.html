@@ -1,0 +1,190 @@
+{# Aqua's exome report (public samples AMB03-AMB05, AMB13): three header
+   columns, the result in a rounded box with a findings grid, a results table,
+   then supplemental pages with coverage, gene details and family
+   inheritance. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% block style %}
+@page {
+  margin: 0.55in 0.55in 0.95in;
+  @top-right {
+    content: {{ content("Patient Name: " ~ patient.name ~ "\n" ~ "MRN #: " ~ (val("mrn") or "N/A") ~ "   Accession #: " ~ val("lab_accession_number")) }};
+    white-space: pre-wrap; text-align: right; vertical-align: bottom; padding-bottom: 6pt;
+    font: 7pt Helvetica, Arial, sans-serif; color: #333;
+  }
+  @bottom-center { text-align: center; color: #333; }
+}
+@page :first { @top-right { content: none; } }
+body { font: 8.5pt Helvetica, Arial, sans-serif; color: #333; line-height: 1.35; }
+.blue { color: #428bca; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 14pt; }
+.product { font-size: 15pt; color: #428bca; }
+.product .sub { display: block; font-size: 8pt; margin-top: 2pt; }
+.cols { display: flex; gap: 18pt; margin-bottom: 12pt; }
+.cols > div { flex: 1; }
+.cols h3 { font-size: 8pt; color: #428bca; margin: 0 0 2pt; }
+.cols div div { margin-bottom: 1pt; }
+.box { border: 2px solid #428bca; border-radius: 8pt; margin: 6pt 0 2pt; }
+.box .result { text-align: center; font-size: 14pt; font-weight: bold; color: #428bca; padding: 3pt 0 2pt; border-bottom: 1px solid #ccc; }
+.box .rf { text-align: center; font-weight: bold; padding: 4pt 0; border-bottom: 1px solid #ccc; }
+.box table { width: 100%; }
+.box td { width: 33.3%; text-align: center; padding: 5pt; font-weight: bold; color: #000; }
+.box tr + tr td { border-top: 1px solid #ccc; }
+.box td + td { border-left: 1px solid #ccc; }
+.foot { font-size: 6.5pt; margin-bottom: 12pt; }
+h2 { font-size: 11pt; font-weight: normal; color: #428bca; margin: 12pt 0 3pt; }
+h2.rule { border-bottom: 1px solid #428bca; padding-bottom: 2pt; }
+table.grid { width: 100%; margin: 4pt 0 8pt; }
+table.grid th { color: #428bca; text-align: left; font-weight: normal; vertical-align: bottom; padding: 3pt 4pt; border: 1px solid #ccc; }
+table.grid td { vertical-align: top; padding: 3pt 4pt; border: 1px solid #ccc; color: #000; }
+ul { padding-left: 14pt; margin: 4pt 0; }
+li { margin-bottom: 4pt; }
+.notes { font-size: 7pt; }
+.notes h3 { font-size: 8pt; color: #428bca; margin: 10pt 0 2pt; }
+.signed { margin-top: 18pt; }
+.run-in { color: #428bca; font-weight: bold; margin: 8pt 0 1pt; }
+.leaflet { font-size: 10.5pt; line-height: 1.45; }
+.leaflet h1 { font-size: 18pt; font-weight: normal; color: #428bca; margin: 0 0 6pt; }
+{% endblock %}
+{% block footer %}{{ content("Laboratory Director: " ~ details.directors[0] ~ ". CLIA# " ~ details.clia ~ "\n" ~ "Toll Free " ~ details.toll_free ~ " | Ph " ~ details.phone ~ " | Fx " ~ details.fax ~ " | " ~ details.web ~ " | " ~ details.address ~ "\n" ~ "Page ", page, " of ", pages, "\n") }}{% endblock %}
+{% block report %}
+{% set primary_genes = primary | map(attribute="gene_symbol") | unique | list %}
+<div class="top">
+  <div class="product"><b>{{ val("test_name") }}</b><span class="sub">Exome Sequencing and Interpretation</span></div>
+  <div class="logo"><span class="mark"></span>{{ lab.name }}</div>
+</div>
+<div class="cols">
+  <div>
+    <h3>PATIENT</h3>
+    <div>Legal Name: <b>{{ patient.listed }}</b></div>
+    <div>Accession #: {{ val("lab_accession_number") }}</div>
+    {% for label, value in other_ids %}<div>{{ label }}: {{ value }}</div>{% endfor %}
+    <div>DOB: {{ val("date_of_birth") }}</div>
+    <div>Sex Assigned at Birth: {{ val("sex") }}</div>
+    {% if val("mrn") %}<div>MRN: {{ val("mrn") }}</div>{% endif %}
+    <div>Indication: {{ val("clinical_indication") }}</div>
+  </div>
+  <div>
+    <h3>TEST INFORMATION</h3>
+    <div>Order #: {{ digits(7) }}</div>
+    <div>Family #: {{ digits(6) }}</div>
+    <div>Specimen #: N/A</div>
+    {% if val("specimen_type") %}<div>Specimen type: {{ val("specimen_type") }}</div>{% endif %}
+    {% if val("collection_date") %}<div>Collection date: {{ val("collection_date") }}</div>{% endif %}
+    {% if val("received_date") %}<div>Received date: {{ val("received_date") }}</div>{% endif %}
+    {% if val("test_started_date") %}<div>Test Started: {{ val("test_started_date") }}</div>{% endif %}
+    <div>Final Report: {{ val("report_date") }}</div>
+  </div>
+  <div>
+    <h3>MEDICAL PROFESSIONAL</h3>
+    <div>{{ clinician }}</div>
+    <div>{{ clinic }}</div>
+    <h3 style="margin-top: 6pt">ADDITIONAL RECIPIENTS</h3>
+    <div>{{ clinic }} Genetic Counseling</div>
+  </div>
+</div>
+<div class="box">
+  <div class="result">{{ val("overall_result_raw") }}</div>
+  <div class="rf">Reportable Findings</div>
+  <table>
+    <tr><td>Single gene variants</td><td>Contiguous gene deletions/duplications</td><td>Mitochondrial genome</td></tr>
+    <tr><td>{% if primary %}{{ primary_genes | length }}({{ primary | length }})*{% else %}None{% endif %}</td><td>None</td><td>Not Ordered</td></tr>
+  </table>
+</div>
+<div class="foot">* genes(variants)</div>
+
+{% if features or family_history %}
+<h2>Indication for Testing</h2>
+<p>{% if features %}{{ c.feature_list(", ") }}{% endif %}{% if features and family_history %}. {% endif %}{{ family_history or "" }}</p>
+{% endif %}
+
+<h2>Results</h2>
+{% if primary %}
+<table class="grid">
+  <thead><tr><th>Gene<br>(RefSeq ID)</th><th>Characterized/<br>Uncharacterized Gene</th><th>Relevant Associated Syndrome</th><th>Mode of<br>Inheritance</th><th>Genotype</th><th>Variant</th><th>Variant<br>Classification</th></tr></thead>
+  {% for v in primary %}
+  <tr{% if v.split %} class="split"{% endif %}><td><i>{{ v.gene_symbol }}</i><br>({{ v.transcript }})</td><td>Characterized</td><td>{{ v.associated_phenotype }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.zygosity_raw }}{% if v.parental_origin_raw %},<br><i>{{ v.parental_origin_raw }}</i>{% endif %}</td><td>{{ v.change }}{% if v.hgvs_p %}<br>({{ v.hgvs_p }}){% endif %}</td><td>{{ v.classification_raw }}</td></tr>
+  {% endfor %}
+</table>
+{% else %}
+<p>No clinically relevant variants were detected in characterized or uncharacterized genes.</p>
+{% endif %}
+
+{% if secondary %}
+<h2>Secondary Findings</h2>
+<table class="grid">
+  <thead><tr><th>Gene<br>(RefSeq ID)</th><th>Relevant Associated Syndrome</th><th>Mode of<br>Inheritance</th><th>Genotype</th><th>Variant</th><th>Variant<br>Classification</th></tr></thead>
+  {% for v in secondary %}
+  <tr><td><i>{{ v.gene_symbol }}</i><br>({{ v.transcript }})</td><td>{{ v.associated_phenotype }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.change }}{% if v.hgvs_p %}<br>({{ v.hgvs_p }}){% endif %}</td><td>{{ v.classification_raw }}</td></tr>
+  {% endfor %}
+</table>
+{% endif %}
+
+<h2 class="rule">Interpretation</h2>
+<ul>
+{% for text in prose.interpretation %}
+  <li>{% if loop.first %}<b>{{ prose.summary }}</b> {% endif %}{{ text }}</li>
+{% endfor %}
+</ul>
+<div class="notes">
+  <h3>Notes</h3>
+  <ul>
+    {% if not secondary %}<li>Any requested secondary findings are reported separately.</li>{% endif %}
+    <li>This test is not designed to confirm copy number variants found by earlier testing.</li>
+    {% for text in prose.recommendations %}<li>{{ text }}</li>{% endfor %}
+  </ul>
+</div>
+<p class="signed">Electronically Signed By {{ signers[0] }}, on {{ val("report_date") }} at {{ "%d:%02d" | format(1 + digits(1) | int, digits(2) | int % 60) }} PM</p>
+
+<div class="page-break">
+<p><b>The pages that follow supplement the report above.</b></p>
+<h2>Samples Received, Metrics, and Coverage</h2>
+<table class="grid">
+  <thead><tr><th>Family Member<br>(Accession #)</th><th>Affected</th><th>% Bases &ge; 10x</th><th>% Bases &ge; 20x</th></tr></thead>
+  <tr><td>Proband*<br>({{ val("lab_accession_number") }})</td><td>Yes</td><td>98.{{ digits(1) }}</td><td>97.{{ digits(1) }}</td></tr>
+  {% if "trio_columns" in tags %}
+  <tr><td>Mother*</td><td>No</td><td>98.{{ digits(1) }}</td><td>97.{{ digits(1) }}</td></tr>
+  <tr><td>Father*</td><td>No</td><td>98.{{ digits(1) }}</td><td>97.{{ digits(1) }}</td></tr>
+  {% endif %}
+</table>
+<p class="notes">*Exome sequenced. Coverage is shown only for family members whose exome was sequenced.</p>
+<h2>Analyses Performed</h2>
+<p>i) The whole exome was sequenced, and the variants were filtered with bioinformatic tools and reviewed by hand under dominant and recessive inheritance models. Variants that passed the filters were reviewed medically against characterized genetic causes of disease.</p>
+<p>ii) {% if primary %}A characterized gene explained the result, so uncharacterized genes were not reviewed as possible candidate genes.{% else %}No characterized gene explained the result, so uncharacterized genes were reviewed as possible candidate genes.{% endif %}</p>
+<h2>Raw Data</h2>
+<p>A table of the filtered variants can be requested through the client portal at {{ details.web }}. It includes variants that are not clinically relevant, and these are not routinely checked by Sanger sequencing.</p>
+</div>
+
+{% for v in variants %}
+<div class="{% if loop.first %}page-break{% endif %}">
+<h2><i>{{ v.gene_symbol }}</i> Gene Details</h2>
+<table class="grid">
+  <thead><tr><th>Gene Symbol</th><th>RefSeq ID</th><th>Inheritance</th></tr></thead>
+  <tr><td><i>{{ v.gene_symbol }}</i></td><td>{{ v.transcript }}</td><td>{{ v.mode_of_inheritance_raw }}</td></tr>
+</table>
+<p>{{ prose.condition.characteristics if loop.first else "" }} {{ prose.condition.cause if loop.first else "" }}</p>
+<h2 class="rule"><i>{{ v.gene_symbol }}</i> {{ v.change }}</h2>
+<div class="run-in">Variant description:</div>
+<p>{{ prose.variant_details[loop.index0] }}</p>
+{% if v.mother %}
+<div class="run-in">Family inheritance:</div>
+<table class="grid">
+  <thead><tr><th>Gene (RefSeq ID)</th><th>Variant</th><th>Proband</th><th>Mother</th><th>Father</th><th>Inheritance</th></tr></thead>
+  <tr><td><i>{{ v.gene_symbol }}</i> ({{ v.transcript }})</td><td>{{ v.change }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.mother }}</td><td>{{ v.father }}</td><td><i>{{ v.parental_origin_raw }}</i></td></tr>
+</table>
+{% endif %}
+<p><b>Weighing the current evidence, we classify the <i>{{ v.gene_symbol }}</i> {{ v.change }} variant as {{ c.sentence_class[v.classification] }}.</b></p>
+</div>
+{% endfor %}
+
+<div class="{% if not variants %}page-break{% endif %}">
+<h2 class="rule">Assay Information</h2>
+{% include "_aqua_assay.html" %}
+</div>
+
+<section class="leaflet page-break">
+  <h1>Your Exome Result, Explained</h1>
+  {{ c.paragraphs(prose.patient_summary) }}
+  <p>Your healthcare provider or a genetic counselor can answer your questions about this result. You can also reach our genetic counselors at {{ details.toll_free }}.</p>
+</section>
+{% endblock %}

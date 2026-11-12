@@ -1,0 +1,9 @@
+# Settings of the evaluation runs that differ from Gentrex's defaults. The
+# scripts local/run_pipeline.sh and minerva/run_pipeline.lsf pass this file
+# to every command (docs/user-guide/runs-and-results.md, "Change the
+# settings").
+
+normalize:
+  # Look up each variant's ClinVar ID, so that the scorer scores it. The file
+  # is one of those that download_reference_files.sh gets.
+  clinvar_path: data/clinvar/variant_summary_2026-11.txt.gz

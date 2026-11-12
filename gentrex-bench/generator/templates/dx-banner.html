@@ -1,0 +1,122 @@
+{# Indigo's diagnostic report (public sample INV01): a gray box of patient,
+   sample and report details, the result in the top strip of a blue box,
+   a variant table when there is a finding, next steps, a clinical summary,
+   the genes analyzed, methods and a signature box. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% block style %}
+@page {
+  margin: 0.5in 0.55in 0.95in;
+  @top-left { content: {{ content(lab.name ~ "     DIAGNOSTIC TESTING RESULTS\n" ~ "Patient name: " ~ patient.name) }}; white-space: pre; vertical-align: bottom; padding-bottom: 6pt; font: 7.5pt Arial, Helvetica, sans-serif; color: #2c6baa; }
+  @bottom-center { text-align: left; font-size: 6.5pt; border-top: 1px solid #999; }
+}
+@page :first { @top-left { content: none; } }
+.top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12pt; }
+.title { color: #2c6baa; font: 11pt Arial, Helvetica, sans-serif; }
+.hbox { display: flex; background: #f1f1f7; padding: 8pt; gap: 8pt; }
+.hbox > div { flex: 1; }
+.hbox td { padding: 0.5pt 6pt 0.5pt 0; vertical-align: top; }
+.hbox td:first-child { font-weight: bold; white-space: nowrap; }
+.two { display: flex; gap: 24pt; margin: 10pt 0; }
+.two > div { flex: 1; }
+.two h4 { font-size: 8pt; margin: 0 0 2pt; }
+.rbox { border: 1.5px solid #2c6baa; border-radius: 6pt; overflow: hidden; margin: 10pt 0; }
+.rbox .strip { background: #2c6baa; color: #fff; font: bold 11pt Arial, Helvetica, sans-serif; padding: 6pt 10pt; display: flex; align-items: center; gap: 10pt; }
+.rbox .icon { width: 16pt; height: 16pt; border: 2px solid #fff; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; }
+.rbox .icon span { display: block; width: 8pt; height: 2px; background: #fff; position: relative; }
+.rbox .icon.plus span::after { content: ""; position: absolute; left: 3pt; top: -3pt; width: 2px; height: 8pt; background: #fff; }
+.rbox .body { padding: 8pt 10pt; }
+.rbox h4 { margin: 6pt 0 2pt; font-size: 8pt; }
+table.vt { width: 100%; margin: 4pt 0 6pt; }
+table.vt th { background: #2c6baa; color: #fff; text-align: left; font-size: 7.5pt; padding: 3pt 5pt; }
+table.vt td { padding: 4pt 5pt; vertical-align: top; border-bottom: 1px solid #ccc; }
+h2 { font: 12pt Arial, Helvetica, sans-serif; color: #2c6baa; border-bottom: 1px solid #aaa; padding-bottom: 2pt; margin: 14pt 0 5pt; }
+.genes { display: flex; gap: 12pt; }
+.genes table { flex: 1; }
+.genes th { text-align: left; color: #2c6baa; font-size: 7.5pt; padding: 2pt 4pt; border-bottom: 1px solid #2c6baa; }
+.genes td { padding: 2pt 4pt; }
+.genes tr:nth-child(even) td { background: #f1f1f7; }
+.sign { background: #eeeeee; padding: 8pt 10pt; margin-top: 12pt; }
+{% endblock %}
+{% block footer %}{{ content("Laboratory Director " ~ details.directors[0] ~ "\n" ~ "Associate Laboratory Director " ~ details.directors[1] ~ "\n" ~ lab.name ~ " " ~ details.address ~ "    P: " ~ details.phone ~ " or " ~ details.toll_free ~ "                                        Page ", page, " of ", pages, "\n") }}{% endblock %}
+{% block report %}
+<div class="top">
+  <div class="mg-logo"><span class="ring"></span>{{ lab.name }}</div>
+  <div class="title">DIAGNOSTIC TESTING RESULTS</div>
+</div>
+<div class="hbox">
+  <div><table>
+    <tr><td>Patient name:</td><td>{{ patient.name }}</td></tr>
+    <tr><td>DOB:</td><td>{{ val("date_of_birth") }}</td></tr>
+    <tr><td>Sex:</td><td>{{ val("sex") }}</td></tr>
+    {% if val("mrn") %}<tr><td>MRN:</td><td>{{ val("mrn") }}</td></tr>{% endif %}
+  </table></div>
+  <div><table>
+    {% if val("specimen_type") %}<tr><td>Sample type:</td><td>{{ val("specimen_type") }}</td></tr>{% endif %}
+    {% if val("collection_date") %}<tr><td>Sample collection date:</td><td>{{ val("collection_date") }}</td></tr>{% endif %}
+    {% if val("received_date") %}<tr><td>Sample accession date:</td><td>{{ val("received_date") }}</td></tr>{% endif %}
+  </table></div>
+  <div><table>
+    <tr><td>Report date:</td><td>{{ val("report_date") }}</td></tr>
+    <tr><td>Lab #:</td><td>{{ val("lab_accession_number") }}</td></tr>
+    {% for label, value in other_ids %}<tr><td>{{ label }}:</td><td>{{ value }}</td></tr>{% endfor %}
+    <tr><td>Clinical team:</td><td>{{ clinician }}</td></tr>
+  </table></div>
+</div>
+<div class="two">
+  <div><h4>Reason for testing</h4>{{ val("clinical_indication") }}
+    {% if features %}<br>Clinical features: {{ c.feature_list() }}{% endif %}
+    {% if family_history %}<br>{{ family_history }}{% endif %}</div>
+  <div><h4>Test performed</h4>Sequencing and deletion/duplication analysis of {{ gene_count }} gene{{ "s" if gene_count != 1 }}, listed under Genes analyzed.<ul class="sq"><li>{{ val("test_name") }}</li></ul></div>
+</div>
+<div class="rbox">
+  <div class="strip"><span class="icon{% if variants %} plus{% endif %}"><span></span></span>{{ val("overall_result_raw") }}</div>
+  <div class="body">
+    {% if variants %}
+    <p>{{ prose.summary }}</p>
+    <table class="vt">
+      <thead><tr><th>GENE</th><th>VARIANT</th><th>ZYGOSITY</th><th>VARIANT CLASSIFICATION</th></tr></thead>
+      {% for v in variants %}
+      <tr{% if v.split %} class="split"{% endif %}><td><i>{{ v.gene_symbol }}</i></td><td>{{ v.change }}{% if v.hgvs_p %}<br>({{ v.hgvs_p }}){% endif %}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.classification_raw }}</td></tr>
+      {% endfor %}
+    </table>
+    <h4>About this result</h4>
+    {{ c.paragraphs(prose.interpretation) }}
+    {% else %}
+    <h4>About this test</h4>
+    <p>This test looks in {{ gene_count }} gene{{ "s" if gene_count != 1 }} for variants that are known to cause genetic disorders. Read together with the family history and other medical findings, the result can help to estimate a person's risk, to make or confirm a clinical diagnosis, and to plan treatment, surveillance and follow-up that suit the individual.</p>
+    {{ c.paragraphs(prose.interpretation) }}
+    {% endif %}
+  </div>
+</div>
+<h2>Next steps</h2>
+<ul class="sq">{% for text in prose.recommendations %}<li>{{ text }}</li>{% endfor %}</ul>
+<h2>Clinical summary</h2>
+{% for v in variants %}
+<p><b>{{ v.associated_phenotype }}</b> (<i>{{ v.gene_symbol }}</i>, {{ v.transcript }})<br>Inheritance: {{ v.mode_of_inheritance_raw }}</p>
+<p>{{ prose.variant_details[loop.index0] }}</p>
+{% endfor %}
+<p>{{ prose.condition.characteristics }} {{ prose.condition.cause }}</p>
+<h2>Genes analyzed</h2>
+{% if genes %}
+<p>This table shows the genes analyzed and the transcript used for each.</p>
+{% set half = (genes | length + 1) // 2 %}
+<div class="genes">
+  <table><tr><th>GENE</th><th>TRANSCRIPT</th></tr>{% for g in genes[:half] %}<tr><td><i>{{ g }}</i></td><td>{{ transcripts.get(g, "") }}</td></tr>{% endfor %}</table>
+  <table><tr><th>GENE</th><th>TRANSCRIPT</th></tr>{% for g in genes[half:] %}<tr><td><i>{{ g }}</i></td><td>{{ transcripts.get(g, "") }}</td></tr>{% endfor %}</table>
+</div>
+{% else %}
+<p>The genes analyzed, with the transcript used for each, are listed for this test at {{ details.web }}.</p>
+{% endif %}
+<h2>Methods</h2>
+<ul class="sq">
+  <li>Target regions are captured from the genomic DNA of the submitted sample with hybridization probes and then sequenced on a next-generation sequencing platform. Each target is sequenced to a depth of at least 50x unless the report states otherwise.</li>
+  <li>Reads are aligned to the GRCh38 reference sequence. Sequence changes are reported according to HGVS nomenclature. {{ hgvs_example or "" }}</li>
+  <li>To find deletions and duplications of exons, software developed by the laboratory estimates the copy number of each target by comparing its read depth in the patient's sample with the average depth of the other samples in the run.</li>
+</ul>
+<h2>Limitations</h2>
+<p>In validation studies, analytical sensitivity and specificity both exceeded 99% for single nucleotide variants, for insertions and deletions shorter than 15 bp, and for deletions and duplications of one exon or more. Variants in regions with poor coverage, in deep intronic sequence or in repetitive sequence may be missed by this assay.</p>
+<h2>Disclaimer</h2>
+<p>A DNA test alone cannot settle the diagnosis of the selected condition(s) in every individual. Errors are also possible, for example from a mix-up of samples or from a mistake in the interpretation of the data. This test was developed and its performance characteristics determined by {{ lab.name }}.</p>
+<div class="sign">Electronically signed by {{ signers[0] }} on {{ val("report_date") }}</div>
+{% endblock %}

@@ -1,0 +1,42 @@
+{# The page frame of every template: the canary string, which Chrome also
+   writes into the PDF's title, the synthetic footer, the cover pages of the
+   late_page_evidence tag and the feature page of the
+   provided_phenotype_page tag. A template fills the blocks style, footer
+   (its own footer lines, each ending with a newline) and report. #}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>{{ case_id }} {{ canary }}</title>
+<meta name="canary" content="{{ canary }}">
+<style>
+{% include "base.css" %}
+@page {
+  @bottom-center { content: {% block footer %}{% endblock %} {{ synthetic }}; }
+}
+{% include lab.name.split()[0].lower() ~ ".css" %}
+{% block style %}{% endblock %}
+</style>
+</head>
+<body>
+{% if "late_page_evidence" in tags %}
+{% include "_cover.html" %}
+<div class="page-break">
+{% endif %}
+{% block report %}{% endblock %}
+{% if "late_page_evidence" in tags %}
+</div>
+{% endif %}
+{% if feature_page %}
+<section class="inserted page-break">
+  <h2>Provided Clinical Phenotype</h2>
+  <p class="small">As written by the ordering clinician on the test requisition form.</p>
+  <ul>
+  {% for feature in all_features %}
+    <li>{{ feature.printed }}</li>
+  {% endfor %}
+  </ul>
+</section>
+{% endif %}
+</body>
+</html>

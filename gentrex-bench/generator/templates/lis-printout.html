@@ -1,0 +1,66 @@
+{# Apricot's report printed from a laboratory information system (public
+   sample SR018): a fixed-width body, no patient name, birth date or record
+   number, procedure bars with received and verified dates, results that
+   point to numbered notes, and the interpretation under Test Information. #}
+{% extends "base.html" %}
+{% import "_apricot.html" as apricot with context %}
+{% import "_common.html" as c with context %}
+{% block style %}
+@page {
+  margin: 1.05in 0.55in 1.3in;
+  @top-left { content: {{ content(lab.name | upper ~ " | " ~ details.web ~ "\n" ~ details.address ~ "\n" ~ "phone: " ~ details.phone ~ ", toll free: " ~ details.toll_free ~ "\n" ~ details.directors[0] ~ ", Chief Medical Officer") }}; white-space: pre; vertical-align: bottom; padding-bottom: 8pt; font: 7pt Arial, Helvetica, sans-serif; }
+  @top-right { content: {{ content("PATIENT REPORT\n\n" ~ "Patient Age/Sex:      " ~ val("sex")) }}; white-space: pre; text-align: right; vertical-align: bottom; padding-bottom: 8pt; font: bold 8pt Arial, Helvetica, sans-serif; }
+  @bottom-left { content: {{ content("*=Abnormal, #=Corrected, C=Critical, f=Result Footnote, H-High, i-Test Information, L-Low, t-Interpretive Text, @=Performing lab\n" ~ "____________________________________________________________________________\n" ~ "Unless otherwise indicated, testing performed at:\n" ~ lab.name ~ ", " ~ details.address ~ "\n" ~ "Laboratory Director: " ~ details.directors[1] ~ "\n") }} {{ synthetic }}; white-space: pre-wrap; vertical-align: top; font: 6.3pt Arial, Helvetica, sans-serif; }
+  @bottom-center { content: none; }
+  @bottom-right { content: {{ content(lab.name.split()[0] ~ " Accession: " ~ val("lab_accession_number") ~ "\n" ~ "Report Request ID: " ~ digits(8) ~ "\n" ~ "Printed: " ~ date("report_date", 2) ~ "\n" ~ "Page ") }} counter(page) " of " counter(pages); white-space: pre; text-align: right; vertical-align: top; padding-top: 12pt; font: 7pt Arial, Helvetica, sans-serif; }
+}
+body { font: 8.5pt "Courier New", Courier, monospace; line-height: 1.25; }
+.bar { background: #e2e2e2; font-weight: bold; padding: 1pt 3pt; margin-top: 6pt; display: flex; justify-content: space-between; }
+table.proc { width: 100%; }
+table.proc th { text-align: left; font-weight: bold; padding: 0 3pt; }
+table.proc td { padding: 0 3pt; vertical-align: top; }
+table.proc td:first-child, table.proc th:first-child { width: 36%; }
+sup { font-size: 6pt; }
+h2 { font: bold 9pt Arial, Helvetica, sans-serif; text-decoration: underline; margin: 12pt 0 4pt; }
+.note { display: flex; gap: 10pt; }
+.note > div:first-child { width: 24pt; flex: none; }
+.note p { margin-bottom: 6pt; }
+{% endblock %}
+{% block report %}
+<div class="bar"><span>Specimen Collected: {{ val("collection_date") or "" }}</span></div>
+{% for label, value in other_ids %}<div>{{ label }}: {{ value }}</div>{% endfor %}
+<div class="bar"><span>DNA Extract and Hold</span><span>|Received: {{ val("received_date") or "" }}&nbsp;&nbsp; Report/Verified: {{ val("report_date") }}</span></div>
+<table class="proc">
+  <tr><th>Procedure</th><th>Result</th><th>Units</th><th>Reference Interval</th></tr>
+  <tr><td>DNA Extract and Hold</td><td>Complete <sup>i1</sup></td><td></td><td></td></tr>
+</table>
+<div class="bar"><span>{{ val("test_name") }}</span><span>|Received: {{ val("received_date") or "" }}&nbsp;&nbsp; Report/Verified: {{ val("report_date") }}</span></div>
+<table class="proc">
+  <tr><th>Procedure</th><th>Result</th><th>Units</th><th>Reference Interval</th></tr>
+  <tr><td>{{ val("test_name") }}</td><td>{{ val("overall_result_raw") }} <sup>i2</sup></td><td></td><td></td></tr>
+  {% if val("specimen_type") %}<tr><td>Specimen</td><td>{{ val("specimen_type") }}</td><td></td><td></td></tr>{% endif %}
+</table>
+<h2>Test Information</h2>
+<div class="note"><div>i1:</div><div>
+  <p>DNA Extract and Hold<br>INTERPRETIVE INFORMATION: DNA Extract and Hold</p>
+  <p>This test was developed and its performance characteristics determined by {{ lab.name }}. It has not been cleared or approved by the U.S. Food and Drug Administration.</p>
+</div></div>
+<div class="note"><div>i2:</div><div>
+  <p>{{ val("test_name") }} Int</p>
+  <p>INDICATION FOR TESTING: {{ val("clinical_indication") }}.{% if features %} CLINICAL HISTORY: {{ c.feature_list() }}.{% endif %} {{ family_history or "" }}</p>
+  {% for v in variants %}
+  <p>RESULT: One {{ v.classification_raw }} variant was detected in the <i>{{ v.gene_symbol }}</i> gene ({{ v.transcript }}). The patient is {{ v.zygosity_raw }} for {{ v.change }}{% if v.hgvs_p %} ({{ v.hgvs_p }}){% endif %}. This variant is associated with {{ v.associated_phenotype }}, which is inherited in {{ c.article(v.mode_of_inheritance_raw) }} {{ v.mode_of_inheritance_raw }} manner.</p>
+  {% else %}
+  <p>RESULT: NEGATIVE. {% if tested %}The <i>{{ tested.gene }}</i> {{ tested.text }} variant was not detected.{% else %}No pathogenic variants were detected in the <i>{{ focus.gene }}</i> gene.{% endif %}</p>
+  {% endfor %}
+  <p>INTERPRETATION: {{ prose.summary }} {{ prose.interpretation | join(" ") }}</p>
+  <p>BACKGROUND INFORMATION: {{ val("test_name") }}</p>
+  <p>CHARACTERISTICS: {{ prose.condition.characteristics }}</p>
+  <p>INHERITANCE: {{ prose.condition.inheritance }}</p>
+  <p>CLINICAL SENSITIVITY: Varies with the condition and the population tested.</p>
+  <p>METHODOLOGY: {% if kind == "targeted" %}Real-time PCR genotyping of the targeted variant with fluorescent probes.{% else %}The coding exons of the gene and their exon-intron boundaries are captured and sequenced on a massively parallel platform. Reported variants are confirmed by Sanger sequencing when needed.{% endif %} {{ hgvs_example or "" }}</p>
+  <p>LIMITATIONS OF ANALYSIS: Some pathogenic variants lie outside the coding regions of genes. The test may miss mosaic variants and variants in regulatory, deep intronic or highly homologous regions.</p>
+  <p>LIMITATIONS OF REPORTING: The report omits benign and likely benign variants.</p>
+  {% for text in prose.recommendations %}<p>{{ text }}</p>{% endfor %}
+</div></div>
+{% endblock %}

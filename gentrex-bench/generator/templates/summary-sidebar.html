@@ -1,0 +1,133 @@
+{# Plum's exome report (public sample PVG01): page 1 is a summary, with
+   the patient, specimen and provider details in a sidebar on the left, and
+   on the right the test, the result with an icon, the requested options,
+   the clinical features, the primary findings in a card and the
+   recommendations. Variant details, methods and definitions follow. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% block style %}
+@page {
+  margin: 0.5in 0.55in 0.95in;
+  @top-right {
+    content: {{ content(patient.listed ~ "     Patient ID: " ~ (val("mrn") or "") ~ "     Lab ID: " ~ val("lab_accession_number")) }};
+    white-space: pre; vertical-align: bottom; padding-bottom: 6pt; font: 7.5pt Arial, Helvetica, sans-serif;
+  }
+  @bottom-center { text-align: left; font-size: 6.5pt; }
+}
+@page :first { @top-right { content: none; } }
+.page1 { display: flex; gap: 16pt; }
+.side { flex: 0 0 1.75in; border-right: 1px solid #bbb; padding-right: 10pt; font-size: 8pt; }
+.side h4 { font-size: 7.5pt; color: #5b4a9b; letter-spacing: 0.4pt; margin: 12pt 0 3pt; text-transform: uppercase; }
+.side .name { font-size: 15pt; line-height: 1.15; margin-bottom: 6pt; }
+.side div { margin: 1pt 0; }
+.main { flex: 1; }
+.head { display: flex; justify-content: space-between; align-items: flex-start; }
+.head .test { font-size: 11pt; font-weight: bold; }
+.head .date { text-align: right; font-size: 8pt; color: #5b4a9b; }
+.head .date b { display: block; color: #111; font-size: 10pt; }
+h2 { font-size: 9pt; letter-spacing: 0.4pt; margin: 12pt 0 4pt; text-transform: uppercase; }
+.result { font-size: 16pt; font-weight: bold; text-align: center; margin: 6pt 0; }
+.result::before { content: ""; display: inline-block; width: 12pt; height: 12pt; border: 2px solid #5b4a9b; border-radius: 50%; margin-right: 8pt; vertical-align: middle; }
+.options span { margin-right: 12pt; }
+.options span::before { content: ""; display: inline-block; width: 6pt; height: 6pt; border: 1px solid #5b4a9b; border-radius: 50%; margin-right: 3pt; }
+.card { border: 1.5px solid #888; border-radius: 6pt; padding: 6pt 9pt; margin: 6pt 0; }
+.card .gene { font-size: 14pt; font-weight: bold; font-style: italic; color: #2c6e2f; }
+.card .pill { float: right; background: #5b4a9b; color: #fff; border-radius: 8pt; padding: 1pt 8pt; font-size: 7.5pt; font-weight: bold; }
+.card .zyg { float: right; clear: right; text-align: right; font-size: 7.5pt; }
+.card .label { font-weight: bold; font-size: 8pt; }
+ul { padding-left: 12pt; margin: 3pt 0; }
+li { margin-bottom: 3pt; }
+table.trio { width: 100%; margin: 6pt 0; font-size: 8pt; }
+table.trio th, table.trio td { border: 1px solid #999; padding: 2pt 4pt; text-align: left; }
+{% endblock %}
+{% block footer %}{{ content(details.address ~ "  -  " ~ details.web ~ "                                                        PAGE ", page, " OF ", pages, "\n" ~ "Phone: " ~ details.phone ~ "   Fax: " ~ details.fax ~ "   Clinical Laboratory Director: " ~ details.directors[0] ~ "   CLIA# " ~ details.clia ~ "\n") }}{% endblock %}
+{% block report %}
+<div class="page1">
+  <div class="side">
+    <div class="plum-logo">{{ lab.name }}</div>
+    <h4>Patient report for</h4>
+    <div class="name">{{ patient.last_name }},<br><b>{{ patient.first_name }}</b></div>
+    <div><b>DOB:</b> {{ val("date_of_birth") }}</div>
+    <div><b>Sex at Birth:</b> {{ val("sex") }}</div>
+    {% if val("mrn") %}<div><b>Patient ID:</b> {{ val("mrn") }}</div>{% endif %}
+    <div><b>Lab ID#:</b> {{ val("lab_accession_number") }}</div>
+    {% for label, value in other_ids %}<div><b>{{ label }}:</b> {{ value }}</div>{% endfor %}
+    <h4>Specimen</h4>
+    {% if val("specimen_type") %}<div><b>Source:</b> {{ val("specimen_type") }}</div>{% endif %}
+    {% if val("collection_date") %}<div><b>Collected:</b> {{ val("collection_date") }}</div>{% endif %}
+    {% if val("received_date") %}<div><b>Received:</b> {{ val("received_date") }}</div>{% endif %}
+    <div><b>Test Method:</b> Exome Platform with CNV</div>
+    <h4>Provider</h4>
+    <div>{{ clinician }}</div>
+    <div>{{ signers[1].split(",")[0] }}, MS, CGC</div>
+    <div>{{ clinic }}</div>
+  </div>
+  <div class="main">
+    <div class="head">
+      <div class="test">{{ val("test_name") }}</div>
+      <div class="date">REPORT DATE<b>{{ val("report_date") }}</b></div>
+    </div>
+    <p>An exome test of germline DNA that looks for sequence and copy number variants to help reach a molecular diagnosis in people suspected to have a genetic condition.</p>
+    <h2>Report Summary</h2>
+    <div class="result">{{ val("overall_result_raw") }}</div>
+    <p>{{ prose.summary }}</p>
+    <h2>Reason for Testing</h2>
+    <p>{{ val("clinical_indication") }}</p>
+    <div class="options"><small>REQUESTED TEST OPTIONS:</small><br><span>Mitochondrial Genome</span><span>ACMG Secondary Findings</span><span>Incidental Findings</span></div>
+    {% if features or family_history %}
+    <h2>Provided Clinical Features</h2>
+    <p>{% if features %}{{ c.feature_list(", ") }}{% endif %}{% if features and family_history %}. {% endif %}{{ family_history or "" }}</p>
+    {% endif %}
+    {% for group, rows in [("Primary Findings", primary), ("Secondary Findings", secondary)] if rows %}
+    <div class="card">
+      <div class="label">{{ group | upper }}</div>
+      {% for v in rows %}
+      <div{% if v.split %} class="split"{% endif %}>
+        <span class="pill">{{ v.classification_raw }}</span>
+        <div class="gene">{{ v.gene_symbol }}</div>
+        <span class="zyg">{{ v.zygosity_raw }}{% if v.parental_origin_raw %}<br>({{ v.parental_origin_raw }}){% endif %}</span>
+        <div>{{ v.change }}{% if v.hgvs_p %}, {{ v.hgvs_p }}{% endif %}</div>
+        <div>{{ v.mode_of_inheritance_raw }} {{ v.associated_phenotype }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="card"><div class="label">PRIMARY FINDINGS</div><div>No variants that explain the reason for testing were found.</div></div>
+    {% endfor %}
+    <h2>Recommendations</h2>
+    <ul>
+      {% for text in prose.recommendations %}<li>{{ text }}</li>{% endfor %}
+      <li>Reanalyzing the exome in the future could lead to a new or additional diagnosis.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="page-break">
+<h2>Interpretation</h2>
+{{ c.paragraphs(prose.interpretation) }}
+{% for v in variants %}
+<h2><i>{{ v.gene_symbol }}</i> ({{ v.transcript }}) {{ v.change }}</h2>
+<p>{{ prose.variant_details[loop.index0] }}</p>
+{% endfor %}
+{% if "trio_columns" in tags and variants %}
+<table class="trio">
+  <tr><th>Variant</th><th>Proband</th><th>Mother</th><th>Father</th></tr>
+  {% for v in variants %}<tr><td><i>{{ v.gene_symbol }}</i> {{ v.change }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.mother }}</td><td>{{ v.father }}</td></tr>{% endfor %}
+</table>
+{% endif %}
+<h2>About the Condition</h2>
+<p>{{ prose.condition.characteristics }}</p>
+<p>{{ prose.condition.inheritance }} {{ prose.condition.penetrance }}</p>
+<p>{{ prose.condition.cause }}</p>
+</div>
+
+<div class="page-break">
+<h2>Test Methods</h2>
+<p>Genomic DNA is enriched for the coding exons of nearly all human genes and sequenced on a massively parallel platform. Reads are aligned to the GRCh37 reference genome. Single nucleotide variants, small insertions and deletions, and copy number variants are called and filtered with a validated pipeline and classified with the ACMG standards. {{ hgvs_example or "" }}</p>
+<h2>Definitions of Results</h2>
+<p><b>Positive result:</b> at least one pathogenic or likely pathogenic variant that explains the reason for testing was found. <b>Uncertain result:</b> a variant was found whose role is not yet known. <b>Negative result:</b> no variant that explains the reason for testing was found.</p>
+<h2>For the Patient</h2>
+{{ c.paragraphs(prose.patient_summary) }}
+<p>Genetic counseling is recommended. Questions about this report can be sent to {{ details.web }} or {{ details.toll_free }}.</p>
+</div>
+{% endblock %}

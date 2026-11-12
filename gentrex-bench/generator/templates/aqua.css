@@ -1,0 +1,4 @@
+/* Aqua Genetics: the logo that its three templates share. */
+.logo { display: inline-flex; align-items: center; gap: 6pt; color: #1d5fa0; font: 19pt Helvetica, Arial, sans-serif; }
+.logo .mark { display: inline-block; width: 18pt; height: 18pt; border-radius: 3pt; background: linear-gradient(135deg, #1d5fa0 0 45%, #6aa3d8 45% 100%); }
+.logo .sub { display: block; font-size: 6.5pt; color: #555; margin-top: 1pt; }

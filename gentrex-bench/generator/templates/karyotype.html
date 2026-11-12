@@ -1,0 +1,84 @@
+{# Lilac's chromosome analysis report (public sample LAB02): the title
+   in the top right corner, patient and specimen fields with an address box,
+   the culture and banding counts, the karyotype and its description in a
+   boxed RESULTS line, then the interpretation, recommendation and comment. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% block style %}
+@page {
+  margin: 0.5in 0.55in 0.8in;
+  @top-left {
+    content: {{ content("Patient Name: " ~ patient.name ~ "     Specimen #: " ~ val("lab_accession_number")) }};
+    white-space: pre; vertical-align: bottom; padding-bottom: 6pt;
+    font: 8pt Arial, Helvetica, sans-serif;
+  }
+  @bottom-center { text-align: center; font-size: 6.5pt; }
+}
+@page :first { @top-left { content: none; } }
+body { font: 9.5pt Arial, Helvetica, sans-serif; line-height: 1.3; }
+.top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10pt; }
+.top h1 { font-size: 17pt; margin: 0; }
+.ids { display: flex; justify-content: space-between; gap: 16pt; }
+.ids .who div { margin: 0.5pt 0; }
+.ids b { font-weight: bold; }
+.address { border: 2px solid #000; width: 2.6in; height: 1.15in; padding: 22pt 0 0 24pt; font-size: 8.5pt; }
+.dates { display: flex; gap: 30pt; margin: 8pt 0; }
+.counts { width: 100%; margin: 14pt 0 4pt; }
+.counts th { text-align: left; padding: 1.5pt 6pt 1.5pt 0; white-space: nowrap; }
+.counts td { padding: 1.5pt 18pt 1.5pt 0; }
+.results { border: 2px solid #000; padding: 4pt 10pt; margin: 2pt 0 8pt; font-weight: bold; font-size: 10pt; }
+.results .desc { padding-left: 0.85in; }
+h3 { font-size: 10pt; margin: 8pt 0 2pt; }
+.signed { display: flex; justify-content: space-between; margin-top: 30pt; }
+{% endblock %}
+{% block footer %}{{ content("Testing performed at " ~ lab.name ~ ", " ~ details.address ~ "   " ~ details.directors[0] ~ ", Laboratory Director   " ~ details.toll_free ~ "\n") }}{% endblock %}
+{% block report %}
+<div class="top">
+  <div class="lilac-logo">{{ lab.name }}<small>Cytogenetics laboratory</small></div>
+  <h1>{{ val("test_name") }}</h1>
+</div>
+<div class="ids">
+  <div class="who">
+    <div><b>Patient Name:</b> {{ patient.name }}</div>
+    <div><b>Referring Physician:</b> {{ clinician }}</div>
+    <div><b>Specimen #:</b> {{ val("lab_accession_number") }}&emsp;&emsp;<b>Client #:</b> {{ digits(5) }}</div>
+    {% for label, value in other_ids %}<div><b>{{ label }}:</b> {{ value }}</div>{% endfor %}
+    {% if val("mrn") %}<div><b>Patient ID:</b> {{ val("mrn") }}</div>{% endif %}
+    <div class="dates">
+      <div>DOB: {{ val("date_of_birth") }}<br>Sex: {{ val("sex") }}<br>SSN: ***-**-****</div>
+      <div>{% if val("collection_date") %}Date Collected: {{ val("collection_date") }}<br>{% endif %}{% if val("received_date") %}Date Received: {{ val("received_date") }}<br>{% endif %}Lab ID: {{ digits(6) }}<br>{% if val("specimen_type") %}Specimen Type: <b>{{ val("specimen_type") }}</b>{% endif %}</div>
+    </div>
+  </div>
+  <div class="address">{{ clinic }}<br>{{ clinic_address[0] }}<br>{{ clinic_address[1] }}</div>
+</div>
+<p><b>Indication:</b> {{ val("clinical_indication") }}</p>
+{% if features or family_history %}
+<p><b>Clinical Information:</b> {% if features %}{{ c.feature_list() }}.{% endif %} {{ family_history or "" }}</p>
+{% endif %}
+<table class="counts">
+  <tr><th>Metaphases Counted:</th><td>{{ finding.cells }}</td><th>Number of Cultures:</th><td>2</td><th>Banding Technique:</th><td>GTW</td></tr>
+  <tr><th>Metaphases Analyzed:</th><td>5</td><th></th><td></td><th>Banding Resolution:</th><td>{{ [450, 550][digits(1) | int % 2] }}</td></tr>
+  <tr><th>Metaphases Karyotyped:</th><td>2</td><th></th><td></td><th>Dept. Section:</th><td>C{{ digits(1) }}</td></tr>
+</table>
+<div class="results">
+  <div>RESULTS:&emsp;{{ val("karyotype") }}</div>
+  <div class="desc">{{ val("overall_result_raw") }}</div>
+</div>
+<h3>INTERPRETATION:</h3>
+<p>{{ prose.summary }}</p>
+{{ c.paragraphs(prose.interpretation) }}
+<h3>RECOMMENDATION:</h3>
+{{ c.paragraphs(prose.recommendations) }}
+<p>We recommend genetic counseling for the family.</p>
+<h3>COMMENT:</h3>
+<p>Routine chromosome analysis, as used here, can miss subtle rearrangements and low-level mosaicism, and it cannot see the small deletions and duplications that a microarray may detect.</p>
+<div class="signed"><span>Signed: {{ signers[0] }}</span><span>Date: {{ val("report_date") }}</span></div>
+<div class="page-break">
+<h3>ABOUT THIS RESULT</h3>
+<p>{{ prose.condition.characteristics }}</p>
+<p>{{ prose.condition.incidence }}</p>
+<p>{{ prose.condition.cause }}</p>
+<h3>INFORMATION FOR THE PATIENT</h3>
+{{ c.paragraphs(prose.patient_summary) }}
+</div>
+{% endblock %}

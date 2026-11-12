@@ -1,0 +1,35 @@
+{# Bronze's panel and mitochondrial report (public samples BLU01-BLU04,
+   SR012-SR015, SR017): stacked blocks, the result as one sentence under
+   PRIMARY FINDINGS, a borderless grid per variant, metrics, the gene list,
+   and a statement page with a timeline and a signature. #}
+{% extends "base.html" %}
+{% import "_bronze.html" as bronze with context %}
+{% import "_common.html" as c with context %}
+{% block footer %}{{ content(lab.name ~ ", " ~ details.address ~ ". CLIA ID Number " ~ details.clia ~ "\n") }}{% endblock %}
+{% block report %}
+{{ bronze.masthead() }}
+{{ bronze.patient_block() }}
+<div class="block-title">SUMMARY OF RESULTS</div>
+<div class="big">PRIMARY FINDINGS</div>
+<p>{{ val("overall_result_raw") }}</p>
+{% if variants %}
+<div class="grid-title">PRIMARY {% if kind == "mito" %}MITOCHONDRIAL {% endif %}FINDINGS: SEQUENCE ALTERATIONS</div>
+{% for v in variants %}{{ bronze.grid(v) }}{% endfor %}
+{% endif %}
+{{ bronze.metrics() }}
+{{ bronze.gene_list() }}
+
+<div class="statement page-break">
+  <div class="block-title">STATEMENT</div>
+  {{ bronze.history() }}
+  <h3>CLINICAL REPORT</h3>
+  {% for v in variants %}{{ bronze.clinical_report(v) }}{% else %}{% for text in prose.interpretation %}<p>{{ text }}</p>{% endfor %}{% endfor %}
+  <h3>CONCLUSION</h3>
+  <p>{{ prose.summary }}</p>
+  {% if variants %}{% for text in prose.interpretation %}<p>{{ text }}</p>{% endfor %}{% endif %}
+  {% for text in prose.recommendations %}<p>{{ text }}</p>{% endfor %}
+  {{ bronze.steps() }}
+  {{ bronze.signatures(1) }}
+</div>
+{{ bronze.appendix() }}
+{% endblock %}

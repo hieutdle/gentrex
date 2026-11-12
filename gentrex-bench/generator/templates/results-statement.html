@@ -1,0 +1,40 @@
+{# Bronze's panel report with a results statement (public samples SR010,
+   SR016): a blank running "Patient: DoB:" line, the result in bold under
+   TEST RESULTS, a primary variant table, then metrics and the gene list on
+   page 2 and a statement with two signatures. #}
+{% extends "base.html" %}
+{% import "_bronze.html" as bronze with context %}
+{% block style %}
+@page { @top-left { content: "Patient:          DoB:"; white-space: pre; vertical-align: bottom; padding-bottom: 2pt; font: 6.5pt Arial, Helvetica, sans-serif; } }
+.result { font-weight: bold; font-size: 10.5pt; margin: 8pt 0 4pt; }
+{% endblock %}
+{% block footer %}{{ content(lab.name ~ ", " ~ details.address ~ ". CLIA ID Number " ~ details.clia ~ "\n") }}{% endblock %}
+{% block report %}
+{{ bronze.masthead() }}
+{{ bronze.patient_block() }}
+<div class="block-title">SUMMARY OF RESULTS</div>
+<div class="big">TEST RESULTS</div>
+<p class="result">{{ val("overall_result_raw") }}</p>
+<p>No known disease-causing copy number variants were found by deletion/duplication (CNV) analysis.</p>
+{% if variants %}
+<div class="grid-title">PRIMARY VARIANT TABLE: SEQUENCE ALTERATIONS</div>
+{% for v in variants %}{{ bronze.grid(v) }}{% endfor %}
+{% endif %}
+<div class="page-break">
+{{ bronze.metrics() }}
+{{ bronze.gene_list() }}
+</div>
+<div class="statement">
+  <div class="block-title" style="margin-top: 14pt">STATEMENT</div>
+  {{ bronze.history() }}
+  <h3>CLINICAL REPORT</h3>
+  {% for v in variants %}{{ bronze.clinical_report(v) }}{% endfor %}
+  {% for text in prose.interpretation %}<p>{{ text }}</p>{% endfor %}
+  <h3>CONCLUSION</h3>
+  <p>{{ prose.summary }}</p>
+  {% for text in prose.recommendations %}<p>{{ text }}</p>{% endfor %}
+  {{ bronze.steps() }}
+  {{ bronze.signatures(2) }}
+</div>
+{{ bronze.appendix() }}
+{% endblock %}

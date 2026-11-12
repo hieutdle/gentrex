@@ -1,0 +1,274 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1460" height="700" viewBox="0 0 1460 700" role="img" aria-labelledby="title desc">
+  <title id="title">Gentrex architecture</title>
+  <desc id="desc">An 8-page PDF report with 2 scanned pages. gentrex transcribe reads the text of every page, with OCR for the scanned ones. gentrex select keeps the 3 pages with the result and the clinical features. gentrex extract turns them into one record with the values as printed, such as the gene SCN1A and the disease Dravet syndrome. gentrex normalize adds HGNC, MONDO and HPO IDs and ISO dates. The records then load into SQLite, PostgreSQL or MySQL, or export as GA4GH Phenopackets, into an OMOP CDM or as HL7 FHIR Bundles.</desc>
+  <defs>
+    <pattern id="scan" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+      <rect width="8" height="8" fill="#d6d6d6"/>
+      <line x1="0" y1="0" x2="0" y2="8" stroke="#a9a9a9" stroke-width="3"/>
+    </pattern>
+  </defs>
+  <rect width="1460" height="700" fill="#ffffff"/>
+  <!-- Steps -->
+  <text x="130.0" y="62" font-family="Helvetica, Arial, sans-serif" font-size="28" font-weight="700" text-anchor="middle" fill="#1a1a1a">PDF report</text>
+  <text x="380.0" y="62" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="28" font-weight="700" text-anchor="middle" fill="#1a1a1a">transcribe</text>
+  <text x="630.0" y="62" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="28" font-weight="700" text-anchor="middle" fill="#1a1a1a">select</text>
+  <text x="930.0" y="62" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="28" font-weight="700" text-anchor="middle" fill="#1a1a1a">extract</text>
+  <text x="1280.0" y="62" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="28" font-weight="700" text-anchor="middle" fill="#1a1a1a">normalize</text>
+  <g>
+    <rect x="38.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="44.0" y1="152" x2="72.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="44.0" y1="161" x2="68.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="44.0" y1="170" x2="72.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="44.0" y1="179" x2="62.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="86.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="92.0" y1="152" x2="120.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="92.0" y1="161" x2="116.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="92.0" y1="170" x2="120.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="92.0" y1="179" x2="110.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="134.0" y="139" width="40" height="54" rx="2" fill="url(#scan)" stroke="#8a8a8a" stroke-width="1.5"/>
+  </g>
+  <g>
+    <rect x="182.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="188.0" y1="152" x2="216.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="188.0" y1="161" x2="212.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="188.0" y1="170" x2="216.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="188.0" y1="179" x2="206.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="38.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="44.0" y1="220" x2="72.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="44.0" y1="229" x2="68.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="44.0" y1="238" x2="72.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="44.0" y1="247" x2="62.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="86.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="92.0" y1="220" x2="120.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="92.0" y1="229" x2="116.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="92.0" y1="238" x2="120.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="92.0" y1="247" x2="110.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="134.0" y="207" width="40" height="54" rx="2" fill="url(#scan)" stroke="#8a8a8a" stroke-width="1.5"/>
+  </g>
+  <g>
+    <rect x="182.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="188.0" y1="220" x2="216.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="188.0" y1="229" x2="212.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="188.0" y1="238" x2="216.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="188.0" y1="247" x2="206.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="288.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="294.0" y1="152" x2="322.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="294.0" y1="161" x2="318.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="294.0" y1="170" x2="322.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="294.0" y1="179" x2="312.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="336.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="342.0" y1="152" x2="370.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="342.0" y1="161" x2="366.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="342.0" y1="170" x2="370.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="342.0" y1="179" x2="360.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="384.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="390.0" y1="152" x2="418.0" y2="152" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="390.0" y1="161" x2="414.0" y2="161" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="390.0" y1="170" x2="418.0" y2="170" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="390.0" y1="179" x2="408.0" y2="179" stroke="#c55a11" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="432.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="438.0" y1="152" x2="466.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="438.0" y1="161" x2="462.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="438.0" y1="170" x2="466.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="438.0" y1="179" x2="456.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="288.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="294.0" y1="220" x2="322.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="294.0" y1="229" x2="318.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="294.0" y1="238" x2="322.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="294.0" y1="247" x2="312.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="336.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="342.0" y1="220" x2="370.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="342.0" y1="229" x2="366.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="342.0" y1="238" x2="370.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="342.0" y1="247" x2="360.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="384.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="390.0" y1="220" x2="418.0" y2="220" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="390.0" y1="229" x2="414.0" y2="229" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="390.0" y1="238" x2="418.0" y2="238" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="390.0" y1="247" x2="408.0" y2="247" stroke="#c55a11" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="432.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="438.0" y1="220" x2="466.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="438.0" y1="229" x2="462.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="438.0" y1="238" x2="466.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="438.0" y1="247" x2="456.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="538.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#4f8a00" stroke-width="4"/>
+    <line x1="544.0" y1="152" x2="572.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="544.0" y1="161" x2="568.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="544.0" y1="170" x2="572.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="544.0" y1="179" x2="562.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g opacity="0.25">
+    <rect x="586.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="592.0" y1="152" x2="620.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="592.0" y1="161" x2="616.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="592.0" y1="170" x2="620.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="592.0" y1="179" x2="610.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="634.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#4f8a00" stroke-width="4"/>
+    <line x1="640.0" y1="152" x2="668.0" y2="152" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="640.0" y1="161" x2="664.0" y2="161" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="640.0" y1="170" x2="668.0" y2="170" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="640.0" y1="179" x2="658.0" y2="179" stroke="#c55a11" stroke-width="2.5"/>
+  </g>
+  <g>
+    <rect x="682.0" y="139" width="40" height="54" rx="2" fill="#ffffff" stroke="#4f8a00" stroke-width="4"/>
+    <line x1="688.0" y1="152" x2="716.0" y2="152" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="688.0" y1="161" x2="712.0" y2="161" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="688.0" y1="170" x2="716.0" y2="170" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="688.0" y1="179" x2="706.0" y2="179" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g opacity="0.25">
+    <rect x="538.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="544.0" y1="220" x2="572.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="544.0" y1="229" x2="568.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="544.0" y1="238" x2="572.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="544.0" y1="247" x2="562.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g opacity="0.25">
+    <rect x="586.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="592.0" y1="220" x2="620.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="592.0" y1="229" x2="616.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="592.0" y1="238" x2="620.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="592.0" y1="247" x2="610.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <g opacity="0.25">
+    <rect x="634.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="640.0" y1="220" x2="668.0" y2="220" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="640.0" y1="229" x2="664.0" y2="229" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="640.0" y1="238" x2="668.0" y2="238" stroke="#c55a11" stroke-width="2.5"/>
+    <line x1="640.0" y1="247" x2="658.0" y2="247" stroke="#c55a11" stroke-width="2.5"/>
+  </g>
+  <g opacity="0.25">
+    <rect x="682.0" y="207" width="40" height="54" rx="2" fill="#ffffff" stroke="#8a8a8a" stroke-width="1.5"/>
+    <line x1="688.0" y1="220" x2="716.0" y2="220" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="688.0" y1="229" x2="712.0" y2="229" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="688.0" y1="238" x2="716.0" y2="238" stroke="#9a9a9a" stroke-width="2.5"/>
+    <line x1="688.0" y1="247" x2="706.0" y2="247" stroke="#9a9a9a" stroke-width="2.5"/>
+  </g>
+  <line x1="236" y1="200" x2="260" y2="200" stroke="#1a1a1a" stroke-width="4"/>
+  <polygon points="274,200 260,191.6 260,208.4" fill="#1a1a1a"/>
+  <line x1="486" y1="200" x2="510" y2="200" stroke="#1a1a1a" stroke-width="4"/>
+  <polygon points="524,200 510,191.6 510,208.4" fill="#1a1a1a"/>
+  <line x1="736" y1="200" x2="760" y2="200" stroke="#1a1a1a" stroke-width="4"/>
+  <polygon points="774,200 760,191.6 760,208.4" fill="#1a1a1a"/>
+  <rect x="780" y="80" width="300" height="252" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="798" y="116" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">gene_symbol</text>
+  <text x="798" y="143" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">SCN1A</text>
+  <text x="798" y="172" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">associated_phenotype</text>
+  <text x="798" y="199" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">Dravet syndrome</text>
+  <text x="798" y="228" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">patient_phenotypes</text>
+  <text x="798" y="255" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">seizures</text>
+  <text x="798" y="284" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">collection_date</text>
+  <text x="798" y="311" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">27-AUG-2026</text>
+  <rect x="1130" y="80" width="300" height="252" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <text x="1148" y="116" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">hgnc_id</text>
+  <text x="1148" y="143" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">HGNC:10585</text>
+  <text x="1148" y="172" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">disease_id</text>
+  <text x="1148" y="199" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">MONDO:0100135</text>
+  <text x="1148" y="228" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">hpo_id</text>
+  <text x="1148" y="255" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">HP:0001250, Seizure</text>
+  <text x="1148" y="284" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="18" font-weight="400" text-anchor="start" fill="#5a5a5a">collection_date</text>
+  <text x="1148" y="311" font-family="Helvetica, Arial, sans-serif" font-size="23" font-weight="700" text-anchor="start" fill="#1a1a1a">2026-08-27</text>
+  <line x1="1088" y1="135" x2="1111" y2="135" stroke="#1a1a1a" stroke-width="3"/>
+  <polygon points="1122,135 1111,128.4 1111,141.6" fill="#1a1a1a"/>
+  <line x1="1088" y1="191" x2="1111" y2="191" stroke="#1a1a1a" stroke-width="3"/>
+  <polygon points="1122,191 1111,184.4 1111,197.6" fill="#1a1a1a"/>
+  <line x1="1088" y1="247" x2="1111" y2="247" stroke="#1a1a1a" stroke-width="3"/>
+  <polygon points="1122,247 1111,240.4 1111,253.6" fill="#1a1a1a"/>
+  <line x1="1088" y1="303" x2="1111" y2="303" stroke="#1a1a1a" stroke-width="3"/>
+  <polygon points="1122,303 1111,296.4 1111,309.6" fill="#1a1a1a"/>
+  <text x="130.0" y="366" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">8 pages, 2 of them</text>
+  <text x="130.0" y="391" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">scanned</text>
+  <text x="380.0" y="366" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">text of every page,</text>
+  <text x="380.0" y="391" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">with OCR for the scans</text>
+  <text x="630.0" y="366" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">3 pages kept, with the</text>
+  <text x="630.0" y="391" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">result and the features</text>
+  <text x="930.0" y="366" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">one record, with the</text>
+  <text x="930.0" y="391" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">values as printed</text>
+  <text x="1280.0" y="366" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">standard IDs and</text>
+  <text x="1280.0" y="391" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="400" text-anchor="middle" fill="#5a5a5a">ISO dates added</text>
+  <text x="130.0" y="434" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" text-anchor="middle" fill="#1a1a1a">report-01.pdf</text>
+  <text x="380.0" y="434" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" text-anchor="middle" fill="#1a1a1a">pages.jsonl</text>
+  <text x="630.0" y="434" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" text-anchor="middle" fill="#1a1a1a">pages.jsonl</text>
+  <text x="930.0" y="434" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" text-anchor="middle" fill="#1a1a1a">extractions.jsonl</text>
+  <text x="1280.0" y="434" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="700" text-anchor="middle" fill="#1a1a1a">normalized.jsonl</text>
+  <!-- Outputs -->
+  <line x1="1280.0" y1="448" x2="1280.0" y2="472" stroke="#1a1a1a" stroke-width="4"/>
+  <line x1="197.5" y1="472" x2="1280.0" y2="472" stroke="#1a1a1a" stroke-width="4"/>
+  <line x1="197.5" y1="472" x2="197.5" y2="486" stroke="#1a1a1a" stroke-width="4"/>
+  <polygon points="197.5,500 189.1,486 205.9,486" fill="#1a1a1a"/>
+  <rect x="30" y="502" width="335" height="178" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <path d="M 170.5 529 L 170.5 579 A 27 9 0 0 0 224.5 579 L 224.5 529" fill="#ffffff" stroke="#2f6db5" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 170.5 545.6666666666666 A 27 9 0 0 0 224.5 545.6666666666666" fill="none" stroke="#2f6db5" stroke-width="3.5"/>
+  <path d="M 170.5 562.3333333333334 A 27 9 0 0 0 224.5 562.3333333333334" fill="none" stroke="#2f6db5" stroke-width="3.5"/>
+  <ellipse cx="197.5" cy="529" rx="27" ry="9" fill="#ffffff" stroke="#2f6db5" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <text x="197.5" y="616" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="700" text-anchor="middle" fill="#1a1a1a">SQL tables</text>
+  <text x="197.5" y="645" font-family="Helvetica, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="middle" fill="#5a5a5a">SQLite, PostgreSQL or MySQL</text>
+  <text x="197.5" y="672" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="400" text-anchor="middle" fill="#1a1a1a">gentrex load</text>
+  <line x1="552.5" y1="472" x2="552.5" y2="486" stroke="#1a1a1a" stroke-width="4"/>
+  <polygon points="552.5,500 544.1,486 560.9,486" fill="#1a1a1a"/>
+  <rect x="385" y="502" width="335" height="178" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <path d="M 530.5 520 L 562.5 520 L 574.5 532 L 574.5 580 L 530.5 580 Z" fill="#ffffff" stroke="#26897c" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <path d="M 562.5 520 L 562.5 532 L 574.5 532" fill="none" stroke="#26897c" stroke-width="3.5" stroke-linejoin="round"/>
+  <circle cx="552.5" cy="542" r="7" fill="#26897c"/>
+  <path d="M 539.5 567 C 539.5 553, 565.5 553, 565.5 567 Z" fill="#26897c"/>
+  <text x="552.5" y="616" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="700" text-anchor="middle" fill="#1a1a1a">Phenopackets</text>
+  <text x="552.5" y="645" font-family="Helvetica, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="middle" fill="#5a5a5a">GA4GH, one per patient</text>
+  <text x="552.5" y="672" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="400" text-anchor="middle" fill="#1a1a1a">export phenopackets</text>
+  <line x1="907.5" y1="472" x2="907.5" y2="486" stroke="#1a1a1a" stroke-width="4"/>
+  <polygon points="907.5,500 899.1,486 915.9,486" fill="#1a1a1a"/>
+  <rect x="740" y="502" width="335" height="178" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <line x1="888.5" y1="532" x2="926.5" y2="532" stroke="#6d58b0" stroke-width="3"/>
+  <line x1="888.5" y1="532" x2="907.5" y2="568" stroke="#6d58b0" stroke-width="3"/>
+  <line x1="926.5" y1="532" x2="907.5" y2="568" stroke="#6d58b0" stroke-width="3"/>
+  <rect x="875.5" y="520" width="26" height="24" rx="3" fill="#ffffff" stroke="#6d58b0" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="875.5" y1="528" x2="901.5" y2="528" stroke="#6d58b0" stroke-width="3"/>
+  <rect x="913.5" y="520" width="26" height="24" rx="3" fill="#ffffff" stroke="#6d58b0" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="913.5" y1="528" x2="939.5" y2="528" stroke="#6d58b0" stroke-width="3"/>
+  <rect x="894.5" y="556" width="26" height="24" rx="3" fill="#ffffff" stroke="#6d58b0" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="894.5" y1="564" x2="920.5" y2="564" stroke="#6d58b0" stroke-width="3"/>
+  <text x="907.5" y="616" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="700" text-anchor="middle" fill="#1a1a1a">OMOP CDM</text>
+  <text x="907.5" y="645" font-family="Helvetica, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="middle" fill="#5a5a5a">with or without extension tables</text>
+  <text x="907.5" y="672" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="400" text-anchor="middle" fill="#1a1a1a">export omop[-extended]</text>
+  <line x1="1262.5" y1="472" x2="1262.5" y2="486" stroke="#1a1a1a" stroke-width="4"/>
+  <polygon points="1262.5,500 1254.1,486 1270.9,486" fill="#1a1a1a"/>
+  <rect x="1095" y="502" width="335" height="178" rx="8" fill="#ffffff" stroke="#4d4d4d" stroke-width="2"/>
+  <rect x="1252.5" y="520" width="40" height="44" rx="4" fill="#ffffff" stroke="#b84a5c" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="1245.5" y="527" width="40" height="44" rx="4" fill="#ffffff" stroke="#b84a5c" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <rect x="1238.5" y="534" width="40" height="44" rx="4" fill="#ffffff" stroke="#b84a5c" stroke-width="3.5" stroke-linejoin="round" stroke-linecap="round"/>
+  <line x1="1245.5" y1="547" x2="1271.5" y2="547" stroke="#b84a5c" stroke-width="3"/>
+  <line x1="1245.5" y1="556" x2="1265.5" y2="556" stroke="#b84a5c" stroke-width="3"/>
+  <line x1="1245.5" y1="565" x2="1271.5" y2="565" stroke="#b84a5c" stroke-width="3"/>
+  <text x="1262.5" y="616" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="700" text-anchor="middle" fill="#1a1a1a">FHIR® Bundles</text>
+  <text x="1262.5" y="645" font-family="Helvetica, Arial, sans-serif" font-size="19" font-weight="400" text-anchor="middle" fill="#5a5a5a">HL7®, one per report</text>
+  <text x="1262.5" y="672" font-family="Menlo, Consolas, 'DejaVu Sans Mono', monospace" font-size="20" font-weight="400" text-anchor="middle" fill="#1a1a1a">export fhir</text>
+</svg>

@@ -1,0 +1,37 @@
+#!/bin/bash
+# Run Gentrex on the benchmark reports in a Minerva job, and score it.
+# Submit it from the gentrex folder, after evaluation/minerva/prepare.sh:
+#
+#   SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
+#
+# gentrex-bench/run.py runs gentrex transcribe, select, extract and normalize
+# on each copy of the reports and scores the records. It serves the model of
+# each command with serve.sh, one after another, so the job holds the two
+# GPUs of gentrex extract for its whole time. The scores go to
+# results/gentrex-bench/.
+#
+# VERSION names the benchmark version (v1 by default), COPIES the copies of
+# the reports to read one after another (native), SPLIT the split (dev), and
+# OPTIONS more options of run.py, as in OPTIONS=--no-select.
+#BSUB -J gentrex-pipeline
+#BSUB -q gpu
+#BSUB -n 4
+#BSUB -W 2:00
+#BSUB -gpu num=2
+#BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
+#BSUB -oo run-pipeline.%J.log
+: "${SERVING:?set SERVING to the serving folder}"
+[ -f gentrex-bench/run.py ] || { echo "submit the job from the gentrex folder"; exit 1; }
+
+module load apptainer
+status=0
+for copy in ${COPIES:-native}; do
+  # HF_HUB_OFFLINE=1 makes gentrex normalize load its embedding models from
+  # the cache that prepare.sh filled, without contacting Hugging Face. --gpus
+  # names the GPUs that serve.sh gives each model.
+  HF_HUB_OFFLINE=1 .venv/bin/python gentrex-bench/run.py \
+    --version "${VERSION:-v1}" --copy "$copy" --split "${SPLIT:-dev}" \
+    --gpus 1 1 2 --serve evaluation/minerva/serve.sh \
+    --settings evaluation/settings.yaml $OPTIONS || status=1
+done
+exit $status

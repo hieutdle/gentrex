@@ -1,0 +1,98 @@
+{# Navy's standard report (public sample NHS01, the standard report of
+   Recchia et al. 2020): a centred masthead, the patient and the referral in
+   two columns, the reason for testing, a one-row result table, the
+   interpretation with a bold summary, the sign-off and a box of notes. It
+   is black on white and fits one page unless the text runs long. Dates are
+   written as 18 Mar 1995, and the patient ID is the NHS number. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% set partner = finding.get("partner") %}
+{% set doctor = "Dr " ~ clinician.split(",")[0].split(" ")[-1] %}
+{% block style %}
+@page { margin: 0.6in 0.75in 0.9in; }
+body { font: 9.5pt Georgia, "Times New Roman", serif; line-height: 1.3; color: #000; }
+.mast { text-align: center; font-family: Arial, Helvetica, sans-serif; }
+.mast .name { font-size: 15pt; font-weight: bold; }
+.mast .address { font-size: 11pt; font-weight: bold; margin-bottom: 3pt; }
+.mast .contact { font-size: 7.5pt; }
+.title { text-align: center; font-size: 13pt; margin: 16pt 0 5pt; padding-bottom: 5pt; border-bottom: 1.5px solid #000; }
+.cols { display: flex; gap: 24pt; }
+.cols table { flex: 1; align-self: flex-start; }
+td { vertical-align: top; padding: 0.5pt 5pt 0.5pt 0; }
+.cols td:first-child, .reason td:first-child { font-family: Arial, Helvetica, sans-serif; white-space: nowrap; width: 1in; }
+.reason { width: 100%; margin: 3pt 0 5pt; padding-bottom: 5pt; border-bottom: 1.5px solid #000; }
+h3 { font: bold 10.5pt Arial, Helvetica, sans-serif; margin: 6pt 0 3pt; }
+table.result { width: 92%; margin: 0 auto 5pt; font-size: 8.5pt; }
+table.result th { font: 9.5pt Arial, Helvetica, sans-serif; border: 1px solid #000; padding: 1pt 4pt; }
+table.result td { border: 1px solid #000; text-align: center; padding: 1.5pt 4pt; }
+.summary { font-weight: bold; font-size: 10.5pt; }
+/* A change must not break across lines, as Chrome would do before a bracket. */
+.nb, .summary span { white-space: nowrap; }
+.sign { display: flex; justify-content: space-between; margin-top: 44pt; font-family: Arial, Helvetica, sans-serif; }
+.sign small { display: block; font-style: italic; font-size: 7pt; margin: 6pt 0 0 44pt; }
+.rely { font: italic 7pt Arial, Helvetica, sans-serif; margin: 10pt 0 2pt; }
+.notes { border: 1px solid #000; padding: 3pt 5pt; font-size: 7.5pt; }
+.notes p { margin: 0 0 3pt; }
+{% endblock %}
+{% block footer %}{{ content(lab.name ~ ", " ~ details.address ~ "        Page ", page, " of ", pages, "\n") }}{% endblock %}
+{% block report %}
+<div class="mast">
+  <div class="name">{{ lab.name }}</div>
+  <div class="address">{{ details.address }}</div>
+  <div class="contact">Website: {{ details.web }} &emsp; Telephone: {{ details.phone }} &emsp; Fax: {{ details.fax }}</div>
+  <div class="contact">Head of Laboratory: {{ signers[0].split(",")[0] }}</div>
+</div>
+<div class="title">Molecular Genetics Report: {{ focus.gene }} Analysis</div>
+<div class="cols">
+  <table>
+    <tr><td>Patient name:</td><td><b>{{ patient.last_name | upper }}</b><br>{{ patient.first_name }}</td></tr>
+    <tr><td>DOB:</td><td>{{ val("date_of_birth") }}</td></tr>
+    <tr><td>Sex:</td><td>{{ val("sex") }}</td></tr>
+    {% if val("mrn") %}<tr><td>NHS No.:</td><td>{{ val("mrn") }}</td></tr>{% endif %}
+    <tr><td>Unit no.:</td><td>Not provided</td></tr>
+    {% if val("specimen_type") %}<tr><td>Sample type:</td><td>{{ val("specimen_type") }}</td></tr>{% endif %}
+  </table>
+  <table>
+    <tr><td>Referred by:</td><td>{{ doctor }}</td></tr>
+    <tr><td>Unit:</td><td>{{ clinic }}</td></tr>
+    <tr><td>Date requested:</td><td>{{ date("collection_date", -1) }}</td></tr>
+    {% if val("collection_date") %}<tr><td>Date collected:</td><td>{{ val("collection_date") }}</td></tr>{% endif %}
+    {% if val("received_date") %}<tr><td>Date received:</td><td>{{ val("received_date") }}</td></tr>{% endif %}
+    {{ c.other_id_rows("td") }}
+  </table>
+</div>
+<table class="reason">
+  <tr><td>Test reason:</td><td>{{ val("clinical_indication") }}.{% if partner %} The referral names the partner, {{ partner.name }} (born {{ partner.born }}), as a carrier of the {{ focus.gene }} mutation {{ partner.change }}. Nothing else is known about the family.{% endif %}{% if features %} Clinical details given: {{ c.feature_list() }}.{% endif %}{% if family_history %} {{ family_history }}{% endif %}</td></tr>
+</table>
+<h3>Results and interpretation:</h3>
+<table class="result">
+  <tr><th>Test</th><th>Result</th><th>Lab ref</th></tr>
+  {% for v in variants %}
+  <tr><td>{{ val("test_name") }}</td><td><b>{{ v.gene_symbol }} <span class="nb">{{ v.change }}</span> {{ v.zygosity_raw }}</b></td><td>{{ val("lab_accession_number") }}</td></tr>
+  {% else %}
+  <tr><td>{{ val("test_name") }}</td><td><b>No mutation detected</b></td><td>{{ val("lab_accession_number") }}</td></tr>
+  {% endfor %}
+</table>
+{% for v in variants %}
+<p>The mutation <span class="nb">{{ v.transcript }}:{{ v.change }}</span>{% if v.hgvs_p %} <span class="nb">{{ v.hgvs_p }}</span>{% endif %} was found in the {{ v.gene_symbol }} gene of this patient. Clinical significance: {{ v.classification_raw }}. Mutations in this gene cause {{ v.associated_phenotype }}. Inheritance: {{ v.mode_of_inheritance_raw }}.</p>
+{% endfor %}
+{{ c.paragraphs(prose.interpretation) }}
+<p>{{ prose.recommendations | join(" ") }}</p>
+<h3>Summary:</h3>
+<p class="summary">{% for word in val("overall_result_raw").split(" ") %}<span>{{ word }}</span> {% endfor %}</p>
+<div class="sign">
+  <div>Reported: {{ signers[1].split(",")[0] }}<small>Clinical Scientist</small></div>
+  <div>Authorised: {{ signers[0].split(",")[0] }}<small>Consultant Clinical Scientist</small></div>
+  <div>Date: {{ val("report_date") }}</div>
+</div>
+<p class="rely">A result is only as reliable as the sample labelling, the diagnoses and the family relationships given on the referral.</p>
+<div class="notes">
+  {% if kind == "carrier" %}
+  <p>Notes: The {{ val("test_name") }} looks for the {{ focus.gene }} mutations that are most often found in people with {{ focus.condition }} in this region, by allele-specific amplification. A mutation outside this set is not found, so a normal result lowers the chance of being a carrier without ruling it out.</p>
+  {% else %}
+  <p>Notes: All coding exons of {{ focus.gene }} and their splice sites were sequenced, and exon copy number was measured by MLPA. Mutations deep within introns or in regulatory regions are not found.</p>
+  {% endif %}
+  <p>Mutations are named as HGVS recommends, on the reference sequence {{ focus.transcript }}. {{ hgvs_example or "" }}</p>
+  <p>Rare sequence changes under a primer or probe can give a false positive or a false negative result. For more about this test, see {{ details.web }}.</p>
+</div>
+{% endblock %}

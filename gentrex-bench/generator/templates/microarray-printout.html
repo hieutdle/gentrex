@@ -1,0 +1,97 @@
+{# Lilac's chromosomal microarray report (public sample LAB07): the
+   sending facility in the top right corner, header fields in two columns of
+   right-aligned labels, the result and its interpretation in capitals, the
+   array result in ISCN, and the narrative in a typewriter font. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% set v = variants[0] if variants else None %}
+{% block style %}
+@page {
+  margin: 0.6in 0.75in 0.85in;
+  @top-left {
+    content: {{ content("Patient Name: " ~ patient.listed | upper ~ "     Specimen Number: " ~ val("lab_accession_number")) }};
+    white-space: pre; vertical-align: bottom; padding-bottom: 6pt;
+    font: 8pt "Times New Roman", Times, serif;
+  }
+  @bottom-center { text-align: left; font: 7pt "Times New Roman", Times, serif; }
+}
+@page :first { @top-left { content: none; } }
+body { font: 9.5pt "Times New Roman", Times, serif; line-height: 1.25; }
+.top { display: flex; justify-content: space-between; margin-bottom: 14pt; }
+.brand { display: flex; gap: 12pt; align-items: flex-end; }
+.brand i { font-size: 10pt; }
+.facility { font-size: 9pt; }
+.facility b { display: block; }
+.fields { display: flex; gap: 20pt; margin-bottom: 8pt; }
+.fields table td { padding: 0.5pt 3pt; vertical-align: top; }
+.fields table td:first-child { text-align: right; white-space: nowrap; }
+.fields table td + td { font-weight: bold; }
+.line { margin: 4pt 0; }
+.result { font-weight: bold; margin: 10pt 0 2pt; }
+.iscn { font: bold 10pt "Courier New", Courier, monospace; text-align: center; margin: 10pt 0; }
+.narrative { font: 9pt "Courier New", Courier, monospace; line-height: 1.2; }
+.narrative p { text-indent: 2.5em; margin-bottom: 8pt; }
+.method { font: 6.8pt "Courier New", Courier, monospace; }
+{% endblock %}
+{% block footer %}{{ content(lab.name ~ " | " ~ details.address ~ " | " ~ details.phone ~ "\n") }}{% endblock %}
+{% block report %}
+<div class="top">
+  <div class="brand"><div class="lilac-logo">{{ lab.name }}<small>Cytogenetics</small></div><i>SNP Microarray</i></div>
+  <div class="facility"><b>Client/Sending Facility:</b>{{ clinic | upper }}<br>{{ clinic_address[0] | upper }}<br>{{ clinic_address[1] | upper }}<br>Ph: {{ details.phone }}</div>
+</div>
+<div class="fields">
+  <table>
+    <tr><td>Specimen Number:</td><td>{{ val("lab_accession_number") }}</td></tr>
+    {% for label, value in other_ids %}<tr><td>{{ label }}:</td><td>{{ value }}</td></tr>{% endfor %}
+    <tr><td>Patient Name:</td><td>{{ patient.listed | upper }}</td></tr>
+    <tr><td>Date of Birth:</td><td>{{ val("date_of_birth") }}</td></tr>
+    <tr><td>Gender:</td><td>{{ val("sex") }}</td></tr>
+    {% if val("mrn") %}<tr><td>Patient ID:</td><td>{{ val("mrn") }}</td></tr>{% endif %}
+    <tr><td>Lab Number:</td><td>YU{{ digits(2) }}-{{ digits(5) }} G</td></tr>
+    <tr><td>Indications:</td><td>{{ val("clinical_indication") }}</td></tr>
+  </table>
+  <table>
+    <tr><td>Account Number:</td><td>{{ digits(8) }}</td></tr>
+    <tr><td>Ordering Physician:</td><td>{{ clinician | upper }}</td></tr>
+    {% if val("specimen_type") %}<tr><td>Specimen Type:</td><td>{{ val("specimen_type") }}</td></tr>{% endif %}
+    {% if val("collection_date") %}<tr><td>Date Collected:</td><td>{{ val("collection_date") }}</td></tr>{% endif %}
+    {% if val("received_date") %}<tr><td>Date Received:</td><td>{{ val("received_date") }}</td></tr>{% endif %}
+    <tr><td>Date Reported:</td><td>{{ val("report_date") }}</td></tr>
+  </table>
+</div>
+{% if features or family_history %}
+<div class="line">Clinical Information: {% if features %}{{ c.feature_list() }}.{% endif %} {{ family_history or "" }}</div>
+{% endif %}
+<div class="line">Test: <b>{{ val("test_name") }}</b></div>
+<div class="line">Genotyping Targets: {{ digits(7) }}&emsp;&emsp;Array Type: SNP</div>
+<div class="result">MICROARRAY RESULT: {{ val("overall_result_raw") }}</div>
+{% if v %}
+<div class="result">INTERPRETATION: {{ v.classification_raw }}</div>
+<div class="iscn">{{ v.dna_change_raw }}</div>
+{% else %}
+<div class="iscn">{{ normal_notation }}</div>
+{% endif %}
+<div class="narrative">
+{% if v %}
+<p>Whole-genome SNP microarray analysis found a {{ "duplication" if finding.gain else "deletion" }} of the segment shown above, which contains {{ finding.genes }} genes.{% if v.associated_phenotype %} It overlaps the region associated with {{ v.associated_phenotype }}.{% endif %}</p>
+<p>{{ prose.variant_details[0] }}</p>
+{% endif %}
+{% for text in prose.interpretation %}<p>{{ text }}</p>{% endfor %}
+<p>Under the current reporting criteria, the array showed no other copy number changes and no copy-neutral regions of homozygosity. <b>Genetic counseling is recommended.</b></p>
+{% if v %}
+<p>For follow-up studies, send the parents' blood samples under test code {{ digits(6) }}, labeled with the proband's name, birth date and specimen number. This sample will be kept for 12 months to serve as a positive control in the parental studies.</p>
+{% endif %}
+</div>
+<p class="method"><b>Methodology:</b> SNP microarray analysis was performed with a whole-genome array of copy number and SNP probes. Genomic DNA was digested, ligated to adaptors, amplified, labeled and hybridized to the array. Data were analyzed against the hg19 (GRCh37) human reference genome. The array detects copy number changes of about 50 kb and larger in targeted regions. It does not detect balanced rearrangements, point mutations or low-level mosaicism.</p>
+<div class="page-break">
+<h3>Additional Information</h3>
+<div class="narrative">
+<p>{{ prose.summary }}</p>
+<p>{{ prose.condition.characteristics }} {{ prose.condition.cause }}</p>
+{% for text in prose.recommendations %}<p>{{ text }}</p>{% endfor %}
+</div>
+<h3>Information for the Family</h3>
+{{ c.paragraphs(prose.patient_summary) }}
+<p>Electronically signed by {{ signers[0] }}, Director, Cytogenetics, on {{ val("report_date") }}.</p>
+</div>
+{% endblock %}

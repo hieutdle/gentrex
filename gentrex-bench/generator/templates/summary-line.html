@@ -1,0 +1,147 @@
+{# Plum's molecular genetics report (public samples PVG02-PVG14): name
+   and patient ID boxes at the top, a purple bar over three columns of
+   patient, specimen and provider details, the test name centered, a
+   one-line summary of results, then per kind of test a table or paragraph,
+   numbered notes and the signatures. The sequencing table prints ClinVar
+   IDs, which are distractors. #}
+{% extends "base.html" %}
+{% import "_common.html" as c with context %}
+{% set v = variants[0] if variants else None %}
+{% set method = {"panel": "Sequencing and CNV", "single_gene": "Sequencing and CNV", "array": "aCGH and SNP", "repeat": "Repeat-primed PCR", "methylation": "MS-MLPA"}[kind] %}
+{% block style %}
+@page {
+  margin: 0.45in 0.5in 1.05in;
+  @top-right {
+    content: {{ content("NAME: " ~ patient.listed | upper ~ "     PATIENT ID: " ~ (val("mrn") or "")) }};
+    white-space: pre; vertical-align: bottom; padding-bottom: 6pt; font: 7.5pt Arial, Helvetica, sans-serif;
+  }
+  @bottom-center { text-align: left; font-size: 6.5pt; border-top: 1px solid #000; }
+}
+@page :first { @top-right { content: none; } }
+.top { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10pt; }
+.boxes { display: flex; gap: 0; }
+.boxes div { border: 1px solid #000; padding: 1pt 5pt 2pt; min-width: 1.6in; font-size: 9pt; }
+.boxes small { display: block; font-size: 5.5pt; color: #444; }
+table.info { width: 100%; border: 1.5px solid #000; margin-bottom: 12pt; }
+table.info th { text-align: left; font-size: 7.5pt; padding: 2pt 5pt; }
+table.info td { vertical-align: top; padding: 3pt 5pt 6pt; width: 33%; border-right: 1px solid #999; }
+h1.title { text-align: center; font-size: 11pt; font-weight: normal; margin: 6pt 0 8pt; }
+h1.title span { text-decoration: underline; }
+.rule { background: #ddd; height: 9pt; margin: 4pt 0 10pt; padding-left: 3pt; font-size: 8pt; line-height: 9pt; color: #5b4a9b; }
+.summary { font-size: 10.5pt; margin: 6pt 0 10pt; }
+.summary b { font-weight: bold; }
+table.vars { width: 100%; margin: 4pt 0 2pt; font-size: 7.5pt; }
+table.vars th { border: 1px solid #000; padding: 2pt 3pt; font-weight: bold; text-align: center; }
+table.vars td { border: 1px solid #000; padding: 3pt; text-align: center; vertical-align: middle; }
+.legend { font-size: 6.5pt; margin-bottom: 8pt; }
+h3 { font-size: 8.5pt; margin: 8pt 0 2pt; }
+ol.notes { padding-left: 14pt; }
+.sign { display: flex; gap: 10pt; border-bottom: 1px solid #000; margin-top: 18pt; padding-bottom: 14pt; }
+.sign div { flex: 1; }
+{% endblock %}
+{% block footer %}{{ content("Reported On: " ~ val("report_date") ~ "                                                                                                Collected On: " ~ (val("collection_date") or "") ~ "\n" ~ details.address ~ "   " ~ details.web ~ "     PAGE ", page, " OF ", pages, "\n" ~ "Phone: " ~ details.phone ~ "   General Fax: " ~ details.fax ~ "   Clinical Laboratory Director: " ~ details.directors[0] ~ "   CLIA# " ~ details.clia ~ "\n") }}{% endblock %}
+{% block report %}
+<div class="top">
+  <div class="plum-logo">{{ lab.name }}<small>Clinical molecular laboratory</small></div>
+  <div class="boxes"><div><small>NAME</small>{{ patient.listed | upper }}</div><div><small>PATIENT ID</small>{{ val("mrn") or "" }}</div></div>
+</div>
+<table class="info">
+  <tr class="purple"><th>PATIENT INFORMATION</th><th>SPECIMEN INFORMATION</th><th>PROVIDER INFORMATION</th></tr>
+  <tr>
+    <td>{{ patient.listed | upper }}<br>{% if val("mrn") %}ID#: {{ val("mrn") }}<br>{% endif %}DOB: {{ val("date_of_birth") }}<br>Sex: {{ val("sex") }}</td>
+    <td>{% if val("specimen_type") %}Type: {{ val("specimen_type") }}<br>{% endif %}{% if val("collection_date") %}Collected: {{ val("collection_date") }}<br>{% endif %}{% if val("received_date") %}Received: {{ val("received_date") }}<br>{% endif %}HG ID: {{ val("lab_accession_number") }}<br>{% for label, value in other_ids %}{{ label }}: {{ value }}<br>{% endfor %}Test Method: {{ method }}</td>
+    <td>{{ clinician }}<br>Genetic Counselor: {{ signers[1].split(",")[0] }}<br>{{ clinic }}</td>
+  </tr>
+</table>
+<h1 class="title"><span>{{ "MICROARRAY REPORT:" if kind == "array" else "MOLECULAR GENETICS REPORT:" }}</span><br>{{ val("test_name") }}</h1>
+<div class="rule">&raquo;</div>
+<p class="summary">SUMMARY OF RESULTS: <b>{{ val("overall_result_raw") }}</b></p>
+<p><b>INDICATION FOR TESTING:</b> {{ val("clinical_indication") }}{% if features %}. Clinical features: {{ c.feature_list(", ") }}{% endif %}.{% if family_history %} {{ family_history }}{% endif %}</p>
+
+{% if kind in ("panel", "single_gene") %}
+{% if variants %}
+<p><b>Sequence Variant(s):</b></p>
+<table class="vars">
+  <thead><tr><th>Gene, Transcript</th><th>Mode of Inheritance</th><th>DNA Variations, Predicted Effects, Zygosity</th><th>ClinVar ID</th><th>Highest Allele Frequency in a gnomAD Population</th><th>In Silico Missense Predictions</th><th>Interpretation</th></tr></thead>
+  {% for v in variants %}
+  <tr{% if v.split %} class="split"{% endif %}>
+    <td><i>{{ v.gene_symbol }}</i>,<br>{{ v.transcript }}</td>
+    <td>{{ v.mode_of_inheritance_raw }}</td>
+    <td>{{ v.change }}{% if v.hgvs_p %},<br>{{ v.hgvs_p }}{% endif %},<br>{{ v.zygosity_raw }}</td>
+    <td>{{ clinvar_ids[loop.index0] }}</td>
+    <td>Not Present</td>
+    <td>{{ "Conflicting" if v.hgvs_p and "fs" not in v.hgvs_p and "*" not in v.hgvs_p and "Ter" not in v.hgvs_p else "Not Applicable" }}</td>
+    <td>{{ v.classification_raw }}</td>
+  </tr>
+  {% endfor %}
+</table>
+<p class="legend">Inheritance: AR, autosomal recessive; AD, autosomal dominant; XLD, X-linked dominant; XLR, X-linked recessive; XL, X-linked. ClinVar ID: the variant's accession in ClinVar. gnomAD: the highest allele frequency among the populations of the Genome Aggregation Database.</p>
+{% for v in variants %}
+<h3><i>{{ v.gene_symbol }}</i> VARIANT INFORMATION:</h3>
+<p>Variants in <i>{{ v.gene_symbol }}</i> are associated with {{ v.associated_phenotype }}. {{ prose.variant_details[loop.index0] }}</p>
+{% endfor %}
+{% else %}
+<p><b>RESULTS AND INTERPRETATIONS:</b> Sequencing of the relevant genes found no variant that is likely to explain the patient's disease.</p>
+{% endif %}
+<p>Copy number analysis of the regions covered by this test also found no copy number variants (CNVs).</p>
+{% if genes %}<p><b>GENES ANALYZED:</b> {{ genes | join(", ") }}</p>{% endif %}
+
+{% elif kind == "array" %}
+{% if v %}
+<table class="vars">
+  <thead><tr><th>Genomic Coordinates</th><th>Type</th><th>Size</th><th>Zygosity</th><th>Interpretation</th></tr></thead>
+  <tr><td>{{ v.dna_change_raw }}</td><td>{{ v.variant_type_raw }}</td><td>{{ finding.size }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.classification_raw }}</td></tr>
+</table>
+<h3>COPY NUMBER VARIANT INFORMATION:</h3>
+<p>This patient has a {{ "duplication" if finding.gain else "deletion" }} at band {{ finding.band }} that contains {{ finding.genes }} genes.{% if v.associated_phenotype %} It is compatible with a diagnosis of {{ v.associated_phenotype }}.{% endif %} {{ prose.variant_details[0] }}</p>
+{% else %}
+<p><b>RESULTS AND INTERPRETATIONS:</b> The microarray showed no copy number change linked to a known microdeletion or microduplication syndrome.</p>
+<p>ISCN Nomenclature:&emsp;{{ normal_notation }}</p>
+{% endif %}
+<p>There was no excess absence of heterozygosity to suggest uniparental disomy or consanguinity.</p>
+
+{% elif kind == "repeat" %}
+<p><b>METHODS:</b> The patient's genomic DNA was tested for a <i>{{ focus.gene }}</i> repeat expansion by repeat-primed PCR and by fluorescent PCR sizing of the alleles. <b>Transcript Number:</b> <i>{{ focus.gene }}</i> ({{ focus.transcript }})</p>
+{% if v %}
+<table class="vars">
+  <thead><tr><th>Gene, Transcript</th><th>Repeat Sizes</th><th>Zygosity</th><th>Mode of Inheritance</th><th>Interpretation</th></tr></thead>
+  <tr><td><i>{{ v.gene_symbol }}</i>,<br>{{ v.transcript }}</td><td>{{ v.dna_change_raw }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.classification_raw }}</td></tr>
+</table>
+<p><b>RESULTS AND INTERPRETATIONS:</b> Expansions of the {{ finding.unit }} repeat in <i>{{ v.gene_symbol }}</i> cause {{ v.associated_phenotype }}. {{ prose.interpretation | join(" ") }}</p>
+{% else %}
+<p><b>RESULTS AND INTERPRETATIONS:</b> Both <i>{{ focus.gene }}</i> alleles of this patient are in the normal range, with {{ normal_repeats }}. {{ prose.interpretation | join(" ") }}</p>
+{% endif %}
+
+{% elif kind == "methylation" %}
+<p><b>RESULTS AND INTERPRETATIONS:</b> The copy number probes of the MS-MLPA assay showed the normal two copies throughout 15q11.2q13, the Prader-Willi/Angelman syndrome region. {% if finding.parent %}Only the {{ finding.parent }} methylation pattern was present, a result that fits a diagnosis of {{ finding.syndrome }}. Uniparental disomy or an imprinting defect can cause this pattern.{% else %}Both the maternal and the paternal methylation patterns were present, which is normal.{% endif %}</p>
+{{ c.paragraphs(prose.interpretation) }}
+{% endif %}
+
+<p>These results need to be read together with the family history, the clinical findings and other laboratory results. Every genetic test has limitations, and the following pages describe those of this test along with other notes.</p>
+<h3>NOTES:</h3>
+<ol class="notes">
+  {% for text in prose.recommendations %}<li>{{ text }}</li>{% endfor %}
+  <li>Genetic counseling is recommended.</li>
+</ol>
+<div class="sign"><div>Electronically signed on {{ date("report_date") }} by: {{ signers[0] }}</div><div>Electronically signed and reported on {{ date("report_date") }} by: {{ signers[1] }}</div></div>
+
+<div class="page-break">
+<h3>ADDITIONAL INFORMATION:</h3>
+<p>{{ prose.summary }}</p>
+<p>{{ prose.condition.characteristics }}</p>
+<p>{{ prose.condition.incidence }} {{ prose.condition.penetrance }}</p>
+<p>{{ prose.condition.cause }}</p>
+<h3>SUMMARY FOR THE PATIENT:</h3>
+{{ c.paragraphs(prose.patient_summary) }}
+<h3>METHODS AND LIMITATIONS:</h3>
+{% if kind in ("panel", "single_gene") %}
+<p>Genomic DNA is enriched for the coding exons and flanking intronic sequence of the genes of this test and sequenced on a next-generation sequencing platform. Reads are aligned to the GRCh37 reference genome, and copy number variants are called from read depth. Variants are classified with the ACMG standards. {{ hgvs_example or "" }}</p>
+{% elif kind == "array" %}
+<p>Patient DNA and DNA from a sex-matched reference are labeled and hybridized to an array with copy number and SNP probes. Positions are given on the GRCh37 reference genome, and results are written in ISCN. The array does not detect balanced rearrangements, sequence variants or low-level mosaicism.</p>
+{% elif kind == "repeat" %}
+<p>The repeat-primed PCR assay screens for an expanded allele, and the fragment-length assay sizes normal alleles accurately up to about 40 repeats. Neither assay detects other kinds of variants in the gene. {{ hgvs_example or "" }}</p>
+{% else %}
+<p>Methylation-specific MLPA measures copy number and methylation at the Prader-Willi/Angelman syndrome region with a commercial probe kit. It does not tell uniparental disomy from an imprinting defect, which microsatellite analysis of chromosome 15 can. {{ hgvs_example or "" }}</p>
+{% endif %}
+</div>
+{% endblock %}
