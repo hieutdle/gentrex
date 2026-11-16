@@ -8,9 +8,9 @@ models alone and with BM25 added.
 Its test set is GSC+, a public corpus in which experts marked 2,122 phenotype
 mentions in 228 PubMed abstracts and gave each one its HPO term.
 
-Run the script when you change `normalize.hpo.models` in settings.yaml or the
-way `gentrex normalize` ranks HPO terms. The results of the last run, and what
-they mean for Gentrex, are in
+Run the script when you change `normalize.hpo.models` in
+`src/gentrex/defaults/settings.yaml` or the way `gentrex normalize` ranks HPO
+terms. The results of the last run, and what they mean for Gentrex, are in
 [evaluation_results/hpo-matching.md](../evaluation_results/hpo-matching.md).
 
 ## Before you start
@@ -118,7 +118,8 @@ single models come from a sample of names and mentions.
 
 ## Evaluate other models
 
-To evaluate other models, change `normalize.hpo.models` in settings.yaml and
-run the script again. It takes the models and their prompts from that
-setting. You don't need to build an HPO index first, because the script builds
+To evaluate other models, change `normalize.hpo.models` in
+`src/gentrex/defaults/settings.yaml` and run the script again. It takes the
+models and their prompts from that file, and doesn't read a settings file of
+your own. You don't need to build an HPO index first, because the script builds
 its own.

@@ -178,6 +178,42 @@ def test_other_spellings_match_but_are_not_exact():
     assert not by_field["specimen_type"].strict
 
 
+def test_a_reference_before_an_m_change_matches():
+    """The schema's own example writes an m. change after its reference."""
+    assert compare.key("dna_change_raw", "NC_012920.1:m.3243A>G") == compare.key(
+        "dna_change_raw", "m.3243A>G"
+    )
+    assert compare.key("hgvs_c", "NM_004006.3(DMD):c.5266dup") == "c.5266dup"
+    # A colon in other wording starts no reference.
+    assert compare.key("dna_change_raw", "SMN1 copy number: 1") != "1"
+
+
+def test_a_variant_matches_under_its_approved_gene_symbol():
+    """The schema doesn't ask for the printed symbol, so MLH1 for COCA2 is right."""
+    truth = _truth()
+    truth["record"]["variants"][0]["gene_symbol"] = "COCA2"
+    truth["normalized"]["variants"][0]["gene_symbol"] = "MLH1"
+    report = _report(truth)
+    report["data"]["variants"][0]["gene_symbol"] = "MLH1"
+
+    outcomes = compare.compare(truth, report, _PAGES, _PAGES, config.load_schema())
+
+    assert {o.result for o in outcomes} == {"correct"}
+
+
+def test_a_variant_without_a_change_matches_on_its_gene():
+    """An SMN1 copy number has no DNA change, so wording copied there is only extra."""
+    truth = _truth()
+    truth["record"]["variants"][0]["hgvs_c"] = None
+    report = _report(truth)
+    report["data"]["variants"][0]["dna_change_raw"] = "DMD copy number: 1"
+
+    outcomes = compare.compare(truth, report, _PAGES, _PAGES, config.load_schema())
+
+    wrong = {o.field: o.result for o in outcomes if o.result != "correct"}
+    assert wrong == {"variants.dna_change_raw": "extra"}
+
+
 def test_an_extra_variant_from_a_distractor_is_told_from_a_made_up_one():
     """Copying a cited variant and inventing one need different fixes."""
     report = _report(_truth())

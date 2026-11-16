@@ -135,7 +135,29 @@ To score another copy, run the command again with another `--copy`.
 
 A command that ends with failed files doesn't stop the run. The reports
 without a record count as wrong, so a setup that often fails can't look good
-by leaving reports out.
+by leaving reports out. `run.py` then writes the scores and ends with exit
+code 1, so that a script or a batch job notices. `scores.json` gives each
+command's `exit_status` and `failed_files` under `performance`. Before you
+use such scores, check in the command's `log.txt` whether the model failed
+on these files or its server stopped.
+
+### Go on after a run that stopped
+
+If a run stops in a later command, the commands before it don't have to run
+again. Each command logs its run folder in a line such as
+`writing results/select/20261110-103801`. Give the folder of the last
+command that finished to `--from-run`:
+
+```bash
+uv run --extra hpo python gentrex-bench/run.py \
+  --version v1 --split dev --gpus 1 1 2 --serve evaluation/local/serve.sh \
+  --from-run results/select/20261110-103801
+```
+
+The run then starts with `gentrex extract`. The scores still give the time
+of every command, because each run folder records its own. Keep `--version`
+and `--split` as they were. `--copy` isn't needed, because the run folder
+already holds the pages.
 
 ## Check the result
 
@@ -289,13 +311,16 @@ on your own reports, so the benchmark measures the Gentrex that you use.
 
 The scorer counts every value as correct, missed, extra or wrong. Text
 matches if it is the same apart from case, spacing and trailing punctuation.
-A c. change also matches with its transcript in front or with the bases
-after `del` or `dup`, so `NM_007294.4:c.5266dupC` matches `c.5266dup`. A
-protein change matches with or without its parentheses. The Fields table
+A c. or m. change also matches with its reference sequence in front, so
+`NC_012920.1:m.3243A>G` matches `m.3243A>G`. A c. change matches with the
+bases after `del` or `dup` as well, so `NM_007294.4:c.5266dupC` matches
+`c.5266dup`. A protein change matches with or without its parentheses. The Fields table
 gives the share of exact matches next to the accuracy.
 
 Variants are matched one to one by gene and DNA change before their other
-fields are compared. Clinical features are matched by their text, and after
+fields are compared. The gene matches as the report prints it or as its
+approved HGNC symbol, so `MLH1` matches a printed `COCA2`. A variant whose
+truth has no DNA change, such as an SMN1 copy number, matches on its gene. Clinical features are matched by their text, and after
 `gentrex normalize` by their HPO ID. The overall result is compared through
 its category, because the copied statement has no single right place to end.
 The ClinVar ID of a variant with a c. change is compared if
@@ -357,6 +382,7 @@ multiplied by its GPUs from `--gpus`, per 1,000 PDFs.
 | `--no-hpo` | off | Runs `gentrex normalize` without HPO terms, which then aren't scored |
 | `--settings` | none | A settings file of your own, which every command then reads |
 | `--no-select` | off | Skips `gentrex select`, so that `gentrex extract` reads every page |
+| `--from-run` | none | A finished run folder of `gentrex transcribe`, `gentrex select` or `gentrex extract`. The run starts with the command after it. |
 
 `score.py` takes `--split` and `--gpus` as well, and these two:
 

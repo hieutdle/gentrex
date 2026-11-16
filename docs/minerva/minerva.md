@@ -720,8 +720,10 @@ line of its own, so you don't have to change it.
   room for the prompt and an answer of up to 16,384 tokens
   (`build.max_tokens`). `--reasoning-parser muse_glimmer` keeps the
   reasoning that the model writes first out of its answer.
-- `-n 8` asks for 8 CPU cores. Chrome and the scans run on the CPU while
-  vLLM writes the next reports, up to `build.concurrency` (8) at a time.
+- `select[h100nvl]` asks for an H100 GPU.
+- `-n 8` and `rusage[mem=4000]` ask for 8 CPU cores with 4,000 MB of memory
+  each. Chrome and the scans run on the CPU while vLLM writes the next
+  reports, up to `build.concurrency` (8) at a time.
 - It runs `generate.py build` with the Chrome from the serving folder.
   Without `CASES`, the job builds every case that has no truth file yet.
 
@@ -782,10 +784,8 @@ until vLLM answers, runs the command and stops vLLM. It does the same for
 and the scorer on the CPU.
 
 `serve.sh` starts vLLM as the three job scripts above do, with the options
-of each model. The script sets three more things:
+of each model. `run_pipeline.lsf` sets two more things:
 
-- `HF_HUB_OFFLINE=1` makes `gentrex normalize` load its embedding models
-  from the cache without contacting Hugging Face.
 - `--gpus 1 1 2` records that the first two servers use one GPU and the
   third uses two, for the GPU-hours in the scores.
 - `--settings evaluation/settings.yaml` turns on the lookup of ClinVar IDs,
@@ -808,8 +808,12 @@ run that a command just made through the command's `latest` link.
 Follow the job with `bjobs` and `tail -f run-pipeline.*.log`. Its last line
 gives the report accuracy and the folder with the scores, such as
 `results/gentrex-bench/20261110-103752/`. If the job ends in `TERM_RUNLIMIT`,
-raise `-W` and submit it again. A benchmark run starts from the beginning
-each time, so that its times cover the whole run.
+raise `-W` and submit it again. To keep the commands that already finished,
+name the run folder of the last one in `OPTIONS`, as in
+`OPTIONS="--from-run results/select/20261110-103801"`
+([Go on after a run that stopped](../development/run-benchmark.md#go-on-after-a-run-that-stopped)).
+The job ends as failed if a command had failed files, also when the scores
+were written.
 
 Continue on the page of the benchmark:
 

@@ -2,7 +2,8 @@
 
 Every value becomes one Outcome. Variants are matched one to one by gene and
 DNA change, and clinical features by their text and, after gentrex normalize,
-by their HPO ID. docs/development/benchmark.md explains the rules.
+by their HPO ID. A gene matches under its printed or its approved symbol.
+docs/development/benchmark.md explains the rules.
 """
 
 import dataclasses
@@ -79,17 +80,19 @@ def key(field: str, value: Any) -> Any:
     """Returns a value as the lenient match compares it.
 
     Text loses its case, spacing and trailing punctuation, and empty text
-    counts as no value. A c. change also loses its transcript and the bases
-    after del or dup, so c.5266dupC equals c.5266dup. A protein change loses
-    its parentheses.
+    counts as no value. A c. or m. change also loses the reference sequence
+    before it, so NC_012920.1:m.3243A>G equals m.3243A>G. A c. change loses
+    the bases after del or dup, so c.5266dupC equals c.5266dup. A protein
+    change loses its parentheses.
     """
     if not isinstance(value, str):
         return value
     text = "".join(unicodedata.normalize("NFKC", value).split()).casefold()
     text = text.rstrip(".,;:")
     name = field.rpartition(".")[2]
+    if name in ("hgvs_c", "dna_change_raw"):
+        text = re.sub(r"^[^:]+:(?=[cm]\.)", "", text)
     if name == "hgvs_c":
-        text = re.sub(r"^[a-z]{2}_\d+(\.\d+)?:", "", text)
         text = re.sub(r"(del|dup)[acgt]+(?=$|ins)", r"\1", text)
     if name == "hgvs_p":
         text = text.replace("(", "").replace(")", "")
@@ -125,8 +128,21 @@ def _change(variant: dict[str, Any]) -> tuple[str, str | None]:
     return "dna_change_raw", variant.get("dna_change_raw")
 
 
-def _identity(variant: dict[str, Any]) -> tuple[Any, Any]:
-    return key("gene_symbol", variant.get("gene_symbol")), key(*_change(variant))
+def _same_variant(
+    found: dict[str, Any], expected: dict[str, Any], approved: Any
+) -> bool:
+    """Whether a found variant is the expected one.
+
+    The gene may be written as the report prints it or as its approved
+    symbol. A variant that the truth gives no DNA change, such as an SMN1
+    copy number, matches on its gene alone.
+    """
+    gene = key("gene_symbol", found.get("gene_symbol"))
+    printed = key("gene_symbol", expected.get("gene_symbol"))
+    if gene not in (printed, key("gene_symbol", approved)):
+        return False
+    change = key(*_change(expected))
+    return change is None or key(*_change(found)) == change
 
 
 def _label(variant: dict[str, Any]) -> str:
@@ -284,8 +300,9 @@ def compare(
     for expected, expected_ids in zip(
         record["variants"], truth["normalized"]["variants"], strict=True
     ):
+        approved = expected_ids.get("gene_symbol")
         match = next(
-            (f for f in found_variants if _identity(f[1]) == _identity(expected)),
+            (f for f in found_variants if _same_variant(f[1], expected, approved)),
             None,
         )
         if match is None:
@@ -298,6 +315,11 @@ def compare(
             continue
         found_variants.remove(match)
         index, found = match
+        if key("gene_symbol", found.get("gene_symbol")) != key(
+            "gene_symbol", expected.get("gene_symbol")
+        ):
+            # Written as the approved symbol, which is as right as the printed one.
+            expected = expected | {"gene_symbol": found["gene_symbol"]}
         outcomes.append(
             Outcome("variants", "correct", True, _label(expected), _label(found))
         )

@@ -283,7 +283,9 @@ GPUs of the models of `gentrex transcribe`, `gentrex select` and
 To change a setting of Gentrex for the evaluation, add it to
 `evaluation/settings.yaml`
 ([Change the settings](../docs/user-guide/runs-and-results.md#change-the-settings)).
-If you name another model there, give `serve.sh` a line for it.
+If you name another model there, give `serve.sh` a line for it. On Minerva,
+also add the model to the list in `minerva/prepare.sh` and run the script
+again, because the jobs serve only the models in the serving folder.
 
 ## When something goes wrong
 
@@ -294,7 +296,7 @@ If you name another model there, give `serve.sh` a line for it.
 | `vLLM stopped; see above` or `serve.sh ended before ... was ready` | vLLM couldn't start. Its own messages are right above this line. Often the model doesn't fit on the GPU, or its download is incomplete. |
 | `serve.sh has no options for ...` | A settings file names a model that `serve.sh` doesn't know. Add a line for it. |
 | `module: command not found` in `prepare.sh` | Run `module load apptainer` and start the script again. |
-| A job ends in `TERM_RUNLIMIT` | Give it more time with `-W` and submit it again. The job that generates reports goes on where it stopped. A pipeline run starts from the beginning, so that its times cover the whole run. |
+| A job ends in `TERM_RUNLIMIT` | Give it more time with `-W` and submit it again. The job that generates reports goes on where it stopped. A pipeline run starts from the beginning, unless you name the run folder of its last finished command with `--from-run` ([Go on after a run that stopped](../docs/development/run-benchmark.md#go-on-after-a-run-that-stopped)). |
 | A case fails all attempts | The log names the values that the model didn't print. Build that case again, or leave it out. |
 | Chrome names a missing library or a sandbox error on Minerva | See [When the job fails](../docs/minerva/minerva.md#when-the-job-fails). |
 
