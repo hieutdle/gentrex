@@ -72,6 +72,9 @@ _SO_TERMS = {
     "Intronic": "intron_variant",
     "Exon deletion": "exon_loss_variant",
     "Exon duplication": "duplication",
+    "5' UTR": "5_prime_UTR_variant",
+    "3' UTR": "3_prime_UTR_variant",
+    "Coding sequence": "coding_sequence_variant",
 }
 _PEDIATRIC = (
     "Epilepsy",
@@ -653,6 +656,8 @@ def _variant_word(variant: sources.Variant) -> str | None:
     c, p = variant.hgvs_c or "", variant.hgvs_p or ""
     if variant.hgvs_m:
         return None
+    if c.startswith("c.("):
+        return "Exon deletion" if c.endswith("del") else "Exon duplication"
     if p.endswith("fs"):
         return "Frameshift"
     if p.endswith("Ter") or p.endswith("*"):
@@ -665,13 +670,16 @@ def _variant_word(variant: sources.Variant) -> str | None:
         return "In-frame deletion"
     if "dup" in c and p:
         return "In-frame duplication"
-    if not p and ("+1" in c or "+2" in c or "-1" in c or "-2" in c):
-        return "Splice site"
-    if c.startswith("c.("):
-        return "Exon deletion" if c.endswith("del") else "Exon duplication"
-    if not p:
-        return "Intronic"
-    return "Missense"
+    if p:
+        return "Missense"
+    # The distance into the intron, as the 5 of c.1601+5G>A.
+    if offsets := [int(n) for n in re.findall(r"\d[+-](\d+)", c)]:
+        return "Splice site" if min(offsets) <= 2 else "Intronic"
+    if c.startswith("c.-"):
+        return "5' UTR"
+    if c.startswith("c.*"):
+        return "3' UTR"
+    return "Coding sequence"
 
 
 def _variant_type(variant: sources.Variant, style: str | None) -> str | None:
@@ -697,8 +705,9 @@ def _x_linked_sex(variant: sources.Variant) -> str | None:
     return "Male"
 
 
-def _zygosity(inheritance: str, sex: str, diagnostic: bool) -> str:
-    if inheritance == "mitochondrial":
+def _zygosity(variant: sources.Variant, sex: str, diagnostic: bool) -> str:
+    inheritance = variant.disease.inheritance
+    if variant.hgvs_m:
         return "heteroplasmic"
     if inheritance.startswith("x_linked") and sex == "Male":
         return "hemizygous"
@@ -714,6 +723,8 @@ class _Sampler:
         self._refs = refs
         self._rng = random.Random(seed)
         self._tag_counts: collections.Counter[str] = collections.Counter()
+        # ClinVar IDs of the variants drawn so far, so that none repeats.
+        self._used: set[str] = set()
         schema = config.load_schema()["properties"]
         self._fields = list(schema)
         self._variant_fields = list(schema["variants"]["items"]["properties"])
@@ -816,13 +827,16 @@ class _Sampler:
             if gene not in exclude
             for v in self._refs.variants.get(gene, [])
             if v.classification in classes
+            and v.variation_id not in self._used
             and (modes is None or v.disease.inheritance in modes)
             and (v.hgvs_m is None) == (not gene.startswith("MT-"))
         ]
         if not candidates:
             return None
         gene = rng.choice(sorted({v.gene for v in candidates}))
-        return rng.choice([v for v in candidates if v.gene == gene])
+        variant = rng.choice([v for v in candidates if v.gene == gene])
+        self._used.add(variant.variation_id)
+        return variant
 
     def _literature_variant(self, variant: sources.Variant) -> sources.Variant | None:
         """Returns another pathogenic ClinVar variant of the same gene, or None."""
@@ -874,6 +888,7 @@ class _Sampler:
             allowed.discard("ambiguous_specimen")
         if not has_variants:
             allowed -= {
+                "trio_columns",
                 "table_split_across_pages",
                 "repeated_variant",
                 "legacy_gene_symbol",
@@ -887,7 +902,7 @@ class _Sampler:
             allowed.discard(
                 rng.choice(["provided_phenotype_page", "late_page_evidence"])
             )
-        count = rng.choice([1, 2, 2, 3])
+        count = rng.choice([1, 2])
         # Sorted first, because a set's order changes from process to process.
         ranked = sorted(
             sorted(allowed), key=lambda t: (self._tag_counts[t], rng.random())
@@ -895,7 +910,6 @@ class _Sampler:
         chosen = ranked[:count]
         if "table_split_across_pages" in chosen and "multiple_variants" in allowed:
             chosen.append("multiple_variants")
-        self._tag_counts.update(chosen)
         return set(chosen)
 
     def _variants(
@@ -1049,7 +1063,7 @@ class _Sampler:
     def _item(self, **values: Any) -> dict[str, Any]:
         """Returns a variant of the record, with every field of the schema."""
         item: dict[str, Any] = dict.fromkeys(self._variant_fields)
-        item.update({"is_secondary_finding": False, **values})
+        item.update(values)
         return item
 
     def _sequenced(self, plan: _Plan) -> _Found | None:
@@ -1150,7 +1164,7 @@ class _Sampler:
         items, normalized = [], []
         for variant, secondary in found:
             zygosity = _zygosity(
-                variant.disease.inheritance,
+                variant,
                 sex,
                 diagnostic=not secondary
                 and plan.scenario not in ("carrier", "indeterminate")
@@ -1197,7 +1211,8 @@ class _Sampler:
                         variant.disease.inheritance
                     ],
                     mode_of_inheritance=variant.disease.inheritance,
-                    is_secondary_finding=secondary,
+                    is_secondary_finding=secondary
+                    or (False if lab.labels_primary else None),
                     variant_type_raw=_variant_type(variant, lab.variant_type_style),
                     chromosomal_position=(
                         lab.position.format(
@@ -1234,6 +1249,10 @@ class _Sampler:
         if plan.kind == "single_gene" and focus is not None:
             genes = [printed.get(focus.gene, focus.gene)]
             test_name = test_name.replace(focus.gene, genes[0], 1)
+        if tested is not None:
+            test_name = test_name.replace(
+                tested.gene, printed.get(tested.gene, tested.gene), 1
+            )
         # The transcript of each gene that a gene list prints: ClinVar's most
         # common one, or the variant's.
         transcripts = {
@@ -1362,12 +1381,14 @@ class _Sampler:
                 c
                 for c in self._refs.copy_number_changes
                 if c.classification in classes
+                and c.variation_id not in self._used
                 and (c.chromosome != "X" or c.copy_number in (0, 1, 2, 3))
                 and (c.chromosome == "X" or c.copy_number in (0, 1, 3))
             ]
             if not pool:
                 return None
             change = rng.choice(pool)
+            self._used.add(change.variation_id)
             if change.chromosome == "X":
                 found.sex = "Male" if change.copy_number in (0, 2) else "Female"
             baseline = 1 if change.chromosome == "X" and found.sex == "Male" else 2
@@ -1853,6 +1874,11 @@ class _Sampler:
         record["patient_phenotypes"] = [
             {"text": text, "present": present} for _, text, present in features
         ]
+        # A tag stays only if the report shows its challenge.
+        if not features:
+            tags.discard("provided_phenotype_page")
+        if all(present for _, _, present in features):
+            tags.discard("negated_or_uncertain_phenotypes")
         record["overall_result_raw"] = lab.wording(plan.kind, plan.scenario).format_map(
             collections.defaultdict(str, found.fields)
         )
@@ -1891,12 +1917,18 @@ class _Sampler:
                 distractors.append(
                     {"kind": "identifier", "text": similar, "label": label}
                 )
+        # Fields that another tag changes, which must stay in the report.
+        kept = set()
+        if "multiple_patient_ids" in tags:
+            kept.add("submitter_patient_id")
+        if "ambiguous_specimen" in tags:
+            kept.add("specimen_type")
         unavailable = None
         if "explicitly_unavailable" in tags:
             present = [
                 f
                 for f in ("mrn", "submitter_patient_id", "collection_date")
-                if record[f] is not None
+                if record[f] is not None and f not in kept
             ]
             unavailable = rng.choice(present)
             record[unavailable] = None
@@ -1910,11 +1942,14 @@ class _Sampler:
                     "submitter_patient_id",
                     "specimen_type",
                 )
-                if record[f] is not None
+                if record[f] is not None and f not in kept
             ]
             omitted = rng.sample(optional, min(len(optional), rng.randint(1, 2)))
             for field in omitted:
                 record[field] = None
+            if not omitted:
+                tags.discard("missing_optional_fields")
+        self._tag_counts.update(tags)
 
         normalized = {
             field: (dates[field].isoformat() if record[field] is not None else None)

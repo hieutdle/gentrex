@@ -45,8 +45,7 @@ without its empty fields:
   "zygosity": "heterozygous",
   "associated_phenotype": "Rett syndrome",
   "mode_of_inheritance_raw": "X-linked dominant",
-  "mode_of_inheritance": "x_linked_dominant",
-  "is_secondary_finding": false
+  "mode_of_inheritance": "x_linked_dominant"
 }
 ```
 
@@ -103,10 +102,14 @@ likely pathogenic or of uncertain significance, with a review status of
 "criteria provided" or higher and without conflicts. Its condition must have
 a MONDO ID, a mode of inheritance and features in HPO's annotations. A
 condition that fewer than a tenth of the gene's variants have is left out,
-because it is often outside the clinical area that tests the gene. So the
+because it is often outside the clinical area that tests the gene. A
+submitter can also name a condition that the gene doesn't cause, as Carney
+complex for a MYO15A variant. A condition is therefore left out too if
+fewer than 1 in 50 of the gene's ClinVar entries name it. So the
 HGVS, classification, condition and IDs of every variant are real. Deletions
 and duplications of whole exons qualify too, written as ClinVar writes them,
-as c.(?_5299)_(5572_?)del.
+as c.(?_5299)_(5572_?)del. No variant or copy-number change is drawn twice,
+so the dev and test cases share none.
 
 The copy-number changes of microarrays come from ClinVar as well. A change
 qualifies when it is a gain or loss of 50 kb to 15 Mb with the same review
@@ -144,9 +147,9 @@ some of them, because its other tests go to templates that would otherwise
 have too few cases. The table under [Templates](#templates) gives every
 template's count.
 
-The case also gets the IDs and dates in its template's formats, and one to
-three challenge tags, which the section [Challenge tags](#challenge-tags)
-below describes.
+The case also gets the IDs and dates in its template's formats, and its
+challenge tags, which the section [Challenge tags](#challenge-tags) below
+describes.
 
 ## Step 2: Write the report
 
@@ -210,11 +213,12 @@ does. The report passes when:
 - every page has the synthetic footer,
 - every value of the truth and every distractor is in the text,
 - the text names the genome build of the truth and no other, and
-- the text names no DNA change (c. or m.), array result or karyotype other
-  than those of the truth and the distractors.
+- the text names no DNA or protein change (c., g., m. or p.), array result
+  or karyotype other than those of the truth and the distractors.
 
-The last rule catches a model that copies a variant wrongly. A report that
-fails gets its text written again, up to three times. A report that passes
+The last rule catches a model that copies a variant wrongly or stops in the
+middle of it. A report that
+fails gets its text written again, for up to three attempts in all. A report that passes
 gets its truth file, with the text of every page and the page of each
 variant. Nobody edits a truth file by hand.
 
@@ -227,8 +231,8 @@ scanned pages:
 | --- | --- |
 | `native` | The PDF as Chrome printed it, with a text layer |
 | `scan` | Page images with a slight skew, blur, noise and JPEG compression, as from an office scanner |
-| `fax` | Page images at half the vertical resolution, with a larger skew, in black and white, with speckles and streaks |
-| `mixed` | The native PDF with about a third of its pages scanned |
+| `fax` | Page images at three quarters of the vertical resolution, with a larger skew, in black and white, with a few speckles and thin streaks |
+| `mixed` | The native PDF with about a third of its pages scanned, and none if the report has one page |
 | `image` | Clean page images whose only text is a short document code, as some labs' PDFs come |
 
 The damage is drawn from a random stream seeded with the case ID, so a
@@ -248,15 +252,15 @@ templates that follow the same real lab share it.
 | Template | Fictional lab | Follows | Tests | Dev cases | Test cases |
 | --- | --- | --- | --- | --- | --- |
 | `graybar-panel` | Aqua Genetics | Ambry | panel, single gene | 6 | 12 |
-| `exome-box` | Aqua Genetics | Ambry | exome | 6 | 8 |
+| `exome-box` | Aqua Genetics | Ambry | exome | 6 | 9 |
 | `genome-card` | Aqua Genetics | Ambry | genome, with uniparental disomy | 0 | 8 |
-| `snp-array` | Aqua Genetics | Ambry | chromosomal microarray, on GRCh38 | 5 | 11 |
+| `snp-array` | Aqua Genetics | Ambry | chromosomal microarray, on GRCh38 | 5 | 12 |
 | `chart` | Apricot Reference Laboratories | ARUP | one known variant | 7 | 8 |
 | `lis-printout` | Apricot Reference Laboratories | ARUP | single gene, one known variant | 0 | 8 |
-| `findings-grid` | Bronze Clinical Genomics | Blueprint | panel, mitochondrial genome | 6 | 12 |
+| `findings-grid` | Bronze Clinical Genomics | Blueprint | panel, mitochondrial genome | 6 | 11 |
 | `screen-badge` | Bronze Clinical Genomics | Blueprint | carrier screen | 5 | 8 |
 | `results-statement` | Bronze Clinical Genomics | Blueprint | panel | 6 | 12 |
-| `exome-findings` | Bronze Clinical Genomics | Blueprint | exome | 5 | 9 |
+| `exome-findings` | Bronze Clinical Genomics | Blueprint | exome | 5 | 8 |
 | `dx-banner` | Indigo Genetic Testing | Invitae | panel, single gene | 6 | 11 |
 | `carrier-grid` | Indigo Genetic Testing | Invitae | carrier screen | 0 | 8 |
 | `teal-banner` | Lilac Molecular Laboratory | Labcorp | single gene, carrier screen | 5 | 8 |
@@ -291,11 +295,14 @@ in `gentrex-bench/generator/labs.py`.
 
 ## Challenge tags
 
-Each case gets one to three challenge tags. A tag makes the report harder in
+Each case draws one or two challenge tags. A tag makes the report harder in
 one known way, and the truth file lists the case's tags, so results can be
-split by tag. Each tag appears in 11 to 24 of the 200 test cases. A tag that
+split by tag. Each tag appears in 11 to 17 of the 200 test cases. A tag that
 can't change a report, such as `legacy_gene_symbol` for a gene without a
-previous symbol, is dropped from it.
+previous symbol, is dropped from it, which leaves 10 of the 200 test cases
+without a tag. A table can only split across pages with two variants, so
+`table_split_across_pages` brings `multiple_variants` with it, and 8 test
+cases have three tags.
 
 | Tag | What it changes in the report |
 | --- | --- |

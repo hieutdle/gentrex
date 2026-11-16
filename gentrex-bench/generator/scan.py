@@ -32,9 +32,9 @@ def degrade(image: Image.Image, level: str, rng: random.Random) -> Image.Image:
     """Returns a grayscale page image after scanning or faxing.
 
     `scan` imitates an office scanner: a slight skew, blur, sensor noise and
-    JPEG compression. `fax` imitates a fax at standard resolution: half the
-    vertical resolution, a larger skew, black and white only, speckles and a
-    few streaks.
+    JPEG compression. `fax` imitates a fax: three quarters of the vertical
+    resolution, a larger skew, black and white only, a few speckles and at
+    most two thin streaks.
     """
     noise = np.random.default_rng(rng.randrange(2**32))
     if level == "scan":
@@ -53,22 +53,21 @@ def degrade(image: Image.Image, level: str, rng: random.Random) -> Image.Image:
         return Image.open(io.BytesIO(buffer.getvalue())).convert("L")
     if level == "fax":
         width, height = image.size
-        image = image.resize((width, height // 2), Image.Resampling.BILINEAR)
+        image = image.resize((width, height * 3 // 4), Image.Resampling.BILINEAR)
         image = image.resize((width, height), Image.Resampling.NEAREST)
         image = image.rotate(
-            rng.uniform(-1.5, 1.5),
+            rng.uniform(-1.0, 1.0),
             resample=Image.Resampling.BILINEAR,
             fillcolor=255,
             expand=False,
         )
         pixels = np.asarray(image, dtype=np.float32)
-        pixels += noise.normal(0, 18, pixels.shape)
+        pixels += noise.normal(0, 10, pixels.shape)
         black = pixels < 150
-        speckles = noise.random(black.shape) < 0.002
+        speckles = noise.random(black.shape) < 0.0005
         black ^= speckles
-        for _ in range(rng.randint(1, 3)):
-            row = rng.randrange(height - 3)
-            black[row : row + rng.randint(1, 3), :] = True
+        for _ in range(rng.randint(0, 2)):
+            black[rng.randrange(height), :] = True
         return Image.fromarray(np.where(black, 0, 255).astype(np.uint8))
     raise ValueError(f"unknown level {level!r}")
 
@@ -116,9 +115,12 @@ def copy(
 
 
 def mixed_pages(case_id: str, page_count: int) -> list[int]:
-    """Returns the pages that a mixed PDF has scanned: some, but never all."""
+    """Returns the pages that a mixed PDF has scanned: some, but never all.
+
+    A one-page report has none, so its mixed PDF is its native PDF.
+    """
     rng = random.Random(f"{case_id}:mixed")
-    count = max(1, min(page_count - 1, round(page_count / 3)))
+    count = min(page_count - 1, max(1, round(page_count / 3)))
     return sorted(rng.sample(range(1, page_count + 1), count))
 
 

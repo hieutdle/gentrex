@@ -19,6 +19,7 @@ sys.path.insert(
 
 import check  # noqa: E402
 import fill  # noqa: E402
+import generate  # noqa: E402
 import labs  # noqa: E402
 import sample  # noqa: E402
 import scan  # noqa: E402
@@ -36,7 +37,7 @@ _MODES = {
 
 
 def references() -> sources.References:
-    """Returns three variants of every gene, one per classification."""
+    """Returns 30 variants of every gene, ten per classification."""
     genes = {g for area in labs.AREAS for g in area.genes}
     genes |= {*labs.CARRIER_GENES, *labs.MITO_GENES, *labs.SECONDARY_GENES}
     terms = {f"HP:000000{i}": sources.Term(f"Feature {i}", ()) for i in range(1, 7)}
@@ -66,7 +67,7 @@ def references() -> sources.References:
                 disease,
             )
             for i, classification in enumerate(
-                ["pathogenic", "likely_pathogenic", "uncertain_significance"]
+                ["pathogenic", "likely_pathogenic", "uncertain_significance"] * 10
             )
         ]
     regions = [
@@ -204,7 +205,8 @@ def test_positive_case_has_a_pathogenic_variant():
     refs = references()
     for gene, variants in refs.variants.items():
         if not gene.startswith("MT-") and gene not in labs.CARRIER_GENES:
-            refs.variants[gene] = variants[2:] if len(gene) % 2 else variants
+            vus = [v for v in variants if v.classification == "uncertain_significance"]
+            refs.variants[gene] = vus if len(gene) % 2 else variants
     for case in sample.sample(refs, "seed", 100, 100):
         if case["scenario"] == "positive" and case["kind"] == "single_gene":
             classes = {v["classification"] for v in case["record"]["variants"]}
@@ -232,6 +234,14 @@ def test_tags_change_the_report(refs):
             assert any(v["hgvs_p"] for v in variants)
         if "multiple_variants" in case["tags"]:
             assert len(variants) >= 2
+        if "trio_columns" in case["tags"]:
+            assert variants
+        if "provided_phenotype_page" in case["tags"]:
+            assert case["record"]["patient_phenotypes"]
+        if "ambiguous_specimen" in case["tags"]:
+            assert case["record"]["specimen_type"]
+        if "multiple_patient_ids" in case["tags"]:
+            assert "," in case["record"]["submitter_patient_id"]
 
 
 def test_templates_print_every_value_and_distractor(refs):
@@ -265,6 +275,24 @@ def test_changes_that_the_case_does_not_print_are_found(refs):
     change = variant["hgvs_c"] or variant["dna_change_raw"]
     pages = [f"The {change} variant.", "Compare c.9999del in another gene."]
     assert check.unexpected_changes(case, pages) == ["c.9999del"]
+
+
+def test_wrong_protein_changes_and_cut_changes_are_found():
+    """The model may copy the DNA change and get the protein change wrong, or
+    stop in the middle of a change. Only a change that wraps at the end of a
+    line may stop early."""
+    variant = {
+        "hgvs_c": "c.1521_1523del",
+        "hgvs_p": "p.Phe508del",
+        "dna_change_raw": None,
+        "chromosomal_position": None,
+    }
+    case = {"record": {"variants": [variant], "karyotype": None}, "distractors": []}
+    pages = [
+        "c.1521_1523del (p.Phe508del), or c.1521_\n1523del",
+        "c.1521 (p.Phe508Leu)",
+    ]
+    assert check.unexpected_changes(case, pages) == ["c.1521", "p.Phe508Leu"]
 
 
 def test_karyotypes_that_the_case_does_not_print_are_found(refs):
@@ -377,6 +405,112 @@ def test_clinvar_rows_need_assertion_criteria(tmp_path):
     assert (region.copy_number, region.genes) == (3, 81)
 
 
+def test_condition_of_another_gene_is_left_out(tmp_path):
+    """A submitter's stray condition must not become the gene's condition when
+    HPO doesn't annotate the condition that the gene's other rows name."""
+    columns = (
+        "VariationID Type Name GeneSymbol HGNC_ID ClinicalSignificance "
+        "ReviewStatus PhenotypeIDS Assembly Chromosome Start Stop Cytogenetic Origin"
+    ).split()
+    conditions = ["MONDO:MONDO:0000002"] * 50 + ["MONDO:MONDO:0000001,OMIM:100000"]
+    path = tmp_path / "variant_summary.txt.gz"
+    with gzip.open(path, "wt") as fh:
+        fh.write("\t".join(columns) + "\n")
+        for n, condition in enumerate(conditions, 1):
+            name = f"NM_1.1(G1):c.{n}del (p.Leu{n}fs)"
+            row = (str(n), "deletion", name, "G1", "HGNC:1", "Pathogenic")
+            row += ("criteria provided, single submitter", condition)
+            row += ("GRCh38", "1", str(n), str(n), "1p36", "germline")
+            fh.write("\t".join(row) + "\n")
+    disease = ("autosomal_dominant", ("HP:0000001", "HP:0000002"))
+    variants, _ = sources.load_clinvar(
+        path, {"G1"}, {"MONDO:0000001": "a disease"}, {"OMIM:100000": disease}
+    )
+    assert not variants.get("G1")
+
+
+def test_variant_types_follow_the_position():
+    """c.2247+19103A>G holds "+1" and is deep in an intron, not at a splice site."""
+
+    disease = sources.Disease("MONDO:0000001", "a disease", "autosomal_dominant", ())
+
+    def word(c: str) -> str | None:
+        variant = sources.Variant(
+            "1", "G1", "HGNC:1", "NM_1.1", c, None, None, "", disease
+        )
+        return sample._variant_word(variant)
+
+    assert word("c.2247+19103A>G") == "Intronic"
+    assert word("c.849+2T>A") == "Splice site"
+    assert word("c.*1859G>A") == "3' UTR"
+    assert word("c.(1341+1_1342-1)_(1716+1_1717-1)del") == "Exon deletion"
+
+
+def test_no_variant_is_drawn_twice(refs):
+    """A variant in both dev and test would be tuned on and then scored."""
+    ids = [
+        variant["clinvar_variation_id"]
+        for case in sample.sample(refs, "seed", 100, 100)
+        for variant in case["normalized"]["variants"]
+        if variant["clinvar_variation_id"]
+    ]
+    assert len(ids) == len(set(ids))
+
+
+def test_only_mitochondrial_dna_is_heteroplasmic(refs):
+    """ClinVar can give a nuclear variant a mitochondrial condition."""
+    nuclear = refs.variants["BRCA1"][0]
+    disease = refs.variants["MT-TL1"][0].disease
+    variant = sources.Variant(**{**vars(nuclear), "disease": disease})
+    assert sample._zygosity(variant, "Female", True) == "heterozygous"
+
+
+def test_targeted_test_is_named_after_the_printed_gene():
+    """A current symbol in the test's name would give the report two symbols
+    for one gene, and the truth only one of them."""
+    refs = references()
+    refs.previous_symbols = {gene: [f"OLD{n}"] for n, gene in enumerate(refs.variants)}
+    cases = [
+        case
+        for case in sample.sample(refs, "seed", 100, 100)
+        if case["kind"] == "targeted" and "legacy_gene_symbol" in case["tags"]
+    ]
+    assert cases
+    for case in cases:
+        gene = case["record"]["variants"][0]["gene_symbol"]
+        assert case["record"]["test_name"].startswith(f"{gene} ")
+
+
+def test_findings_are_primary_or_secondary_only_where_the_report_says_so(refs):
+    """gentrex extract leaves is_secondary_finding null unless the report flags
+    the finding, so the truth must too."""
+    labelled = {lab.key for lab in labs.LABS if lab.labels_primary}
+    for case in sample.sample(refs, "seed", 60, 60):
+        for variant in case["record"]["variants"]:
+            flag = variant["is_secondary_finding"]
+            if case["scenario"] == "secondary_finding":
+                assert flag is True
+            else:
+                assert flag is (False if case["lab"] in labelled else None)
+
+
+def test_one_page_report_has_no_scanned_page_in_its_mixed_copy():
+    """A mixed copy never has every page scanned, or it would be a scan."""
+    assert scan.mixed_pages("SYN-0001", 1) == []
+    assert len(scan.mixed_pages("SYN-0001", 3)) == 1
+
+
+def test_error_in_one_report_does_not_end_the_build(monkeypatch):
+    """A template or Chrome error fails the report's attempts like a failed check."""
+
+    def attempt(*args):
+        raise RuntimeError("Chrome did not write the PDF")
+
+    monkeypatch.setattr(generate, "_attempt", attempt)
+    case = {"case_id": "SYN-0001"}
+    assert not generate._build_one(case, None, {"attempts": 2}, None, "", "")  # pyright: ignore[reportArgumentType]
+
+
 def test_image_copy_goes_to_ocr():
     """The image copy's only text, a document code, is longer than
     transcribe.native_min_chars, so only its full-page image sends it to OCR."""
@@ -450,6 +584,13 @@ def test_paragraphs_written_as_one_string_are_split():
     prose = write.paragraphs(prose)
     assert prose["interpretation"] == ["First.", "Second."]
     assert write.problems(case, prose) == []
+
+
+def test_condition_written_as_one_string_is_a_problem():
+    """A template that prints prose.condition.cause would raise on a string."""
+    case = {"record": {"variants": []}}
+    prose = fill.stand_in_prose(case) | {"condition": "A recessive disease."}
+    assert write.problems(case, prose)
 
 
 def test_list_field_of_another_type_is_a_problem():

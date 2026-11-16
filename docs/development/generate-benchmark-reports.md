@@ -171,8 +171,9 @@ uv run --env-file .env python gentrex-bench/generator/generate.py --version v1 b
 time depends mostly on the model server. Printing, checking and copying take
 about 2 seconds per report.
 
-A report that fails the check gets its text written again, up to three
-times. You can stop the build with Ctrl-C and run the command again later. It
+A report that fails the check gets its text written again, for up to three
+attempts in all. An error in one report, such as Chrome not printing it, counts as a
+failed check and doesn't stop the others. You can stop the build with Ctrl-C and run the command again later. It
 skips the cases that already have a truth file.
 
 ## Check the result
@@ -195,11 +196,11 @@ cases that failed:
 | `pdf/native/<case>.pdf` | The report with its text layer |
 | `pdf/scan/<case>.pdf` | Page images, as from an office scanner |
 | `pdf/fax/<case>.pdf` | Page images, as from a fax |
-| `pdf/mixed/<case>.pdf` | The native PDF with about a third of its pages scanned |
+| `pdf/mixed/<case>.pdf` | The native PDF with about a third of its pages scanned, and none if the report has one page |
 | `pdf/image/<case>.pdf` | Clean page images whose only text is a document code |
 | `truth/<case>.json` | The truth of a report that passed the check |
 
-A truth file has five keys:
+A truth file has six keys:
 
 | Key | Holds |
 | --- | --- |
@@ -208,6 +209,7 @@ A truth file has five keys:
 | `normalized` | What `gentrex normalize` should add, such as ISO dates and HGNC, MONDO and HPO IDs |
 | `pages` | The text of each page of the native PDF |
 | `distractors` | Values the report prints that must not be extracted |
+| `canary` | The canary string |
 
 The JSON and HTML files also hold a canary string, in the JSON files under
 `canary`. It is a fixed sentence with a random ID that appears nowhere else.
@@ -233,7 +235,7 @@ on each:
 | `build.model` | `meta-models/Muse-Glimmer-30B` | The model that writes the text, as the server names it |
 | `build.max_tokens` | `16384` | The longest answer, in tokens. A longer answer counts as a failed attempt. |
 | `build.timeout_seconds` | `900` | How long one answer may take |
-| `build.attempts` | `3` | How often a failed report gets its text written again |
+| `build.attempts` | `3` | How many attempts a report gets, the first one included |
 | `build.concurrency` | `8` | How many reports are written at the same time |
 
 Change the settings before you sample a new version, and not during a build,

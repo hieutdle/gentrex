@@ -173,6 +173,8 @@ class Lab:
             same recessive gene.
         clinvar_ids: Whether the variant table prints ClinVar's variation
             IDs, which are distractors.
+        labels_primary: Whether the layout prints its findings under a
+            heading that calls them primary.
     """
 
     key: str
@@ -207,6 +209,7 @@ class Lab:
     carrier_genes: tuple[str, ...] | None = None
     indeterminate: bool = False
     clinvar_ids: bool = False
+    labels_primary: bool = False
 
     def wording(self, kind: str, scenario: str) -> str:
         """Returns the headline result of a scenario of a kind of test."""
@@ -396,6 +399,7 @@ LABS = [
     _bronze(
         key="findings-grid",
         indeterminate=True,
+        labels_primary=True,
         based_on=(
             "BLU01",
             "BLU02",
@@ -425,6 +429,7 @@ LABS = [
     _bronze(
         key="results-statement",
         indeterminate=True,
+        labels_primary=True,
         based_on=("SR010", "SR016"),
         kinds=("panel",),
         result=_results(
@@ -436,6 +441,7 @@ LABS = [
     ),
     _bronze(
         key="exome-findings",
+        labels_primary=True,
         based_on=("SR011",),
         kinds=("exome",),
         result=_results(
@@ -785,6 +791,7 @@ LABS = [
         ),
         trio=True,
         build="GRCh37",
+        labels_primary=True,
     ),
     Lab(
         key="patient-page",

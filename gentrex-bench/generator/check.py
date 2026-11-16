@@ -2,7 +2,7 @@
 
 A report passes when every page has the synthetic footer, every value of
 the truth and every distractor is in its text, the text names the genome build
-of the truth and no other, and it names no c. or m. change, array result or
+of the truth and no other, and it names no c., g., m. or p. change, array result or
 karyotype besides those of the truth and the distractors. The truth file then
 gets the text of each page and the page of each variant. Text matching follows
 gentrex transcribe, which reads the PDF's text with pdfplumber.
@@ -16,8 +16,10 @@ from typing import Any
 
 import pdfplumber
 
-# A c. or m. change as printed, as c.1521_1523del or m.3243A>G.
-_CHANGE = re.compile(r"(?<![\w.])[cm]\.[-*]?\d[^\s,;()]*")
+# A change as printed: c.1521_1523del, c.(?_5299)_(5572_?)del, m.3243A>G,
+# g.117559590_117559592del, p.Arg412Trp, p.(R412W) or p.?.
+_CHANGE = re.compile(r"(?<![\w.])(?:[cgm]\.[-*(?_]*\d|p\.\(?[A-Z=?*])[^\s,;]*")
+_CHANGE_FIELDS = ("hgvs_c", "hgvs_p", "dna_change_raw", "chromosomal_position")
 # The start of an array result or a karyotype in ISCN, as arr[GRCh38] or 47,XX.
 _ISCN = re.compile(r"arr\[|\b4[4-9],[XY]")
 # The words that name each genome build.
@@ -114,14 +116,32 @@ def unexpected_changes(case: dict[str, Any], pages: list[str]) -> list[str]:
     """Returns the changes and ISCN results in the text that the case doesn't print.
 
     They come from the writing model, which may print a variant wrongly. A
-    change is a c. or m. change, and an ISCN result an array result or a
-    karyotype.
+    change is a c., g., m. or p. change, and an ISCN result an array result or
+    a karyotype. The start of a known change passes only where Chrome wraps
+    one: at the end of a line, after a hyphen or before a bracket.
     """
     record = case["record"]
-    known = {_change(v) for v in record["variants"]}
+    known = {v[f] for v in record["variants"] for f in _CHANGE_FIELDS if v[f]}
     known |= {d["text"] for d in case["distractors"]}
-    changes = (c.rstrip(".:") for p in pages for c in _CHANGE.findall(p))
-    found = {c for c in changes if not any(k.startswith(c) for k in known)}
+    found = set()
+    for line in "\n".join(pages).split("\n"):
+        for match in _CHANGE.finditer(line):
+            change = match[0]
+            while change[-1] in ".:" or (
+                change[-1] == ")" and change.count(")") > change.count("(")
+            ):
+                change = change[:-1]
+            wrapped = any(
+                k.startswith(match[0])
+                and (
+                    match.end() == len(line)
+                    or match[0][-1] == "-"
+                    or k[len(match[0]) :].startswith("(")
+                )
+                for k in known
+            )
+            if not wrapped and not any(k.endswith(change) for k in known):
+                found.add(change)
     notations = [v["dna_change_raw"] for v in record["variants"]]
     notations += [record["karyotype"], *(d["text"] for d in case["distractors"])]
     for page in pages:

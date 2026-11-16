@@ -37,7 +37,7 @@ shows the scores of all runs as tables and plots.
   karyotypes, repeat expansions, SMN1 copy numbers and a methylation test.
 - **Five copies of each report.** The native PDF, an office scan, a fax, a
   PDF with some pages scanned, and one made of page images.
-- **Known traps.** Each case gets one to three of 18 challenge tags, such as
+- **Known traps.** Most cases get one or two of 18 challenge tags, such as
   a relative's feature in the family history or dates in an unusual format,
   so results can be split by what makes a report hard.
 - **Checked reports.** Every PDF is checked against its truth before it is
@@ -84,15 +84,17 @@ that Gentrex's schema covers. The others are tumor profiling,
 pharmacogenomics and prenatal screening.
 
 The labs haven't allowed anyone to share their PDFs, so the repository holds
-only the links. Download the reports with:
+only the links. Download the 61 reports in scope with:
 
 ```bash
 uv run python gentrex-bench/public/download.py
 ```
 
+With `--all`, the script downloads all 77.
+
 The PDFs go to `data/gentrex-bench/public/pdf/`, named by the catalog's IDs,
-such as `AMB01.pdf`. `downloads.json` next to them records the link, size,
-page count and checksum of each file. If a file's checksum differs from the
+such as `AMB01.pdf`. `data/gentrex-bench/public/downloads.json` records the
+link, size, page count and checksum of each file. If a file's checksum differs from the
 one in the catalog, the lab has changed the report since the catalog was
 made, and the script names it in its last line. If a link fails, save the
 PDF from your browser under its ID and run the script again. It then

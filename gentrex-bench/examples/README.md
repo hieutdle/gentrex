@@ -49,7 +49,7 @@ of a real lab, which
 | --- | --- |
 | `carrier-banner.pdf` | The PDF as Chrome printed it, with a text layer |
 | `carrier-banner-scan.pdf` | Page images with a slight skew, blur, noise and JPEG compression, as from an office scanner |
-| `carrier-banner-fax.pdf` | Page images at half the vertical resolution, with a larger skew, in black and white, with speckles and streaks |
+| `carrier-banner-fax.pdf` | Page images at three quarters of the vertical resolution, with a larger skew, in black and white, with a few speckles and thin streaks |
 | `carrier-banner-mixed.pdf` | The native PDF with about a third of its pages scanned |
 | `carrier-banner-image.pdf` | Clean page images whose only text is a short document code |
 

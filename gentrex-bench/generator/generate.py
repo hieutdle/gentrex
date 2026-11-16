@@ -48,10 +48,14 @@ def _sha256(path: pathlib.Path) -> str:
 
 
 def _write_json(path: pathlib.Path, value) -> None:
+    """Writes a JSON file whole or not at all, so that a stopped build leaves no
+    half-written truth file for the next one to skip."""
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(
+    part = path.with_name(path.name + ".part")
+    part.write_text(
         json.dumps(value, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
     )
+    part.replace(path)
 
 
 def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
@@ -109,66 +113,88 @@ def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
 
 
 def _build_one(
-    case: dict, out: pathlib.Path, settings: dict[str, Any], client, chrome: str
+    case: dict,
+    out: pathlib.Path,
+    settings: dict[str, Any],
+    client,
+    chrome: str,
+    chrome_version: str,
 ) -> bool:
-    """Writes, fills, prints and checks one report until it passes, then scans it."""
+    """Writes, fills, prints and checks one report until it passes, then scans it.
+
+    An attempt that raises fails like one that doesn't pass the check, so one
+    report's error doesn't end the build. Only an error that every request
+    would get is raised.
+    """
     case_id = case["case_id"]
-    native = out / "pdf" / "native" / f"{case_id}.pdf"
     for attempt in range(1, settings["attempts"] + 1):
         try:
-            response = write.write(
-                client, case, settings["model"], settings["max_tokens"]
-            )
-        except write.WriteError as exc:
-            _logger.warning("%s, attempt %d", exc, attempt)
-            continue
-        _write_json(
-            out / "responses" / f"{case_id}-{attempt}.json",
-            {"canary": fill.CANARY, **response},
-        )
-        html = out / "html" / f"{case_id}.html"
-        html.parent.mkdir(parents=True, exist_ok=True)
-        html.write_text(fill.fill(case, response["prose"]), encoding="utf-8")
-        native.parent.mkdir(parents=True, exist_ok=True)
-        render.print_pdf(chrome, html, native)
-        writer = {k: response[k] for k in ("model", "prompt_sha256", "date")}
-        writer["max_tokens"] = settings["max_tokens"]
-        writer["attempt"] = attempt
-        writer["chrome"] = render.chrome_version(chrome)
-        result = check.check(case, native, writer)
-        for warning in result.warnings:
-            _logger.info("%s: %s", case_id, warning)
-        if result.truth is None:
-            for error in result.errors:
-                _logger.warning("%s, attempt %d: %s", case_id, attempt, error)
-            continue
-        for level in scan.LEVELS:
-            scan.copy(native, out / "pdf" / level / f"{case_id}.pdf", level, case_id)
-        mixed = scan.mixed_pages(case_id, len(result.truth["pages"]))
-        scan.copy(
-            native, out / "pdf" / "mixed" / f"{case_id}.pdf", "scan", case_id, mixed
-        )
-        scan.image_copy(
-            native,
-            out / "pdf" / "image" / f"{case_id}.pdf",
-            case_id,
-            chrome,
-            fill.CANARY,
-        )
-        result.truth["case"]["mixed_scanned_pages"] = mixed
-        result.truth["case"]["image_document_code"] = scan.document_code(case_id)
-        _write_json(
-            out / "truth" / f"{case_id}.json", {"canary": fill.CANARY, **result.truth}
-        )
-        _logger.info(
-            "%s passed on attempt %d (%d output tokens)",
-            case_id,
-            attempt,
-            response["output_tokens"],
-        )
-        return True
+            if _attempt(case, out, settings, client, chrome, chrome_version, attempt):
+                return True
+        except llm.FATAL_ERRORS:
+            raise
+        except Exception as exc:
+            _logger.warning("%s, attempt %d: %r", case_id, attempt, exc)
     _logger.error("%s failed all %d attempts", case_id, settings["attempts"])
     return False
+
+
+def _attempt(
+    case: dict,
+    out: pathlib.Path,
+    settings: dict[str, Any],
+    client,
+    chrome: str,
+    chrome_version: str,
+    attempt: int,
+) -> bool:
+    """Makes one attempt at a report and returns whether it passed the check."""
+    case_id = case["case_id"]
+    native = out / "pdf" / "native" / f"{case_id}.pdf"
+    response = write.write(client, case, settings["model"], settings["max_tokens"])
+    _write_json(
+        out / "responses" / f"{case_id}-{attempt}.json",
+        {"canary": fill.CANARY, **response},
+    )
+    html = out / "html" / f"{case_id}.html"
+    html.parent.mkdir(parents=True, exist_ok=True)
+    html.write_text(fill.fill(case, response["prose"]), encoding="utf-8")
+    native.parent.mkdir(parents=True, exist_ok=True)
+    render.print_pdf(chrome, html, native)
+    writer = {k: response[k] for k in ("model", "prompt_sha256", "date")}
+    writer["max_tokens"] = settings["max_tokens"]
+    writer["attempt"] = attempt
+    writer["chrome"] = chrome_version
+    result = check.check(case, native, writer)
+    for warning in result.warnings:
+        _logger.info("%s: %s", case_id, warning)
+    if result.truth is None:
+        for error in result.errors:
+            _logger.warning("%s, attempt %d: %s", case_id, attempt, error)
+        return False
+    for level in scan.LEVELS:
+        scan.copy(native, out / "pdf" / level / f"{case_id}.pdf", level, case_id)
+    mixed = scan.mixed_pages(case_id, len(result.truth["pages"]))
+    scan.copy(native, out / "pdf" / "mixed" / f"{case_id}.pdf", "scan", case_id, mixed)
+    scan.image_copy(
+        native,
+        out / "pdf" / "image" / f"{case_id}.pdf",
+        case_id,
+        chrome,
+        fill.CANARY,
+    )
+    result.truth["case"]["mixed_scanned_pages"] = mixed
+    result.truth["case"]["image_document_code"] = scan.document_code(case_id)
+    _write_json(
+        out / "truth" / f"{case_id}.json", {"canary": fill.CANARY, **result.truth}
+    )
+    _logger.info(
+        "%s passed on attempt %d (%d output tokens)",
+        case_id,
+        attempt,
+        response["output_tokens"],
+    )
+    return True
 
 
 def _build(args: argparse.Namespace, settings: dict[str, Any]) -> int:
@@ -187,6 +213,7 @@ def _build(args: argparse.Namespace, settings: dict[str, Any]) -> int:
         )
         return 2
     chrome = args.chrome or render.find_chrome()
+    chrome_version = render.chrome_version(chrome)
     client = llm.make_client(
         base_url, os.environ.get(_API_KEY_ENV, "EMPTY"), settings["timeout_seconds"]
     )
@@ -201,6 +228,7 @@ def _build(args: argparse.Namespace, settings: dict[str, Any]) -> int:
                 settings,
                 client,
                 chrome,
+                chrome_version,
             ): path.stem
             for path in todo
         }

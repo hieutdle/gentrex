@@ -76,6 +76,14 @@ def problems(case: dict, prose: dict) -> list[str]:
         or not all(isinstance(part, str) for part in prose[key])
     ]:
         found.append(f"{', '.join(wrong)} must be lists of paragraphs")
+    elif not isinstance(prose["summary"], str):
+        found.append("summary must be a string")
+    elif (
+        not isinstance(prose["condition"], dict)
+        or set(prose["condition"]) != set(_CONDITION)
+        or not all(isinstance(part, str) for part in prose["condition"].values())
+    ):
+        found.append(f"condition must have a string for each of {_CONDITION}")
     elif len(prose["variant_details"]) != len(case["record"]["variants"]):
         found.append(
             f"{len(prose['variant_details'])} variant details for "

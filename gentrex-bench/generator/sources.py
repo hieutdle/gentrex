@@ -324,8 +324,9 @@ def load_clinvar(
     and a c. change (or an m. change for mtDNA), and one of its conditions
     must have a MONDO ID and an OMIM or Orphanet entry with HPO features and
     one mode of inheritance. Of a variant's conditions, the one that ClinVar
-    names most often for the gene is kept, and a variant whose condition less
-    than a tenth of the gene's variants have is left out. A c. change of
+    names most often for the gene is kept. A variant is left out if less than
+    1 in 50 of the gene's rows with a condition name its condition, or if
+    less than a tenth of the gene's variants have it. A c. change of
     whole exons, whose ends are ranges such as c.(?_5299)_(5572_?)del, is
     kept, and other changes with unknown positions or repeats are left out.
 
@@ -335,6 +336,10 @@ def load_clinvar(
     """
     csv.field_size_limit(sys.maxsize)
     found: list[tuple[list[Disease], Variant]] = []
+    counts: dict[str, collections.Counter[str]] = collections.defaultdict(
+        collections.Counter
+    )
+    rows_with_condition: collections.Counter[str] = collections.Counter()
     regions: dict[str, dict[str, dict[str, str]]] = collections.defaultdict(dict)
     with gzip.open(path, "rt", encoding="utf-8") as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
@@ -358,6 +363,9 @@ def load_clinvar(
             if coding and ("[" in coding[3] or "?" in coding[3]):
                 if not _EXON_CHANGE.match(coding[3]):
                     continue
+            named = set(re.findall(r"MONDO:(MONDO:\d+)", row["PhenotypeIDS"]))
+            counts[row["GeneSymbol"]].update(named)
+            rows_with_condition[row["GeneSymbol"]] += bool(named)
             diseases = _diseases(row["PhenotypeIDS"], mondo, annotations)
             if not diseases:
                 continue
@@ -380,15 +388,15 @@ def load_clinvar(
                     ),
                 )
             )
-    counts: dict[str, collections.Counter[str]] = collections.defaultdict(
-        collections.Counter
-    )
-    for diseases, variant in found:
-        counts[variant.gene].update(d.mondo_id for d in diseases)
+    # A condition that less than 1 in 50 of a gene's rows name is one that the
+    # gene doesn't cause, as Carney complex is for MYO15A. The rows count
+    # whether or not HPO annotates their conditions.
     variants: dict[str, list[Variant]] = collections.defaultdict(list)
     for diseases, variant in found:
-        main = max(diseases, key=lambda d: counts[variant.gene][d.mondo_id])
-        variants[variant.gene].append(dataclasses.replace(variant, disease=main))
+        rows = counts[variant.gene]
+        main = max(diseases, key=lambda d: rows[d.mondo_id])
+        if rows[main.mondo_id] * 50 >= rows_with_condition[variant.gene]:
+            variants[variant.gene].append(dataclasses.replace(variant, disease=main))
     # A condition of less than a tenth of a gene's variants is often outside
     # the clinical area that tests the gene, as multiple self-healing squamous
     # epithelioma is for TGFBR1, so those variants are left out.
