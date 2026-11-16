@@ -53,16 +53,15 @@ def _earlier_texts(
 ) -> dict[int, str]:
     """Returns the earlier OCR text of each scanned page that needs no new call.
 
-    The earlier pages count only if the PDF still has the same pages, each
-    scanned or native as before, and the same text on its native pages.
-    Scanned pages with an error or without text are sent to OCR again.
+    The earlier pages count only if the PDF is the same file, by its
+    SHA-256, with each page scanned or native as before. Scanned pages with
+    an error or without text are sent to OCR again.
     """
 
-    def outline(found: list[records.PageRecord]) -> list[tuple[int, str, str]]:
-        return [
-            (page.page, page.source, page.text if page.source == "native" else "")
-            for page in found
-        ]
+    def outline(
+        found: list[records.PageRecord],
+    ) -> list[tuple[int, str, str | None]]:
+        return [(page.page, page.source, page.sha256) for page in found]
 
     if outline(earlier) != outline(pages):
         return {}

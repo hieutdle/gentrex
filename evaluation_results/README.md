@@ -37,7 +37,9 @@ The notebook has these parts:
 | The errors of the run | Every value that isn't right, with the truth and what Gentrex wrote |
 
 It is saved without outputs, because its numbers come from your own runs. It
-computes no scores itself, so they are those of each run's `scores.md`.
+computes no scores itself, so they are those of each run's `scores.md`. The
+difference between two runs is the exception, which the notebook computes
+with the scorer's `score.difference`.
 
 Some tables quote values from the reports. After a run on real reports,
 clear the outputs before you save or share the notebook.

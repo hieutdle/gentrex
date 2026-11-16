@@ -133,7 +133,8 @@ last three to its implication:
 | Genomic structural variant copy number | LOINC 82155-3 | `copy_number`, as a number without a unit. |
 | Human reference sequence assembly version | LOINC 62374-4 | `genome_build`, as the LOINC answer GRCh37 or GRCh38. |
 | Allelic state | LOINC 53034-5 | `zygosity`. |
-| Origin of germline genetic variant | LOINC 94186-4 | `parental_origin`. |
+| Origin of germline genetic variant | LOINC 94186-4 | `parental_origin`, if it is maternal or paternal. |
+| Genomic source class | LOINC 48002-0 | `parental_origin`, if it is de novo, which the IG lists as a source class. |
 | Clinical significance | LOINC 53037-8 | `classification`. |
 | Associated phenotype | LOINC 81259-4 | `disease_id` and `disease_label` from MONDO, with `associated_phenotype` as printed. |
 | Mode of inheritance | `condition-inheritance`, a code of the IG | `mode_of_inheritance`, as an HPO term. |

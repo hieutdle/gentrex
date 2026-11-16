@@ -51,11 +51,22 @@ def _gene_symbols(
     return {symbol for symbol in symbols if symbol}
 
 
+def _feature_texts(extractions: list[records.ReportExtraction]) -> list[str]:
+    """Returns the different texts of the clinical features of all reports."""
+    texts: dict[str, None] = {}
+    for extraction in extractions:
+        features = (extraction.data or {}).get("patient_phenotypes")
+        for feature in features if isinstance(features, list) else []:
+            if isinstance(feature, dict) and isinstance(feature.get("text"), str):
+                texts[feature["text"]] = None
+    return list(texts)
+
+
 def _normalize(
     data: dict[str, Any],
     hgnc: genes_lib.HgncIndex,
     mondo: diseases.MondoIndex,
-    hpo: phenotypes.HpoIndex | None,
+    hpo: dict[str, dict[str, Any]] | None,
     clinvar: variants_lib.ClinvarIndex | None,
     day_first: bool,
 ) -> dict[str, Any]:
@@ -80,8 +91,7 @@ def _normalize(
     }
     if hpo is not None:
         normalized["patient_phenotypes"] = [
-            hpo.map(phenotype["text"])
-            for phenotype in data.get("patient_phenotypes") or []
+            hpo[phenotype["text"]] for phenotype in data.get("patient_phenotypes") or []
         ]
     return normalized
 
@@ -90,7 +100,7 @@ def _normalize_report(
     extraction: records.ReportExtraction,
     hgnc: genes_lib.HgncIndex,
     mondo: diseases.MondoIndex,
-    hpo: phenotypes.HpoIndex | None,
+    hpo: dict[str, dict[str, Any]] | None,
     clinvar: variants_lib.ClinvarIndex | None,
     day_first: bool,
 ) -> records.NormalizedReport:
@@ -145,12 +155,18 @@ def run(
         extractions = [records.ReportExtraction(**json.loads(line)) for line in fh]
     if clinvar is not None:
         clinvar.read(_gene_symbols(extractions, hgnc))
+    matches = None
+    if hpo is not None:
+        texts = _feature_texts(extractions)
+        matches = dict(zip(texts, hpo.map_all(texts), strict=True))
     failed: list[str] = []
     # Data from `gentrex extract` may hold half of a surrogate pair; it is kept as
     # a JSON escape.
     with output_path.open("w", encoding="utf-8", errors="backslashreplace") as fh:
         for extraction in extractions:
-            report = _normalize_report(extraction, hgnc, mondo, hpo, clinvar, day_first)
+            report = _normalize_report(
+                extraction, hgnc, mondo, matches, clinvar, day_first
+            )
             _logger.info("normalized %s", report.file)
             fh.write(report.to_json() + "\n")
             if report.error:

@@ -291,10 +291,9 @@ A report is listed as failed in two cases:
   Run `gentrex transcribe`, `gentrex select` and `gentrex extract` again, each
   with `--retry`. Only this report then goes to the models again
   ([Redo failed files](runs-and-results.md#redo-failed-files)).
-- **The request failed.** `data` is `null`, and `error` says why. A connection
-  error means the server was down or busy, even after Gentrex's
-  [retries](runs-and-results.md#failed-requests). Check that the server is
-  running, then run `gentrex extract --retry results/extract/latest`.
+- **The request failed.** `data` is `null`, and `error` says why. After an
+  error from the server, such as `InternalServerError`, check that the server
+  is running. Then run `gentrex extract --retry results/extract/latest`.
 
 Three errors come from the report rather than the server:
 

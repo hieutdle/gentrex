@@ -63,31 +63,17 @@ class PageScorer:
         self.config = config
         self._client = client
 
-    def ask(self, text: str, question: str) -> float:
-        """Returns P(yes) for `question` about the page `text`.
-
-        Connection, rate-limit and 5xx errors are retried.
-
-        Raises:
-            MissingLogprobsError: The server sent no logprobs.
-            ValueError: The answer starts with neither yes nor no.
-            openai.OpenAIError: The request still failed, or cannot succeed.
-        """
-        return llm.with_retries(lambda: self._request(text, question))
-
     def ask_or_error(self, text: str, question: str) -> float | Exception:
         """Returns P(yes) for `question` about `text`, or the error that prevented it.
 
         Raises:
             MissingLogprobsError: The server sent no logprobs.
-            openai.OpenAIError: The endpoint is misconfigured (llm.FATAL_ERRORS).
+            openai.OpenAIError: The endpoint is misconfigured or can't be
+                reached (llm.result_or_error).
         """
-        try:
-            return self.ask(text, question)
-        except (*llm.FATAL_ERRORS, MissingLogprobsError):
-            raise
-        except Exception as exc:  # One question's failure must not cost the others.
-            return exc
+        return llm.result_or_error(
+            lambda: self._request(text, question), fatal=(MissingLogprobsError,)
+        )
 
     def _request(self, text: str, question: str) -> float:
         # Page before question: a page's questions then share a cached prefix.

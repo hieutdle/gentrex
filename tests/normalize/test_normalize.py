@@ -140,11 +140,25 @@ def _hgnc_index(tmp_path: pathlib.Path) -> genes.HgncIndex:
         ("Abnormal female karyotype", "positive"),
         ("ABNORMAL MICROARRAY RESULT", "positive"),
         ("No abnormal microarray findings were detected.", "negative"),
+        ("No pathogenic/likely pathogenic variants were identified.", "negative"),
+        ("No (likely) pathogenic variants were identified.", "negative"),
+        ("Pathogenic variants were not detected.", "negative"),
+        ("Pathogenic Variant(s) Identified: None", "negative"),
+        ("No deletions. One pathogenic variant was identified.", "positive"),
+        (
+            "POSITIVE: Pathogenic variant identified. Carrier testing of relatives"
+            " is recommended.",
+            "positive",
+        ),
+        ("POSITIVE: The patient is not a carrier of F508del.", "positive"),
+        ("Positive for a secondary finding; primary result negative", "negative"),
+        ("Secondary findings: none. Result: POSITIVE", "positive"),
+        ("NEGATIVE (secondary findings were not requested)", "negative"),
     ],
 )
 def test_result_follows_the_lab_wording(wording, category):
     """The first category the statement names decides, except that carrier
-    outranks positive; secondary results don't."""
+    outranks positive in the same sentence; secondary results don't."""
     result = rules.overall_result(wording, [])
 
     assert (result["overall_result"], result["overall_result_basis"]) == (
@@ -203,6 +217,11 @@ def test_wording_and_classifications_that_disagree_are_flagged():
         ("19/06/2001", "2001-06-19"),
         ("29-Jul-25 08:27", "2025-07-29"),
         ("14-Mar-52", "1952-03-14"),
+        ("Sept. 18th, 2026", "2026-09-18"),
+        ("September 18 2026", "2026-09-18"),
+        ("09-18-2026", "2026-09-18"),
+        ("2026/09/18", "2026-09-18"),
+        ("08/18/2026 10:15 AM EST", "2026-08-18"),
         ("27.08.2026", None),
         (None, None),
     ],
@@ -221,6 +240,7 @@ def test_day_first_decides_only_dates_that_fit_both_ways():
     assert rules.parse_date("03/04/2020") == "2020-03-04"
     assert rules.parse_date("03/04/2020", day_first=True) == "2020-04-03"
     assert rules.parse_date("03/25/2020", day_first=True) == "2020-03-25"
+    assert rules.parse_date("03-04-2020", day_first=True) == "2020-04-03"
 
 
 @pytest.mark.parametrize(
@@ -326,6 +346,57 @@ def test_match_says_when_the_models_disagree(tmp_path, monkeypatch):
 
     assert term["models_agree"] is False
     assert {c["hpo_id"] for c in term["candidates"][:2]} == {"HP:0001250", "HP:0001252"}
+
+
+def test_a_feature_far_from_every_term_gets_no_match(tmp_path, monkeypatch):
+    """A text that names no feature must not be exported as the closest term."""
+    monkeypatch.setattr(phenotypes, "load_encoder", lambda model: _ENCODERS[model])
+    models = [{"name": "words"}]
+    path = tmp_path / "hpo.npz"
+    phenotypes.build_index(_write_release(tmp_path), path, models)
+    index = phenotypes.HpoIndex(path, models, top_k=2, min_similarity=0.8)
+
+    close, far = index.map_all(["Seizure", "seizure and ataxia"])
+
+    assert close["hpo_id"] == "HP:0001250"
+    assert (far["hpo_id"], far["label"]) == (None, None)
+    assert len(far["candidates"]) == 2
+
+
+def test_the_features_of_a_run_are_embedded_in_one_call(tmp_path, monkeypatch):
+    """A call per feature takes most of the time of a run of thousands of reports."""
+    calls = []
+
+    class _Counting(_WordEncoder):
+        def encode(self, texts, prompt_name=None):
+            calls.append(list(texts))
+            return super().encode(texts, prompt_name)
+
+    monkeypatch.setitem(_ENCODERS, "words", _Counting())
+    index = _hpo_index(tmp_path, monkeypatch, top_k=1)
+    calls.clear()
+    features = [
+        {"text": "Seizure", "present": True},
+        {"text": "Ataxia", "present": True},
+    ]
+    extractions = [
+        records.ReportExtraction("a.pdf", [1], {"patient_phenotypes": features}),
+        records.ReportExtraction("b.pdf", [1], {"patient_phenotypes": features[:1]}),
+    ]
+    input_path = tmp_path / "extractions.jsonl"
+    input_path.write_text("".join(e.to_json() + "\n" for e in extractions))
+    output_path = tmp_path / "normalized.jsonl"
+
+    run.run(
+        input_path, output_path, _hgnc_index(tmp_path), _mondo_index(tmp_path), index
+    )
+
+    written = [json.loads(line) for line in output_path.read_text().splitlines()]
+    assert calls == [["seizure", "ataxia"]]
+    assert [
+        [match["hpo_id"] for match in report["normalized"]["patient_phenotypes"]]
+        for report in written
+    ] == [["HP:0001250", "HP:0001251"], ["HP:0001250"]]
 
 
 @pytest.mark.parametrize(

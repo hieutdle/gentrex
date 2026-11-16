@@ -1,4 +1,6 @@
+import argparse
 import dataclasses
+import hashlib
 import json
 import logging
 import pathlib
@@ -11,6 +13,7 @@ from unittest import mock
 import openai
 import pytest
 
+from gentrex import cli
 from gentrex import records
 from gentrex import runs
 from gentrex.transcribe import native
@@ -46,7 +49,7 @@ class _FakeOcr(ocr.OcrEngine):
         self._in_flight = 0
         self.max_in_flight = 0
 
-    def image_to_text(self, image_png: bytes) -> str:
+    def _request(self, image_png: bytes) -> str:
         (height,) = struct.unpack(">I", image_png[20:24])
         with self._lock:
             self._in_flight += 1
@@ -92,13 +95,39 @@ def test_page_image_with_a_document_code_goes_to_ocr(make_pdf):
     assert page.source == "scanned"
 
 
+def test_text_without_a_unicode_mapping_does_not_count_as_native():
+    """pdfplumber writes such characters as codes, which no model can read."""
+    text = "(cid:36)(cid:37)" * 100
+
+    assert native.classify_source(text, 20, 0.0, 0) == "scanned"
+
+
+def test_transcription_cut_off_at_max_tokens_is_an_error():
+    """A model stuck repeating itself must not pass as the page's text."""
+    with mock.patch.object(openai, "OpenAI") as client_class:
+        create = client_class.return_value.chat.completions.create
+        create.return_value.usage = None
+        create.return_value.choices = [mock.Mock(finish_reason="length")]
+        engine = ocr.OcrEngine(_FakeOcr(1).config, "http://unused", "EMPTY")
+        result = engine.text_or_error(b"png")
+
+    assert isinstance(result, ValueError) and "cut off at max_tokens" in str(result)
+
+
+def test_missing_input_folder_is_an_error_not_a_traceback(tmp_path, caplog):
+    args = argparse.Namespace(input_dir=tmp_path / "missing")
+
+    assert cli._run_transcribe(args) == 1
+    assert "no PDFs in" in caplog.text
+
+
 def test_empty_prompt_sends_the_page_image_alone():
     """LightOnOCR is trained to transcribe a page from its image alone."""
     config = dataclasses.replace(_FakeOcr(1).config, prompt="")
     with mock.patch.object(openai, "OpenAI") as client_class:
         create = client_class.return_value.chat.completions.create
         create.return_value.usage = None
-        ocr.OcrEngine(config, "http://unused", "EMPTY").image_to_text(b"png")
+        ocr.OcrEngine(config, "http://unused", "EMPTY").text_or_error(b"png")
 
     (message,) = create.call_args.kwargs["messages"]
     assert [part["type"] for part in message["content"]] == ["image_url"]
@@ -174,16 +203,20 @@ def test_failed_ocr_call_costs_only_that_page(make_pdf, tmp_path):
 
 
 def test_retry_sends_only_failed_pages_and_changed_pdfs_to_ocr(make_pdf, tmp_path):
-    """OCR is the slow part, so pages read without an error keep their text."""
+    """OCR is the slow part, so pages read without an error keep their text.
+
+    A PDF counts as changed when its bytes differ, even with the same pages.
+    """
     pdfs = [make_pdf("a.pdf", [400, 410]), make_pdf("b.pdf", [420])]
+    same = hashlib.sha256(pdfs[0].read_bytes()).hexdigest()
     earlier_dir = tmp_path / "transcribe-run"
     earlier_dir.mkdir()
     (earlier_dir / "pages.jsonl").write_text(
-        records.PageRecord("a.pdf", 1, "scanned", "earlier").to_json()
+        records.PageRecord("a.pdf", 1, "scanned", "earlier", None, same).to_json()
         + "\n"
-        + records.PageRecord("a.pdf", 2, "scanned", "", "OCR failed").to_json()
+        + records.PageRecord("a.pdf", 2, "scanned", "", "failed", same).to_json()
         + "\n"
-        + records.PageRecord("b.pdf", 1, "native", "An older b.pdf").to_json()
+        + records.PageRecord("b.pdf", 1, "scanned", "old", None, "other").to_json()
         + "\n"
     )
     heights: list[int] = []

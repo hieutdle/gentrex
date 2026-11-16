@@ -385,9 +385,11 @@ def prepare(
     if extended:
         own += [found[name] for name in _EXTENSION]
     with engine.begin() as conn:
+        # PostgreSQL refuses CREATE SCHEMA IF NOT EXISTS without the right to
+        # create schemas, even for a schema that exists.
         for schema in {schemas.gentrex, schemas.extension if extended else None}:
-            if schema:
-                conn.execute(sa.schema.CreateSchema(schema, if_not_exists=True))
+            if schema and not inspector.has_schema(schema):
+                conn.execute(sa.schema.CreateSchema(schema))
         own[0].metadata.create_all(conn, tables=own)
         if person_map is None:
             person, created = found["person"], found["omop_persons"]
@@ -806,22 +808,36 @@ def _observation_periods(
         (found["measurement"], "measurement_date"),
         (found["observation"], "observation_date"),
     ]
+    days: dict[int, list[datetime.date]] = {}
+    for table, column in dated:
+        for person_id, first, last in conn.execute(
+            sa.select(
+                table.c.person_id,
+                sa.func.min(table.c[column]),
+                sa.func.max(table.c[column]),
+            ).group_by(table.c.person_id)
+        ):
+            days.setdefault(person_id, []).extend([first, last])
+    current = {
+        period_id: (start, end)
+        for period_id, start, end in conn.execute(
+            sa.select(
+                period.c.observation_period_id,
+                period.c.observation_period_start_date,
+                period.c.observation_period_end_date,
+            )
+        )
+    }
     for key, person_id, period_id in conn.execute(sa.select(created)).all():
-        days = [
-            day
-            for table, column in dated
-            for day in conn.execute(
-                sa.select(
-                    sa.func.min(table.c[column]), sa.func.max(table.c[column])
-                ).where(table.c.person_id == person_id)
-            ).one()
-            if day is not None
-        ]
+        days_of_person = days.get(person_id, [])
+        span = (min(days_of_person), max(days_of_person)) if days_of_person else None
+        if span == current.get(period_id) and (span or period_id is None):
+            continue
         if period_id is not None:
             conn.execute(
                 period.delete().where(period.c.observation_period_id == period_id)
             )
-        if not days:
+        if not span:
             period_id = None
         else:
             period_id = period_id or ids.next("observation_period")
@@ -830,8 +846,8 @@ def _observation_periods(
                 {
                     "observation_period_id": period_id,
                     "person_id": person_id,
-                    "observation_period_start_date": min(days),
-                    "observation_period_end_date": max(days),
+                    "observation_period_start_date": span[0],
+                    "observation_period_end_date": span[1],
                     "period_type_concept_id": _NLP,
                 },
             )

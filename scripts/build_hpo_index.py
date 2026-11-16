@@ -26,5 +26,8 @@ try:
 except config.SettingsError as exc:
     parser.error(str(exc))
 output = pathlib.Path(settings["path"])
-count = phenotypes.build_index(args.release, output, settings["models"])
+try:
+    count = phenotypes.build_index(args.release, output, settings["models"])
+except ImportError as exc:
+    parser.exit(1, f"{exc}; run the script with uv run --extra hpo\n")
 print(f"wrote {count} names to {output}")

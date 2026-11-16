@@ -18,6 +18,8 @@ class PageRecord:
         source: How `text` was produced.
         text: Page text; empty for a scanned page that was not transcribed.
         error: Why OCR produced no text, if it failed.
+        sha256: SHA-256 of the PDF file; None in runs from before it was
+            recorded.
     """
 
     file: str
@@ -25,6 +27,7 @@ class PageRecord:
     source: PageSource
     text: str = ""
     error: str | None = None
+    sha256: str | None = None
 
     def to_json(self) -> str:
         """Returns the record as one JSONL line, without the newline."""

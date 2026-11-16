@@ -102,7 +102,8 @@ def run(
         failed request), in input order. Their records are still written.
 
     Raises:
-        openai.OpenAIError: The endpoint is misconfigured (llm.FATAL_ERRORS).
+        openai.OpenAIError: The endpoint is misconfigured or can't be reached
+            (llm.result_or_error).
     """
     start = time.perf_counter()
     with input_path.open(encoding="utf-8") as fh:
@@ -129,7 +130,9 @@ def run(
                 if extraction is None:
                     extraction = next(extracted)
                     _logger.info("extracted %s", extraction.file)
+                # Flushed, so that a job killed halfway keeps its records.
                 fh.write(extraction.to_json() + "\n")
+                fh.flush()
                 if extraction.error:
                     failed.append(extraction.file)
                 flagged += len(extraction.not_in_pages or [])

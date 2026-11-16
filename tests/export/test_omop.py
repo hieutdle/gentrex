@@ -269,6 +269,23 @@ def test_a_created_person_needs_a_year_of_birth(cdm, tmp_path):
     ) == [(datetime.date(2026, 8, 27), datetime.date(2026, 8, 27))]
 
 
+def test_a_later_report_widens_the_persons_observation_period(cdm, tmp_path):
+    """OHDSI tools ignore rows outside a person's observation period."""
+    _export(cdm, tmp_path, [_report()])
+    later = _report("report-02.pdf")
+    assert later.normalized is not None
+    later.normalized["collection_date"] = "2026-10-01"
+
+    _export(cdm, tmp_path, [later])
+
+    assert _rows(
+        cdm,
+        "observation_period",
+        "observation_period_start_date",
+        "observation_period_end_date",
+    ) == [(datetime.date(2026, 8, 27), datetime.date(2026, 10, 1))]
+
+
 def test_persons_are_not_created_in_a_cdm_with_other_persons(cdm, tmp_path):
     """In an institutional CDM, new persons would duplicate real patients."""
     with cdm.begin() as conn:

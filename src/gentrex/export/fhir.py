@@ -56,6 +56,7 @@ _COPY_NUMBER: Code = (_LOINC, "82155-3", "Genomic structural variant copy number
 _ASSEMBLY: Code = (_LOINC, "62374-4", "Human reference sequence assembly version")
 _ALLELIC_STATE: Code = (_LOINC, "53034-5", "Allelic state")
 _ORIGIN: Code = (_LOINC, "94186-4", "Origin of germline genetic variant [Type]")
+_SOURCE_CLASS: Code = (_LOINC, "48002-0", "Genomic source class [Type]")
 _SIGNIFICANCE: Code = (
     _LOINC,
     "53037-8",
@@ -101,11 +102,13 @@ _ASSEMBLIES: dict[str, Code] = {
     "GRCh37": (_LOINC, "LA14029-5", "GRCh37"),
     "GRCh38": (_LOINC, "LA26806-2", "GRCh38"),
 }
+# The IG's answers for the origin are maternal, paternal and unknown. De novo
+# is an answer for the genomic source class instead.
 _ORIGINS: dict[str, Code] = {
-    "de_novo": (_LOINC, "LA26807-0", "De novo"),
     "maternal": (_LOINC, "LA26320-4", "Maternal"),
     "paternal": (_LOINC, "LA26321-2", "Paternal"),
 }
+_DE_NOVO: Code = (_LOINC, "LA26807-0", "De novo")
 # HPO terms, as the IG's value set for the mode of inheritance lists them.
 _INHERITANCES: dict[str, Code] = {
     "autosomal_dominant": (_HPO, "HP:0000006", "Autosomal dominant inheritance"),
@@ -412,9 +415,10 @@ def _variant(
         _ALLELIC_STATES, variant.get("zygosity"), variant.get("zygosity_raw")
     ):
         components.append(_component(_ALLELIC_STATE, state))
-    if origin := _coded(
-        _ORIGINS, variant.get("parental_origin"), variant.get("parental_origin_raw")
-    ):
+    origin_raw = variant.get("parental_origin_raw")
+    if variant.get("parental_origin") == "de_novo":
+        components.append(_component(_SOURCE_CLASS, _concept(_DE_NOVO, origin_raw)))
+    elif origin := _coded(_ORIGINS, variant.get("parental_origin"), origin_raw):
         components.append(_component(_ORIGIN, origin))
 
     observation: dict[str, Any] = {"meta": {"profile": [_PROFILES + "variant"]}}

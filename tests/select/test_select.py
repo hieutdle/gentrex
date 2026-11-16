@@ -95,7 +95,7 @@ def _run(
 def _request(text: str, question: str) -> dict:
     """Returns the arguments of the request that asks `question` about `text`."""
     client = _client(lambda prompt: _first_token({"Yes": 1.0}))
-    score.PageScorer(_CONFIG, client).ask(text, question)
+    score.PageScorer(_CONFIG, client).ask_or_error(text, question)
     return client.chat.completions.create.call_args.kwargs
 
 

@@ -23,6 +23,8 @@ from gentrex.load import tables
 DRIVERS = {"sqlite": "pysqlite", "postgresql": "psycopg", "mysql": "pymysql"}
 
 _HALF_SURROGATE = re.compile("[\ud800-\udfff]")
+# A NUL character as JSON writes it, after an even number of backslashes.
+_NUL = re.compile(r"(?<!\\)((?:\\\\)*)\\u0000")
 
 # Fields of `data` that `gentrex normalize` leaves as printed.
 _REPORT_FIELDS = (
@@ -134,11 +136,12 @@ def read_report(line: str) -> records.NormalizedReport:
     """Parses one line of normalized.jsonl.
 
     Databases and Phenopackets can't hold half of a surrogate pair, which data
-    from `gentrex extract` may hold, so it becomes U+FFFD, the replacement
-    character.
+    from `gentrex extract` may hold, and PostgreSQL can't hold a NUL
+    character. Both become U+FFFD, the replacement character.
     """
     text = json.dumps(json.loads(line), ensure_ascii=False)
-    return records.NormalizedReport(**json.loads(_HALF_SURROGATE.sub("�", text)))
+    text = _NUL.sub(r"\1�", _HALF_SURROGATE.sub("�", text))
+    return records.NormalizedReport(**json.loads(text))
 
 
 def _date(value: str | None) -> datetime.date | None:
@@ -351,6 +354,7 @@ def run(input_path: pathlib.Path, engine: sa.Engine, tree: hpo.HpoTree) -> list[
         match["hpo_id"]
         for report in reports
         for match in (report.normalized or {}).get("patient_phenotypes") or []
+        if match["hpo_id"]
     }
     if missing := sorted(matched - tree.labels.keys()):
         _logger.warning(

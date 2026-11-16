@@ -46,7 +46,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
-      - run: uv sync --extra postgresql --extra mysql
+      - run: uv sync --locked --extra postgresql --extra mysql
       - run: uv run ruff check .
       - run: uv run ruff format --check .
       - run: uv run basedpyright

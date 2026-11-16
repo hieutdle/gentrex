@@ -59,34 +59,22 @@ class ReportExtractor:
         self._answer_schema = copy.deepcopy(config.schema)
         _require_all(self._answer_schema)
 
-    def extract(self, pages: list[records.PageRecord]) -> dict[str, Any]:
-        """Returns the record of the report that `pages` come from.
-
-        Connection, rate-limit and 5xx errors are retried.
-
-        Args:
-            pages: The pages to send, in page order.
-
-        Raises:
-            ValueError: The answer was cut off at max_tokens, or is not JSON.
-            openai.OpenAIError: The request still failed, or cannot succeed.
-        """
-        return llm.with_retries(lambda: self._request(pages))
-
     def extract_or_error(
         self, pages: list[records.PageRecord]
     ) -> dict[str, Any] | Exception:
         """Returns the record of the report, or the error that prevented it.
 
+        An answer that was cut off at max_tokens or is not a JSON object is
+        an error.
+
+        Args:
+            pages: The pages to send, in page order.
+
         Raises:
-            openai.OpenAIError: The endpoint is misconfigured (llm.FATAL_ERRORS).
+            openai.OpenAIError: The endpoint is misconfigured or can't be
+                reached (llm.result_or_error).
         """
-        try:
-            return self.extract(pages)
-        except llm.FATAL_ERRORS:
-            raise
-        except Exception as exc:  # One report's failure must not cost the others.
-            return exc
+        return llm.result_or_error(lambda: self._request(pages))
 
     def _request(self, pages: list[records.PageRecord]) -> dict[str, Any]:
         text = "\n\n".join(f"--- PAGE {page.page} ---\n{page.text}" for page in pages)
@@ -108,4 +96,7 @@ class ReportExtractor:
         choice = response.choices[0]
         if choice.finish_reason == "length":
             raise ValueError(f"answer cut off at max_tokens ({self.config.max_tokens})")
-        return json.loads(choice.message.content or "")
+        data = json.loads(choice.message.content or "")
+        if not isinstance(data, dict):
+            raise ValueError("answer is not a JSON object")
+        return data

@@ -17,6 +17,7 @@ meaning as a concept, a numbered entry in OMOP's vocabularies.
 | MEASUREMENT | The variant, as the concept "SCN1A (sodium voltage-gated channel alpha subunit 1) gene variant measurement", with the value Present and the HGVS change as its source value. |
 | MEASUREMENT | Its clinical significance, as the LOINC code 53037-8 with the answer Pathogenic. |
 | MEASUREMENT | Its allelic state, as the LOINC code 53034-5 with the answer Heterozygous. |
+| MEASUREMENT | Its gene, as the LOINC code 48018-6 with the symbol SCN1A as text. |
 
 The export reads `normalized.jsonl` from a run of `gentrex normalize` and
 writes the rows into the PostgreSQL database that `GENTREX_OMOP_DATABASE_URL`
@@ -29,7 +30,7 @@ You need:
 
 - Gentrex installed ([Transcribe PDF pages](transcribe.md#step-1-install)).
 - A finished run of `gentrex normalize` in `results/normalize/`.
-- An OMOP CDM 5.4 or 5.5 database in PostgreSQL, with OHDSI's standardized
+- An OMOP CDM 5.4 database in PostgreSQL, with OHDSI's standardized
   vocabularies loaded. Step 1 explains how to get one.
 - A machine approved for patient data, because the CDM will hold the records
   of every report.
@@ -213,8 +214,8 @@ a report says the patient doesn't have.
 ### Turn a report into rows
 
 Each report gets one row for the test and, if the report names a specimen,
-one row for the specimen. Every other row of the report points to the test's
-row.
+one row for the specimen. The rows of its variants and clinical features
+point to the test's row.
 
 | Report data | Table | Concept | Value |
 | --- | --- | --- | --- |
@@ -225,7 +226,7 @@ row.
 | Its zygosity | MEASUREMENT | LOINC 53034-5, Allelic state | The LOINC answer of the zygosity |
 | Its gene | MEASUREMENT | LOINC 48018-6, Gene studied | The approved symbol as text |
 | Its protein change | MEASUREMENT | LOINC 48005-3, Amino acid change | `hgvs_p` as text |
-| Its disease | MEASUREMENT or OBSERVATION | LOINC 81259-4, Associated phenotype | The MONDO ID, and the disease label as text |
+| Its disease | MEASUREMENT or OBSERVATION | LOINC 81259-4, Associated phenotype | The MONDO ID, and in OBSERVATION the disease label as text |
 | A clinical feature | OBSERVATION | 0 | Present or Absent, with the HPO ID as source value |
 
 The rows of a variant's attributes point to the variant's row, so a query can

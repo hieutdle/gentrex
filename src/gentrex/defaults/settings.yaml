@@ -27,7 +27,7 @@ transcribe:
     longest_dim: 2048
     # Longest answer allowed for one page, in tokens (8192 tokens are about
     # 6000 words). It stops a model stuck repeating itself on a blank or
-    # noisy page. A page with more text than this would be cut off.
+    # noisy page. A page whose answer is cut off here fails with an error.
     max_tokens: 8192
     # Randomness of the output. At 0, the model always picks the most likely
     # next token. 0.2 is the value LightOn's model card uses.
@@ -135,6 +135,11 @@ normalize:
     # match. The other four are alternatives for when you check it, because
     # the right term is sometimes a close second.
     top_k: 5
+    # The first term is the match only if every model gives it at least this
+    # cosine similarity. Below it the feature gets no HPO term and keeps its
+    # candidates, so a text that names no clinical feature isn't exported
+    # as one. Lower keeps more matches.
+    min_similarity: 0.5
   # ClinVar's variant_summary file, from ftp.ncbi.nlm.nih.gov/pub/clinvar.
   # Gentrex looks up each variant's gene and c. change in it to find the
   # variant's ClinVar ID. null skips the lookup.

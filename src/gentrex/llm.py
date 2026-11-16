@@ -60,6 +60,34 @@ def with_retries[T](call: Callable[[], T]) -> T:
     return call()
 
 
+def result_or_error[T](
+    call: Callable[[], T], fatal: tuple[type[Exception], ...] = ()
+) -> T | Exception:
+    """Returns the result of `call`, or the error that prevented it.
+
+    Connection, rate-limit and 5xx errors are retried first.
+
+    Args:
+        call: Sends one request.
+        fatal: Errors to raise besides the ones below.
+
+    Raises:
+        openai.OpenAIError: The endpoint is misconfigured (FATAL_ERRORS), or
+            the server still can't be reached, so every later call would
+            fail the same way.
+    """
+    try:
+        return with_retries(call)
+    except (*FATAL_ERRORS, *fatal):
+        raise
+    except openai.APITimeoutError as exc:
+        return exc
+    except openai.APIConnectionError:
+        raise
+    except Exception as exc:  # One item's failure must not cost the others.
+        return exc
+
+
 def count(response: chat.ChatCompletion) -> None:
     """Adds an answer and its token counts to the totals that usage() returns."""
     with _usage_lock:

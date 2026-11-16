@@ -42,8 +42,12 @@ _PSEUDONYM_KEY_ENV = "GENTREX_PSEUDONYM_KEY"
 
 
 def _run_transcribe(args: argparse.Namespace) -> int:
-    pdf_paths = sorted(
-        path for path in args.input_dir.iterdir() if path.suffix.lower() == ".pdf"
+    pdf_paths = (
+        sorted(
+            path for path in args.input_dir.iterdir() if path.suffix.lower() == ".pdf"
+        )
+        if args.input_dir.is_dir()
+        else []
     )
     if not pdf_paths:
         _logger.error("no PDFs in %s", args.input_dir)
@@ -199,7 +203,10 @@ def _run_normalize(args: argparse.Namespace) -> int:
             return 1
         try:
             hpo = phenotypes.HpoIndex(
-                hpo_path, settings["hpo"]["models"], settings["hpo"]["top_k"]
+                hpo_path,
+                settings["hpo"]["models"],
+                settings["hpo"]["top_k"],
+                settings["hpo"]["min_similarity"],
             )
         except ValueError as exc:
             _logger.error(

@@ -46,28 +46,16 @@ class OcrEngine:
         self.config = config
         self._client = llm.make_client(base_url, api_key, config.timeout_seconds)
 
-    def image_to_text(self, image_png: bytes) -> str:
-        """Returns the text on a page image.
-
-        Connection, rate-limit and 5xx errors are retried.
-
-        Raises:
-            openai.OpenAIError: The request still failed, or cannot succeed.
-        """
-        return llm.with_retries(lambda: self._request(image_png))
-
     def text_or_error(self, image_png: bytes) -> str | Exception:
         """Returns the text on a page image, or the error that prevented it.
 
+        A transcription cut off at max_tokens is an error.
+
         Raises:
-            openai.OpenAIError: The endpoint is misconfigured (llm.FATAL_ERRORS).
+            openai.OpenAIError: The endpoint is misconfigured or can't be
+                reached (llm.result_or_error).
         """
-        try:
-            return self.image_to_text(image_png)
-        except llm.FATAL_ERRORS:
-            raise
-        except Exception as exc:  # One page's failure must not cost the others.
-            return exc
+        return llm.result_or_error(lambda: self._request(image_png))
 
     def _request(self, image_png: bytes) -> str:
         encoded = base64.b64encode(image_png).decode()
@@ -86,7 +74,12 @@ class OcrEngine:
             messages=[{"role": "user", "content": content}],
         )
         llm.count(response)
-        return (response.choices[0].message.content or "").strip()
+        choice = response.choices[0]
+        if choice.finish_reason == "length":
+            raise ValueError(
+                f"transcription cut off at max_tokens ({self.config.max_tokens})"
+            )
+        return (choice.message.content or "").strip()
 
 
 def _render_page_png(
@@ -117,8 +110,9 @@ def submit_pages(
 
     Returns:
         The pending result of each page: its text, or the error that page hit,
-        so one unreadable page does not cost the report its other pages. A
-        misconfigured endpoint (llm.FATAL_ERRORS) is raised by the result instead.
+        so one unreadable page does not cost the report its other pages. An
+        endpoint that is misconfigured or can't be reached is raised by the
+        result instead (llm.result_or_error).
     """
     doc = pypdfium2.PdfDocument(pdf_path)
     try:

@@ -203,7 +203,7 @@ def test_every_field_is_required():
     client = _client()
     page = records.PageRecord("a.pdf", 1, "native", "Result: negative")
 
-    extractor.ReportExtractor(_CONFIG, client).extract([page])
+    extractor.ReportExtractor(_CONFIG, client).extract_or_error([page])
 
     request = client.chat.completions.create.call_args.kwargs
     schema = request["response_format"]["json_schema"]["schema"]
@@ -233,6 +233,24 @@ def test_cut_off_answer_costs_only_that_report(tmp_path):
     ]
 
 
+def test_answer_that_is_not_a_json_object_costs_only_that_report(tmp_path):
+    """A server that doesn't enforce the schema may answer with a list."""
+
+    def answer(pages: str) -> tuple[str, str]:
+        return ("[]", "stop") if "LIST" in pages else _echo(pages)
+
+    failed, extractions = _run(
+        tmp_path,
+        _client(answer),
+        records.PageRecord("a.pdf", 1, "native", "LIST"),
+        records.PageRecord("b.pdf", 1, "native", "short"),
+    )
+
+    assert failed == ["a.pdf"]
+    assert extractions[0]["error"] == "ValueError: answer is not a JSON object"
+    assert extractions[1]["data"] == {"sent": "--- PAGE 1 ---\nshort"}
+
+
 def test_answer_with_half_a_surrogate_pair_is_still_written(tmp_path):
     """JSON allows the escape but UTF-8 cannot encode it; the run must go on."""
     _, (extraction,) = _run(
@@ -254,5 +272,20 @@ def test_misconfigured_endpoint_stops_the_run(tmp_path):
         _run(
             tmp_path,
             _client(reject),
+            records.PageRecord("a.pdf", 1, "native", "Result: negative"),
+        )
+
+
+def test_server_that_cannot_be_reached_stops_the_run(tmp_path, monkeypatch):
+    """A dead server would fail every report, each after a minute of retries."""
+    monkeypatch.setattr("gentrex.llm.time.sleep", lambda seconds: None)
+
+    def refuse(pages: str) -> tuple[str, str]:
+        raise openai.APIConnectionError(request=mock.Mock())
+
+    with pytest.raises(openai.APIConnectionError):
+        _run(
+            tmp_path,
+            _client(refuse),
             records.PageRecord("a.pdf", 1, "native", "Result: negative"),
         )

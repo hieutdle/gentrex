@@ -118,8 +118,20 @@ def test_a_variant_has_the_loinc_components_of_the_ig(tmp_path):
         "51958-7": ("http://www.ncbi.nlm.nih.gov/refseq", "NM_001165963.4"),
         "48004-6": ("http://varnomen.hgvs.org", "NM_001165963.4:c.4933C>T"),
         "53034-5": (_LOINC, "LA6706-1"),
-        "94186-4": (_LOINC, "LA26807-0"),
+        "48002-0": (_LOINC, "LA26807-0"),
     }
+
+
+def test_a_parent_of_origin_is_the_origin_component(tmp_path):
+    """De novo is a genomic source class in the IG, and a parent is an origin."""
+    report = _report()
+    assert report.data is not None
+    report.data["variants"][0]["parental_origin"] = "maternal"
+    [bundle] = _export(tmp_path, [report]).values()
+
+    [variant] = _observations(bundle, "69548-6")
+
+    assert _values(variant)["94186-4"] == (_LOINC, "LA26320-4")
 
 
 def test_a_protein_change_without_its_reference_sequence_is_a_note(tmp_path):

@@ -1,6 +1,8 @@
 """Embedded-text extraction and per-page routing with pdfplumber."""
 
+import hashlib
 import pathlib
+import re
 
 import pdfplumber
 from pdfplumber import page as page_lib
@@ -15,6 +17,9 @@ _MIN_IMAGE_COVERAGE = 0.5
 _MAX_IMAGE_PAGE_CHARS = 300
 _MIN_CURVES = 1000
 _MAX_CURVE_PAGE_CHARS = 600
+# pdfplumber writes a character whose font has no Unicode mapping as a code,
+# such as (cid:36). Such text is unreadable, so it doesn't count.
+_UNMAPPED_CHARACTER = re.compile(r"\(cid:\d+\)")
 
 
 def _image_coverage(page: page_lib.Page) -> float:
@@ -31,7 +36,9 @@ def _image_coverage(page: page_lib.Page) -> float:
 def classify_source(
     text: str, native_min_chars: int, image_coverage: float, curves: int
 ) -> records.PageSource:
-    """Routes a page by how much embedded text it has, ignoring whitespace.
+    """Routes a page by how much embedded text it has.
+
+    Whitespace and characters without a Unicode mapping don't count.
 
     Args:
         text: The page's embedded text.
@@ -44,7 +51,7 @@ def classify_source(
         "scanned" if the page has fewer than `native_min_chars` characters, or
         few characters on a page of images or curves; otherwise "native".
     """
-    char_count = len("".join(text.split()))
+    char_count = len("".join(_UNMAPPED_CHARACTER.sub("", text).split()))
     if char_count < native_min_chars:
         return "scanned"
     if image_coverage >= _MIN_IMAGE_COVERAGE and char_count < _MAX_IMAGE_PAGE_CHARS:
@@ -62,6 +69,7 @@ def classify_pages(
     Routing is per page because a report can mix native and scanned pages.
     """
     pages: list[records.PageRecord] = []
+    sha256 = hashlib.sha256(pdf_path.read_bytes()).hexdigest()
     with pdfplumber.open(pdf_path) as pdf:
         for number, page in enumerate(pdf.pages, start=1):
             text = (page.extract_text() or "").strip()
@@ -74,6 +82,7 @@ def classify_pages(
                     page=number,
                     source=source,
                     text=text if source == "native" else "",
+                    sha256=sha256,
                 )
             )
     return pages

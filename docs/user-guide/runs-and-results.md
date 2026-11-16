@@ -32,6 +32,10 @@ that the server read and wrote for them, as the server reports them. Tokens
 are words or pieces of words, and hosted providers charge by them. A run
 with `--retry` counts only what it sent again.
 
+A run that stopped with an error has the error in `run.yaml`, as in
+`crashed: 'APIConnectionError: Connection error.'`. Its traceback is at the
+end of `log.txt`.
+
 `latest` in each command's folder, as in `results/transcribe/latest`, points
 to the newest finished run. The next command reads it unless you name another
 run with `--input`. A run that finished with some failed files still becomes
@@ -80,8 +84,15 @@ when you update Gentrex, and you can keep one file per setup.
 
 When a request to the model server fails or times out, Gentrex tries it again
 after 5, 20 and 60 seconds. After the fourth failure it records the error for
-that page or report and moves on to the next. A wrong API key or model name
-stops the run straight away, since every request would fail. A traceback that
+that page or report and moves on to the next.
+
+If the server still can't be reached on the fourth try, the run stops, because
+every later request would fail too. The traceback ends in
+`openai.APIConnectionError`. Check that the server is running and that the
+address in `.env` is right, then [redo the rest](#redo-failed-files) with
+`--retry` and the stopped run's folder.
+
+A wrong API key or model name stops the run straight away. A traceback that
 ends in `openai.AuthenticationError` means the API key in `.env` is wrong.
 `openai.NotFoundError` means the server runs a different model than
 settings.yaml names, or the address in `.env` doesn't end in `/v1`.
@@ -113,8 +124,7 @@ under `retry`.
 A record is reused only if its input hasn't changed. This lets retries build
 on each other. Once `gentrex transcribe --retry` has read a page that failed,
 `gentrex select --retry` and `gentrex extract --retry` send just that report
-to the model again. For a PDF, unchanged means the same pages, each scanned
-or native as before, with the same text on the native ones.
+to the model again. A PDF is unchanged if it is the same file, byte for byte.
 
 The settings have to match the earlier run, except for `timeout_seconds`,
 `concurrency` and `max_tokens`. Raising those is how most failures get fixed.

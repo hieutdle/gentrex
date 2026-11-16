@@ -107,7 +107,8 @@ def run(
         written.
 
     Raises:
-        openai.OpenAIError: The endpoint is misconfigured (llm.FATAL_ERRORS).
+        openai.OpenAIError: The endpoint is misconfigured or can't be reached
+            (llm.result_or_error).
         score.MissingLogprobsError: The server sent no logprobs.
     """
     start = time.perf_counter()
@@ -136,10 +137,13 @@ def run(
                 if decision.file != last_file:
                     _logger.info("deciding %s", decision.file)
                     last_file = decision.file
+                # Flushed, so that a job killed halfway keeps its records.
                 decisions_fh.write(decision.to_json() + "\n")
+                decisions_fh.flush()
                 if decision.keep:
                     kept += 1
                     kept_fh.write(page.to_json() + "\n")
+                    kept_fh.flush()
                 if decision.error and decision.file not in failed:
                     failed.append(decision.file)
     finally:

@@ -42,6 +42,21 @@ def test_crashed_run_does_not_become_latest(tmp_path, monkeypatch):
     assert not runs.latest("transcribe").exists()
 
 
+def test_crashed_run_records_why_it_stopped(tmp_path, monkeypatch):
+    """Without it, the folder of a crashed run looks like a finished one."""
+    monkeypatch.chdir(tmp_path)
+
+    with (
+        pytest.raises(RuntimeError),
+        runs.new_run("transcribe", tmp_path, {}) as run_dir,
+    ):
+        raise RuntimeError("model server stopped")
+
+    record = yaml.safe_load((run_dir / "run.yaml").read_text())
+    assert record["crashed"] == "RuntimeError: model server stopped"
+    assert "Traceback" in (run_dir / "log.txt").read_text()
+
+
 def test_a_run_records_the_gentrex_version_and_commit(tmp_path, monkeypatch):
     """A result must be traceable to the code that produced it."""
     monkeypatch.chdir(tmp_path)
@@ -117,9 +132,13 @@ def test_retry_allows_the_limits_that_made_reports_fail(tmp_path, monkeypatch):
 
 
 def test_a_run_that_stopped_halfway_is_read_up_to_its_last_whole_line(tmp_path):
-    """A job killed at its time limit can leave half a line behind."""
-    record = records.ReportExtraction("a.pdf", [1], {"mrn": "SYN-MRN-0001"})
+    """A job killed at its time limit can leave half a line behind.
+
+    The line may even end inside a character of several bytes.
+    """
+    record = records.ReportExtraction("a.pdf", [1], {"test_name": "Trio – exome"})
+    line = record.to_json().encode()
     path = tmp_path / "extractions.jsonl"
-    path.write_text(record.to_json() + "\n" + record.to_json()[:20])
+    path.write_bytes(line + b"\n" + line[: line.index("–".encode()) + 1])
 
     assert runs.read_earlier(path, records.ReportExtraction) == [record]

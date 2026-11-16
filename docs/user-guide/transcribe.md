@@ -172,8 +172,8 @@ The run folder has three files:
 `pages.jsonl` has one line per page, each a JSON object:
 
 ```json
-{"file": "report-01.pdf", "page": 1, "source": "native", "text": "Hereditary Cancer Panel ...", "error": null}
-{"file": "report-01.pdf", "page": 2, "source": "scanned", "text": "RESULT: NEGATIVE ...", "error": null}
+{"file": "report-01.pdf", "page": 1, "source": "native", "text": "Hereditary Cancer Panel ...", "error": null, "sha256": "9f2c..."}
+{"file": "report-01.pdf", "page": 2, "source": "scanned", "text": "RESULT: NEGATIVE ...", "error": null, "sha256": "9f2c..."}
 ```
 
 | Field | Meaning |
@@ -183,6 +183,7 @@ The run folder has three files:
 | `source` | `native` if the text came from the PDF, `scanned` if the page went to OCR. |
 | `text` | The text of the page. Empty for a scanned page when OCR was off or failed. |
 | `error` | Why OCR failed on this page, or `null` when nothing went wrong. |
+| `sha256` | SHA-256 checksum of the PDF file. `--retry` reuses a page's text only if the PDF still has this checksum. |
 
 To count the pages of each kind:
 
@@ -225,6 +226,10 @@ Outlined text makes about one curve per letter, so such a page has thousands of
 curves. Other pages have far fewer. A page with at least 1,000 curves and fewer
 than 600 characters goes to OCR.
 
+A font may lack the table that maps its characters to Unicode. The text of
+such a page comes out as codes, like `(cid:36)(cid:37)`. The codes don't count
+as characters, so a page that has little else goes to OCR.
+
 Each scanned page is drawn as an image at 400 dots per inch
 (`transcribe.ocr.render_dpi`) and then shrunk until its longer side is 2,048
 pixels (`transcribe.ocr.longest_dim`), the size LightOnOCR is trained on.
@@ -257,13 +262,16 @@ send a page with more text to OCR are fixed in
 A file is listed as failed in two cases:
 
 - **OCR failed on one of its pages.** The other pages are still written, and
-  the failed page has an `error`. A connection error or a timeout means the
-  server was down or busy, even after Gentrex's
-  [retries](runs-and-results.md#failed-requests). Check that the server is
-  running, then run `gentrex transcribe --retry results/transcribe/latest`.
+  the failed page has an `error`. A timeout means the server was busy, even
+  after Gentrex's [retries](runs-and-results.md#failed-requests). Run
+  `gentrex transcribe --retry results/transcribe/latest`.
+  `ValueError: transcription cut off at max_tokens (8192)` means the answer
+  was longer than `transcribe.ocr.max_tokens` allows. The model was most
+  likely stuck repeating itself, and a retry often gets through. If the page
+  really holds that much text, raise `max_tokens` in settings.yaml first.
 - **The PDF could not be opened.** Nothing is written for it, and the error is
   in the output. The file is usually damaged or not a real PDF.
 
-A traceback means the run stopped early, most often because of a wrong API key
-or model name. [Runs and results](runs-and-results.md#failed-requests) lists the
-causes.
+A traceback means the run stopped early, most often because of a wrong API
+key or model name, or because the server could not be reached.
+[Runs and results](runs-and-results.md#failed-requests) lists the causes.

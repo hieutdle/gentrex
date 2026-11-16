@@ -263,10 +263,10 @@ Lower `keep_threshold` to keep more pages. Fewer result pages are missed, but
 A file is listed as failed in two cases:
 
 - **A question failed on one of its pages.** The page is kept with its other
-  answers, and `error` says which question failed. A connection error or a
-  timeout means the server was down or busy, even after Gentrex's
-  [retries](runs-and-results.md#failed-requests). Check that the server is
-  running, then run `gentrex select --retry results/select/latest`.
+  answers, and `error` says which question failed. A timeout means the server
+  was busy, even after Gentrex's
+  [retries](runs-and-results.md#failed-requests). Run
+  `gentrex select --retry results/select/latest`.
 - **One of its pages has an error from `gentrex transcribe`.** The page is
   kept, and its `error` starts with `transcribe:`. Run `gentrex transcribe`
   and then `gentrex select` again, each with `--retry`.

@@ -177,7 +177,11 @@ class HpoIndex:
     """
 
     def __init__(
-        self, path: pathlib.Path, models: list[dict[str, str]], top_k: int
+        self,
+        path: pathlib.Path,
+        models: list[dict[str, str]],
+        top_k: int,
+        min_similarity: float | None = None,
     ) -> None:
         """Reads the index that build_index wrote and loads its models.
 
@@ -185,6 +189,9 @@ class HpoIndex:
             path: The index file.
             models: normalize.hpo.models from settings.yaml.
             top_k: Terms returned per phenotype.
+            min_similarity: The cosine similarity that every model must give
+                the first term for it to be the match, or None to always
+                match the first term.
 
         Raises:
             ValueError: The index was built with other models or prompts, so
@@ -221,20 +228,45 @@ class HpoIndex:
         self._models = wanted
         self._encoders = [load_encoder(name) for name, _ in wanted]
         self._top_k = top_k
+        self._min_similarity = min_similarity
 
     def map(self, text: str) -> dict[str, Any]:
         """Returns the HPO term for `text`, and the top_k terms that fuse ranks highest.
 
         Each candidate gives, for each model, the closest name of the term and
         its cosine similarity. `models_agree` says whether all models score the
-        same term highest, and is None with a single model.
+        same term highest, and is None with a single model. `hpo_id` and
+        `label` are None if a model gives the first candidate less than
+        min_similarity.
         """
-        similarities = [
-            vectors @ embed(encoder, [text], prompt or None)[0]
-            for vectors, encoder, (_, prompt) in zip(
-                self._vectors, self._encoders, self._models, strict=True
-            )
+        return self.map_all([text])[0]
+
+    def map_all(self, texts: list[str]) -> list[dict[str, Any]]:
+        """Returns what map returns for each of `texts`.
+
+        Each model embeds all the texts in one call, which is much faster
+        than a call per text.
+        """
+        if not texts:
+            return []
+        embedded = [
+            embed(encoder, texts, prompt or None)
+            for encoder, (_, prompt) in zip(self._encoders, self._models, strict=True)
         ]
+        return [
+            self._match(
+                [
+                    vectors @ model_embedded[i]
+                    for vectors, model_embedded in zip(
+                        self._vectors, embedded, strict=True
+                    )
+                ]
+            )
+            for i in range(len(texts))
+        ]
+
+    def _match(self, similarities: list[np.ndarray]) -> dict[str, Any]:
+        """Returns the match for one text, from its similarity to every name."""
         scores = [term_scores(sims, self._starts) for sims in similarities]
         candidates = []
         for term in np.argsort(-fuse(scores))[: self._top_k]:
@@ -254,9 +286,13 @@ class HpoIndex:
                 }
             )
         agree = len({int(np.argmax(term_score)) for term_score in scores}) == 1
+        matched = self._min_similarity is None or all(
+            model["similarity"] >= self._min_similarity
+            for model in candidates[0]["models"].values()
+        )
         return {
-            "hpo_id": candidates[0]["hpo_id"],
-            "label": candidates[0]["label"],
+            "hpo_id": candidates[0]["hpo_id"] if matched else None,
+            "label": candidates[0]["label"] if matched else None,
             "models_agree": agree if len(scores) > 1 else None,
             "candidates": candidates,
         }

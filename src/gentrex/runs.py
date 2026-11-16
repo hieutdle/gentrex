@@ -11,6 +11,7 @@ import shlex
 import subprocess
 import sys
 import time
+import traceback
 from collections.abc import Iterator
 from typing import Any
 
@@ -101,9 +102,10 @@ def new_run(
     the input with links resolved, the settings and the earlier run that a
     retry reuses, and log.txt, a copy of the log. When the run ends, run.yaml
     also gets the seconds it took, the answers it got from model servers and
-    their tokens. A second run that starts in the same second gets the folder
-    name with "-2" added. latest(name) is pointed at the folder when the run
-    finishes without raising.
+    their tokens. A run that stopped with an error also gets the error under
+    `crashed`, and its traceback in log.txt. A second run that starts in the
+    same second gets the folder name with "-2" added. latest(name) is pointed
+    at the folder when the run finishes without raising.
 
     Args:
         name: Folder under results/ that holds the command's runs.
@@ -148,6 +150,11 @@ def new_run(
     try:
         _logger.info("writing %s", run_dir)
         yield run_dir
+    except BaseException as exc:
+        record["crashed"] = f"{type(exc).__name__}: {exc}"
+        with (run_dir / "log.txt").open("a", encoding="utf-8") as fh:
+            fh.write(traceback.format_exc())
+        raise
     finally:
         record["seconds"] = round(time.perf_counter() - start, 1)
         record.update({key: count - before[key] for key, count in llm.usage().items()})
@@ -193,13 +200,13 @@ def read_earlier[T](path: pathlib.Path, record_type: type[T]) -> list[T]:
     """Reads the records in a file of an earlier run.
 
     A run that was stopped halfway, such as a job that reached its time
-    limit, may end with half a line or have no file yet. The records before
-    that are returned.
+    limit, may end with half a line, even half a character, or have no file
+    yet. The records before that are returned.
     """
     if not path.is_file():
         return []
     found = []
-    with path.open(encoding="utf-8") as fh:
+    with path.open(encoding="utf-8", errors="replace") as fh:
         for line in fh:
             try:
                 found.append(record_type(**json.loads(line)))

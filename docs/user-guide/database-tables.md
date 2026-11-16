@@ -159,7 +159,7 @@ One row per clinical feature of a report. The key is `file` and
 | `phenotype_number` | integer | no | Position of the feature in the report's list, starting at 1. |
 | `text` | text | no | The feature, copied verbatim, like `Global developmental delay`. |
 | `present` | boolean | yes | True if the patient has the feature, false if the report rules it out, and null if the report is unsure, as in `possible seizure`. Filter on `present` when you count the patients with a feature, or "no hearing impairment" counts as hearing impairment. |
-| `hpo_id` | text, up to 32 characters | yes | Matched HPO term, like `HP:0001263`. It is the first candidate, and null if `gentrex normalize` ran with `--no-hpo`. |
+| `hpo_id` | text, up to 32 characters | yes | Matched HPO term, like `HP:0001263`. It is the first candidate. It is null if `gentrex normalize` ran with `--no-hpo`, or if the candidate's similarity is below `normalize.hpo.min_similarity`. |
 | `hpo_label` | text | yes | Label of the matched term. |
 | `models_agree` | boolean | yes | True if all the models rank the same term first. False marks a match worth checking, because these are wrong more often. Null with a single model, or with `--no-hpo`. |
 

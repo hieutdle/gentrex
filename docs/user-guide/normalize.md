@@ -270,7 +270,7 @@ Each HPO match has these fields:
 
 | Field | Meaning |
 | --- | --- |
-| `hpo_id`, `label` | The matched HPO term and its label, the first of the `candidates`. |
+| `hpo_id`, `label` | The matched HPO term and its label, the first of the `candidates`. Both are `null` if a model gives that term a `similarity` below `normalize.hpo.min_similarity`. |
 | `models_agree` | `true` if both models score the same term highest. Check the matches with `false` first, because they're more often wrong. |
 | `candidates` | The 5 terms with the highest combined score, best first. Under `models`, each model gives the term's label or synonym that came closest to the feature (`name`) and how close it came (`similarity`). |
 
@@ -376,17 +376,27 @@ any secondary findings. The first category word in the statement decides:
 | Normal male karyotype | `negative` |
 | ABNORMAL MICROARRAY RESULT | `positive` |
 
-Everything from the word "secondary" on is ignored, because a secondary
-finding doesn't change the primary result. Besides the category words,
-"pathogenic variant" counts as positive, "VUS" and "unknown significance"
-count as uncertain, and "indeterminate" counts as inconclusive.
-"No" or "not" followed within six words by "variants"
-counts as negative, and so does "not a carrier". In "No pathogenic or likely
-pathogenic variants were identified.", the negative wording comes first, so
-the statement is negative. A statement that names both positive and carrier,
-as "POSITIVE: CARRIER", is carrier, because positive there only says that
-something was found. For the same reason, a positive statement is carrier
-when the test name contains "carrier", as in "Expanded Carrier Panel".
+A sentence that mentions "secondary" is ignored, and so is a part of one
+between semicolons, because a secondary finding doesn't change the primary
+result. "Positive for a secondary finding; primary result negative" is
+therefore negative. If the rest of the statement names no category, the text
+before "secondary" decides.
+
+Besides the category words, "pathogenic variant" counts as positive, "VUS"
+and "unknown significance" count as uncertain, and "indeterminate" counts as
+inconclusive. "No" or "not" followed within six words of the same sentence
+by "variants" counts as negative, and so does "not a carrier". In "No
+pathogenic/likely pathogenic variants were identified.", the negative wording
+comes first, so the statement is negative. "Not" or "none" right after
+"pathogenic variants" counts as negative too, as in "Pathogenic variants were
+not detected." and "Pathogenic variants: None detected".
+
+A sentence that starts positive and also says carrier, as "POSITIVE:
+CARRIER", is carrier, because positive there only says that something was
+found. A later sentence doesn't change the category, so "POSITIVE: Pathogenic
+variant identified. Carrier testing of relatives is recommended." stays
+positive. A positive statement is also carrier when the test name contains
+"carrier", as in "Expanded Carrier Panel".
 
 Karyotypes and arrays have wording of their own. "Normal" right before
 karyotype, microarray, array or chromosome counts as negative, and
@@ -411,12 +421,16 @@ inconclusive.
 
 ### Dates
 
-Gentrex reads dates printed like `2026-08-27`, `08/27/2026`, `27-AUG-2026`,
-`27-August-2026`, `27 August 2026`, `27 Aug 2026`, `August 27, 2026` and
-`Aug 27, 2026`. A date in any other format becomes `null` instead of a guess.
-A time of day after the date is ignored, so `27-Aug-2026 08:27` is read too.
+Gentrex reads dates printed like `2026-08-27`, `2026/08/27`, `08/27/2026`,
+`08-27-2026`, `27-AUG-2026`, `27-August-2026`, `27 August 2026`,
+`27 Aug 2026`, `August 27, 2026` and `Aug 27, 2026`. The comma may be
+missing, the day may have an ending as in `August 27th, 2026`, and September
+may be written `Sept` or `Sep.`. A date in any other format becomes `null`
+instead of a guess. A time of day after the date is ignored, so
+`27-Aug-2026 08:27` and `08/27/2026 10:15 AM EST` are read too.
 
-A date with slashes can have the month or the day first. `08/27/2026` and
+A date of numbers with slashes or dashes can have the month or the day
+first. `08/27/2026` and
 `27/08/2026` are both read as August 27, because 27 can only be the day.
 `06/08/2026` fits both ways. Gentrex reads it month first, as June 8, the way
 US laboratories print dates. If your laboratories print the day first, as
@@ -501,6 +515,16 @@ well above average comes first, and a model that is far surer of one term
 than of the others counts more. The 5 terms with the highest sums
 (`normalize.hpo.top_k`) become the `candidates`.
 
+The first candidate is the match only if every model gives it a similarity
+of at least 0.5 (`normalize.hpo.min_similarity`). Otherwise `hpo_id` and
+`label` are `null`, and the exports write the feature without an HPO term.
+This keeps a text that names no clinical feature, such as "see clinical
+notes", from being exported as the closest term. The `candidates` stay, so
+you can still check them.
+
+All features of a run are embedded together, and a text that several reports
+share is embedded once.
+
 EmbeddingGemma 2 is trained with task prompts, short texts put before each
 input. Gentrex gives it the prompt `SentenceSimilarity`, which puts
 "task: sentence similarity | query: " before every feature and every HPO
@@ -529,6 +553,7 @@ To change one, name it in a
 | `hpo.models` | SapBERT, and EmbeddingGemma 2 with the prompt `SentenceSimilarity` | The sentence-transformers models that embed the HPO names and the clinical features, each with its `name` on Hugging Face and an optional `prompt`. After you change them, build the index again (step 2). |
 | `hpo.path` | `data/ontology/hpo-v2026-09-01.npz` | The HPO index from step 2. |
 | `hpo.top_k` | `5` | The number of terms kept in `candidates` for each feature. The four after the match are alternatives for when you check it, because the right term is sometimes a close second. |
+| `hpo.min_similarity` | `0.5` | The similarity that every model must give the first candidate for it to be the match. Below it, the feature gets no HPO term. Lower keeps more matches. |
 | `clinvar_path` | `null` | ClinVar's `variant_summary` file from step 4. `null` skips the lookup of ClinVar IDs. |
 
 `scripts/build_hpo_index.py` takes `--settings` too. If your file changes
@@ -551,7 +576,7 @@ before it writes anything:
 | `lacks columns: alias_symbol, hgnc_id, prev_symbol, symbol` | The file at `normalize.hgnc_path` isn't the HGNC complete set, for example a web page saved in its place. Download it again as in step 1. |
 | `data/ontology/mondo-base.json not found` | Do step 3. |
 | `data/ontology/hpo-v2026-09-01.npz not found` | Do step 2, or run with `--no-hpo`. |
-| `No module named 'sentence_transformers'` or `requires the Torchvision library` | Run `gentrex normalize` with `uv run --extra hpo`, as in step 5. |
+| `No module named 'torch'`, `No module named 'sentence_transformers'` or `requires the Torchvision library` | Run `gentrex normalize` with `uv run --extra hpo`, as in step 5. |
 | `data/clinvar/variant_summary_2026-11.txt.gz not found` | Do step 4, or take `clinvar_path` out of your settings file. |
 | `is not a gzip-compressed text file` or `lacks columns: Name, VariationID` | The file at `normalize.clinvar_path` isn't ClinVar's `variant_summary.txt.gz`, or it was unpacked. Download it again as in step 4. |
 | `the index ... was built with ..., but settings.yaml names ...` | `normalize.hpo.models` changed after the index was built, or an older version of Gentrex built the index. Build the index again as in step 2. |

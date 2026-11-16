@@ -175,6 +175,14 @@ def test_half_a_surrogate_pair_is_loaded_as_a_replacement_character(engine, tmp_
     assert _select(engine, "SELECT test_name FROM reports") == [("Panel �",)]
 
 
+def test_a_nul_character_is_loaded_as_a_replacement_character(engine, tmp_path):
+    """PostgreSQL refuses a NUL character in text, and the report would be lost."""
+    report = records.NormalizedReport("a.pdf", [1], {"test_name": "Panel\x00"}, None)
+
+    assert _load(engine, tmp_path, [report]) == []
+    assert _select(engine, "SELECT test_name FROM reports") == [("Panel�",)]
+
+
 def test_a_feature_is_found_under_every_term_above_its_match(engine, tmp_path):
     """A query on a broad term must find the features matched to narrower ones."""
     tree = hpo.HpoTree(
