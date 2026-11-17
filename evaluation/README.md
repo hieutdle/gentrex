@@ -130,6 +130,9 @@ lists more.
 
 ## Run on Minerva
 
+[Evaluate Gentrex on Minerva](../docs/minerva/evaluate.md) has these steps
+on one page, from the installation to the scores.
+
 ### Step 1: Prepare
 
 Download everything first, in an interactive session, so that the GPU jobs

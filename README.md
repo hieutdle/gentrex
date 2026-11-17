@@ -225,6 +225,7 @@ for what they have in common:
 Running Gentrex on Minerva:
 
 - [Running on Minerva (Mount Sinai)](docs/minerva/minerva.md)
+- [Evaluate Gentrex on Minerva](docs/minerva/evaluate.md)
 
 Working on Gentrex itself:
 
