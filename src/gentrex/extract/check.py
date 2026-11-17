@@ -2,6 +2,7 @@
 
 import unicodedata
 from collections.abc import Iterator
+from collections.abc import Sequence
 from typing import Any
 
 
@@ -52,3 +53,18 @@ def not_in_pages(
         for path, value in copied_values(data, schema)
         if _letters(value) not in pages
     ]
+
+
+def first_page(value: str, pages: Sequence[tuple[int, str]]) -> int | None:
+    """Returns the first page that prints a value, or None if none does.
+
+    Only letters and digits are compared, as in not_in_pages.
+
+    Args:
+        value: The value as the record holds it.
+        pages: The number and the text of each page, in page order.
+    """
+    wanted = _letters(value)
+    if not wanted:
+        return None
+    return next((number for number, text in pages if wanted in _letters(text)), None)

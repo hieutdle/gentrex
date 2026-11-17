@@ -13,6 +13,7 @@ from sqlalchemy import exc as sa_exc
 from gentrex import config
 from gentrex import llm
 from gentrex import runs
+from gentrex import servers
 from gentrex.export import omop
 from gentrex.export import pseudonyms as pseudonyms_lib
 from gentrex.export import run as export_run
@@ -136,7 +137,7 @@ def _run_extract(args: argparse.Namespace) -> int:
     # Added to the settings, so that run.yaml records it for every run.
     settings = {
         **config.load_settings(args.settings)["extract"],
-        "schema": config.load_schema(),
+        "schema": config.load_schema(args.schema),
     }
     try:
         earlier = runs.earlier(args.retry, "extract", settings) if args.retry else None
@@ -426,11 +427,64 @@ def _run_export_omop(args: argparse.Namespace) -> int:
     return 0
 
 
+def _run_all(args: argparse.Namespace) -> int:
+    """Runs gentrex transcribe, select, extract and normalize, one after another.
+
+    Each command reads the run folder of the one before it. A command with
+    failed files doesn't stop the others, which pass the errors on.
+    """
+    settings = config.load_settings(args.settings)
+    steps = (
+        ("transcribe", _OCR_BASE_URL_ENV, settings["transcribe"]["ocr"]["model"]),
+        ("select", _LLM_BASE_URL_ENV, settings["select"]["model"]),
+        ("extract", _LLM_BASE_URL_ENV, settings["extract"]["model"]),
+        ("normalize", None, None),
+    )
+    parser = _build_parser()
+    source = ["--input-dir", str(args.input_dir)]
+    failed = False
+    for command, variable, model in steps:
+        arguments = [command, *source]
+        if args.settings:
+            arguments += ["--settings", str(args.settings)]
+        if command == "extract" and args.schema:
+            arguments += ["--schema", str(args.schema)]
+        if command == "normalize" and args.no_hpo:
+            arguments.append("--no-hpo")
+        latest = runs.latest(command)
+        before = latest.resolve() if latest.exists() else None
+        try:
+            with servers.served(args.serve if model else None, model or "") as url:
+                if variable and url:
+                    os.environ[variable] = url
+                step = parser.parse_args(arguments)
+                status = step.func(step)
+        except RuntimeError as exc:
+            _logger.error("%s", exc)
+            return 1
+        after = latest.resolve() if latest.exists() else None
+        if after is None or after == before:
+            _logger.error("gentrex %s did not finish, so the run stops here", command)
+            return status or 1
+        failed = failed or bool(status)
+        source = ["--input", str(after)]
+    return int(failed)
+
+
 def _add_settings(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--settings",
         type=pathlib.Path,
         help="YAML file with the settings that differ from Gentrex's defaults.",
+    )
+
+
+def _add_schema(command: argparse.ArgumentParser) -> None:
+    command.add_argument(
+        "--schema",
+        type=pathlib.Path,
+        help="YAML file with an extraction schema of your own, in place of"
+        " Gentrex's schema.yaml.",
     )
 
 
@@ -490,6 +544,7 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Earlier run folder of gentrex extract whose good records to reuse.",
     )
     _add_settings(extract)
+    _add_schema(extract)
     extract.set_defaults(func=_run_extract)
 
     normalize = commands.add_parser("normalize", help="Normalize report data.")
@@ -569,6 +624,27 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Run folder of gentrex normalize to read.",
     )
     to_fhir.set_defaults(func=_run_export_fhir)
+
+    run = commands.add_parser(
+        "run",
+        help="Run transcribe, select, extract and normalize, one after another.",
+    )
+    run.add_argument("--input-dir", type=pathlib.Path, default=pathlib.Path("data/raw"))
+    run.add_argument(
+        "--serve",
+        type=pathlib.Path,
+        required=True,
+        help="Script that starts the model server of a command, given the"
+        " model's name and a port.",
+    )
+    run.add_argument(
+        "--no-hpo",
+        action="store_true",
+        help="Leave the clinical features without HPO terms.",
+    )
+    _add_settings(run)
+    _add_schema(run)
+    run.set_defaults(func=_run_all)
     return parser
 
 

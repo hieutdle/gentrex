@@ -484,6 +484,31 @@ def test_change_of_several_clinvar_variants_needs_a_transcript_to_get_an_id(tmp_
     assert with_transcript["clinvar_variation_id"] == "10381"
 
 
+@pytest.mark.parametrize(
+    ("protein", "status"),
+    [
+        ("p.(Gln1756Profs*74)", "same"),
+        ("p.Q1756fs", "same"),
+        ("p.Gln1765Profs*74", "different"),
+        (None, "missing"),
+    ],
+)
+def test_protein_change_is_compared_with_the_one_clinvar_names(
+    tmp_path, protein, status
+):
+    """A digit that OCR or the model got wrong shows as a difference, while
+    another spelling of the same change doesn't."""
+    index = _clinvar_index(tmp_path)
+    index.read({"BRCA1"})
+
+    found = index.normalize("BRCA1", None, "c.5266dup", protein)
+
+    assert (found["clinvar_hgvs_p"], found["clinvar_hgvs_p_status"]) == (
+        "p.Gln1756fs",
+        status,
+    )
+
+
 def test_file_that_is_not_clinvars_summary_is_refused(tmp_path):
     path = tmp_path / "variant_summary.txt.gz"
     with gzip.open(path, "wt", encoding="utf-8") as fh:

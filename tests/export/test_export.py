@@ -263,6 +263,35 @@ def test_only_primary_findings_are_candidates(
     assert interpretation["interpretationStatus"] == status
 
 
+def test_a_variant_keeps_its_clinvar_id_and_only_a_change_that_is_hgvs(tmp_path):
+    """Tools resolve the expressions of a Phenopacket, so none may be unreadable."""
+    variant = {"gene_symbol": "BRCA1", "transcript": "NM_007294.4"}
+    report = _report(
+        "a.pdf",
+        "SYN-MRN-0001",
+        variants=(
+            (
+                variant | {"hgvs_c": "c.5266dupC"},
+                {"hgvs_c_status": "valid", "clinvar_variation_id": "17677"},
+            ),
+            (variant | {"hgvs_c": "c.5266 dup C"}, {"hgvs_c_status": "invalid"}),
+        ),
+    )
+
+    _, packets = _export(tmp_path, [report])
+
+    [packet] = packets.values()
+    first, second = (
+        interpretation["variantInterpretation"]["variationDescriptor"]
+        for interpretation in packet["interpretations"][0]["diagnosis"][
+            "genomicInterpretations"
+        ]
+    )
+    assert first["xrefs"] == ["clinvar:17677"]
+    assert first["expressions"][0]["value"] == "NM_007294.4:c.5266dupC"
+    assert "expressions" not in second and "xrefs" not in second
+
+
 def test_an_array_result_is_an_iscn_expression(tmp_path):
     """ISCN is the syntax that the Phenopacket schema names for array results."""
     report = _report("report-01.pdf", "SYN-MRN-0001", variants=(_DUP17P,))

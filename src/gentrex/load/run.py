@@ -74,6 +74,16 @@ _VARIANT_FIELDS = (
     "variant_type_raw",
 )
 
+# What `gentrex normalize` finds out about each variant's changes.
+_CHECK_FIELDS = (
+    "hgvs_c_status",
+    "hgvs_p_status",
+    "clinvar_variation_id",
+    "clinvar_status",
+    "clinvar_hgvs_p",
+    "clinvar_hgvs_p_status",
+)
+
 _logger = logging.getLogger(__name__)
 
 
@@ -183,6 +193,7 @@ def _rows(
             "disease_id": gene.get("disease_id"),
             "disease_label": gene.get("disease_label"),
             "disease_status": gene.get("disease_status"),
+            **{field: gene.get(field) for field in _CHECK_FIELDS},
             **{field: variant.get(field) for field in _VARIANT_FIELDS},
         }
         for number, (variant, gene) in enumerate(zip(variants, genes, strict=True), 1)

@@ -66,8 +66,8 @@ columns of `gentrex load` in [Database tables](database-tables.md).
 `genomic_test` has the test name and type, the overall result and its
 wording, the karyotype, the clinical indication, the laboratory, the
 accession number and the genome build.
-`genomic_variant` has every field of a variant, with the gene's HGNC ID and
-the MONDO disease. `phenotype_feature` has the feature as printed, `present`,
+`genomic_variant` has every field of a variant, with the gene's HGNC ID, the
+MONDO disease, the HGVS statuses and the ClinVar ID. `phenotype_feature` has the feature as printed, `present`,
 its HPO term and `models_agree`, and `phenotype_candidate` lists the
 candidates with their `rank`.
 

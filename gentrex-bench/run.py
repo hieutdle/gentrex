@@ -13,20 +13,16 @@ docs/development/run-benchmark.md explains it.
 """
 
 import argparse
-import contextlib
 import json
 import logging
 import os
 import pathlib
 import re
 import shutil
-import signal
-import socket
 import subprocess
 import sys
 import time
 import urllib.request
-from collections.abc import Iterator
 from typing import Any
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent / "scorer"))
@@ -35,10 +31,10 @@ import score  # noqa: E402
 
 from gentrex import config  # noqa: E402
 from gentrex import runs  # noqa: E402
+from gentrex import servers  # noqa: E402
 
 _logger = logging.getLogger("run")
 _DATA_DIR = pathlib.Path("data/gentrex-bench")
-_POLL_SECONDS = 5.0
 # A command, the variable with its server's address and its model.
 type _Step = tuple[str, str | None, str | None]
 
@@ -66,56 +62,6 @@ def link_pdfs(
             (folder / pdf.name).symlink_to(pdf.resolve())
             linked += 1
     return linked
-
-
-def _answers(url: str) -> bool:
-    try:
-        with urllib.request.urlopen(url, timeout=5):
-            return True
-    except OSError:
-        return False
-
-
-@contextlib.contextmanager
-def served(script: pathlib.Path | None, model: str) -> Iterator[str | None]:
-    """Starts the model server of one command, and stops it afterwards.
-
-    The script gets the model's name and a free port, and must serve the
-    model there until it is stopped.
-
-    Args:
-        script: The script that starts a model server, or None to use the
-            servers that are already running.
-        model: The model's name in settings.yaml.
-
-    Yields:
-        The server's address, or None without a script.
-
-    Raises:
-        RuntimeError: The script ended before the server answered.
-    """
-    if script is None:
-        yield None
-        return
-    with socket.socket() as probe:
-        probe.bind(("", 0))
-        port = probe.getsockname()[1]
-    base_url = f"http://localhost:{port}/v1"
-    # In a process group of its own, so that stopping reaches its children.
-    server = subprocess.Popen(
-        [str(script.resolve()), model, str(port)], start_new_session=True
-    )
-    try:
-        _logger.info("waiting for %s at %s", model, base_url)
-        while not _answers(f"{base_url}/models"):
-            if server.poll() is not None:
-                raise RuntimeError(f"{script} ended before {model} was ready")
-            time.sleep(_POLL_SECONDS)
-        yield base_url
-    finally:
-        with contextlib.suppress(ProcessLookupError):
-            os.killpg(server.pid, signal.SIGTERM)
-        server.wait()
 
 
 def _server_version(base_url: str | None) -> str | None:
@@ -281,6 +227,7 @@ def main() -> int:
             return 1
     versions: dict[str, Any] = {}
     statuses: dict[str, int] = {}
+    starts: dict[str, float] = {}
     for command, variable, model in steps:
         arguments = ["--input-dir" if command == "transcribe" else "--input"]
         arguments.append(str(run_dir))
@@ -290,9 +237,12 @@ def main() -> int:
             arguments += ["--settings", str(args.settings)]
         env = dict(os.environ)
         try:
-            with served(args.serve if model else None, model or "") as base_url:
+            started = time.perf_counter()
+            script = args.serve if model else None
+            with servers.served(script, model or "") as base_url:
                 if variable and base_url:
                     env[variable] = base_url
+                    starts[command] = round(time.perf_counter() - started, 1)
                 if variable:
                     versions[command] = _server_version(env.get(variable))
                 found, statuses[command] = _gentrex(command, arguments, env)
@@ -306,6 +256,9 @@ def main() -> int:
     scores, errors = score.score(version_dir / "truth", run_dir, args.split, args.gpus)
     scores["performance"]["server_versions"] = versions
     scores["performance"]["gpu_names"] = _gpu_names() if args.serve else []
+    # The time a server took to load its model, which `seconds` leaves out.
+    for name, command in scores["performance"]["commands"].items():
+        command["server_start_seconds"] = starts.get(name)
     failures = add_failures(scores, statuses)
     score.write(out, scores, errors)
     _logger.info(

@@ -126,6 +126,7 @@ last three to its implication:
 | Component | Code | From |
 | --- | --- | --- |
 | Gene studied | LOINC 48018-6 | `hgnc_id`, with the approved symbol. A gene without an HGNC ID keeps `gene_symbol` as printed. |
+| Discrete genetic variant | LOINC 81252-9 | `clinvar_variation_id`, as a ClinVar code. |
 | Transcript reference sequence | LOINC 51958-7 | `transcript`. |
 | DNA change (c.HGVS) | LOINC 48004-6 | `transcript` and `hgvs_c`, as one HGVS expression. |
 | Amino acid change (pHGVS) | LOINC 48005-3 | `hgvs_p`, if it names the protein's reference sequence. |
@@ -252,7 +253,8 @@ sequence, as in `NM_000059.4:c.5946del`, or when the report names the
 `transcript`. A protein change needs the protein's reference sequence, as in
 `NP_000050.2:p.(Asn1836Lys)`, which reports rarely print. Changes without a
 reference sequence go into the variant's `note` as printed, after
-`DNA change:` or `Protein change:`. So does a DNA change without a c.
+`DNA change:` or `Protein change:`. A change that `gentrex normalize` marked
+`invalid` goes there too. So does a DNA change without a c.
 notation from `dna_change_raw`, like `NC_012920.1:m.3243A>G` or a deletion of
 whole exons.
 

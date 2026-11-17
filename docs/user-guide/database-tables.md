@@ -130,6 +130,12 @@ One row per reported variant. The key is `file` and `variant_number`.
 | `transcript` | text | yes | Reference transcript, like `NM_007294.4`. |
 | `hgvs_c` | text | yes | Coding DNA change, copied verbatim, like `c.5266dupC`. |
 | `hgvs_p` | text | yes | Protein change, copied verbatim, like `p.(Gln1756Profs*74)`. |
+| `hgvs_c_status` | text | yes | Whether `hgvs_c` follows the HGVS syntax, one of `valid`, `invalid` or `missing`. |
+| `hgvs_p_status` | text | yes | The same for `hgvs_p`. |
+| `clinvar_variation_id` | text | yes | The variant's Variation ID in ClinVar, like `17677`. Null after a run of `gentrex normalize` without ClinVar's file. |
+| `clinvar_status` | text | yes | How the ClinVar lookup went, one of `found`, `other_transcript`, `ambiguous`, `unmapped` or `missing`. [Normalize report data](normalize.md#check-the-result) explains the values. |
+| `clinvar_hgvs_p` | text | yes | The protein change in ClinVar's name of the variant, like `p.Gln1756fs`. |
+| `clinvar_hgvs_p_status` | text | yes | Whether `hgvs_p` is the protein change that ClinVar names, one of `same`, `different` or `missing`. |
 | `dna_change_raw` | text | yes | DNA change when the report gives no c. notation, for example `NC_012920.1:m.3243A>G`, `Deletion of exons 45-50`, the array result `arr[GRCh37] 17p11.2(16761827_20304681)x3` or `30 and 56 CGG repeats`. |
 | `chromosomal_position` | text | yes | Genomic position or range as printed, like `chr17:43057062`. Positions differ between genome builds, so compare them only between reports with the same `genome_build`. |
 | `copy_number` | integer | yes | Copies of the gene or region in the patient, like `3` for the `x3` of an array result or `0` for `SMN1 copy number: 0`. Null when the report gives no number. |
@@ -230,7 +236,7 @@ from before `schema_version` existed counts as version 1. The key is
 
 | Column | Type | Null | Holds |
 | --- | --- | --- | --- |
-| `version` | integer | no | The version of the tables, which is 3 for this Gentrex. |
+| `version` | integer | no | The version of the tables, which is 4 for this Gentrex. |
 
 ## SQL that creates the tables
 

@@ -509,8 +509,8 @@ terms. A run with another release replaces them, in one transaction.
 Gentrex creates the tables at the start of a run if they don't exist yet,
 and it never changes a table that exists. So when a new version of Gentrex
 changes the tables, `gentrex load` stops on a database from an older version
-with `the database holds version 2 of the Gentrex tables, but this Gentrex
-writes version 3`. Then delete the database as below, do step 1 again and
+with `the database holds version 3 of the Gentrex tables, but this Gentrex
+writes version 4`. Then delete the database as below, do step 1 again and
 load each run of `gentrex normalize` again.
 
 To start again with an empty database, delete it and do step 1 again. This
@@ -592,7 +592,7 @@ If something is missing, Gentrex stops before it loads anything:
 | `can't connect to the database: ... Connection refused` | The server isn't running. Start it with `docker start gentrex-postgres` or `docker start gentrex-mysql`, or create it in step 1. |
 | `can't connect to the database: ... password authentication failed` or `... Access denied for user` | The password in `GENTREX_DATABASE_URL` differs from the one in step 1. Correct it in `.env`. |
 | `can't connect to the database: unable to open database file` | Gentrex can't write the SQLite file. Check the path after `sqlite:///` in `.env`, and that you may write there. |
-| `the database holds version 2 of the Gentrex tables, but this Gentrex writes version 3` | The database was made by an older version of Gentrex. Delete it and load the runs of `gentrex normalize` again ([Load a run again](#load-a-run-again)). |
+| `the database holds version 3 of the Gentrex tables, but this Gentrex writes version 4` | The database was made by an older version of Gentrex. Delete it and load the runs of `gentrex normalize` again ([Load a run again](#load-a-run-again)). |
 
 While loading, Gentrex prints a line for each report it doesn't load:
 

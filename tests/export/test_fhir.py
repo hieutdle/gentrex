@@ -143,6 +143,27 @@ def test_a_protein_change_without_its_reference_sequence_is_a_note(tmp_path):
     assert variant["note"] == [{"text": "Protein change: p.(Arg1645*)"}]
 
 
+def test_a_change_that_is_not_hgvs_is_a_note_and_the_clinvar_id_a_component(tmp_path):
+    """A server that validates HGVS refuses a Bundle with a change it can't read."""
+    report = _report()
+    assert report.data is not None and report.normalized is not None
+    report.data["variants"][0]["hgvs_c"] = "c.4933 C to T"
+    report.normalized["variants"][0] |= {
+        "hgvs_c_status": "invalid",
+        "clinvar_variation_id": "68512",
+    }
+    [bundle] = _export(tmp_path, [report]).values()
+
+    [variant] = _observations(bundle, "69548-6")
+
+    assert "48004-6" not in _values(variant)
+    assert {"text": "DNA change: c.4933 C to T"} in variant["note"]
+    assert _values(variant)["81252-9"] == (
+        "http://www.ncbi.nlm.nih.gov/clinvar",
+        "68512",
+    )
+
+
 def test_an_array_result_has_the_ig_components_of_a_copy_number_change(tmp_path):
     """FHIR searches find the ISCN, copy number and genome build by these codes."""
     change = "arr[GRCh37] 17p11.2(16761827_20304681)x3"

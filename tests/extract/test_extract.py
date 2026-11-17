@@ -129,6 +129,31 @@ def test_copied_value_that_the_pages_lack_is_named(tmp_path):
     assert extractions[0]["not_in_pages"] == ["variants[1].gene_symbol"]
 
 
+def test_variant_gets_the_page_that_prints_its_change(tmp_path):
+    """The page text settles where a variant is, whatever page the model names.
+    A variant whose change no page prints keeps the model's page."""
+
+    def answer(pages: str) -> tuple[str, str]:
+        variants = [
+            {"page": 2, "hgvs_c": "c.5266dupC"},
+            {"page": 2, "hgvs_c": None, "dna_change_raw": "Deletion of exon 7"},
+            {"page": 4, "hgvs_c": "c.1A>G"},
+        ]
+        return json.dumps({"variants": variants}), "stop"
+
+    _, extractions = _run(
+        tmp_path,
+        _client(answer),
+        records.PageRecord("a.pdf", 2, "native", "Methods"),
+        records.PageRecord("a.pdf", 4, "native", "BRCA1 c.5266dupC"),
+        records.PageRecord(
+            "a.pdf", 5, "scanned", "**deletion** of\nexon 7, c.5266dupC"
+        ),
+    )
+
+    assert [v["page"] for v in extractions[0]["data"]["variants"]] == [4, 5, 4]
+
+
 def test_retry_extracts_only_failed_and_changed_reports(tmp_path):
     """Good records are reused, so a retry spends GPU time only where needed."""
     earlier_input = tmp_path / "select-run"

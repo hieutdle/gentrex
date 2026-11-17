@@ -6,6 +6,7 @@ import logging
 import pathlib
 import time
 from concurrent import futures
+from typing import Any
 
 from gentrex import records
 from gentrex import runs
@@ -15,6 +16,22 @@ from gentrex.extract import extractor as extractor_lib
 _logger = logging.getLogger(__name__)
 
 
+def _locate_variants(data: dict[str, Any], pages: list[records.PageRecord]) -> None:
+    """Sets each variant's page to the first page that prints its DNA change.
+
+    The model's page stays where the variant has no DNA change or no page
+    prints it.
+    """
+    texts = [(page.page, page.text) for page in pages]
+    variants = data.get("variants")
+    for variant in variants if isinstance(variants, list) else []:
+        if not isinstance(variant, dict):
+            continue
+        change = variant.get("hgvs_c") or variant.get("dna_change_raw")
+        if isinstance(change, str) and (page := check.first_page(change, texts)):
+            variant["page"] = page
+
+
 def _extract(
     pages: list[records.PageRecord], extractor: extractor_lib.ReportExtractor
 ) -> records.ReportExtraction:
@@ -22,7 +39,8 @@ def _extract(
 
     Pages with an error from `gentrex transcribe` are left out and named in
     the record's error. A report without page text gets no request. The
-    record names the copied values that aren't in the text of the pages sent.
+    record names the copied values that aren't in the text of the pages sent,
+    and each variant gets the page that prints its DNA change.
     """
     sent = [page for page in pages if page.text]
     errors = [
@@ -35,6 +53,7 @@ def _extract(
             errors.append(f"{type(result).__name__}: {result}")
         else:
             data = result
+            _locate_variants(data, sent)
             not_in_pages = check.not_in_pages(
                 data, extractor.config.schema, [page.text for page in sent]
             )

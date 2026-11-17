@@ -59,7 +59,20 @@ def load_settings(path: pathlib.Path | None = None) -> dict[str, Any]:
     return settings
 
 
-def load_schema() -> dict[str, Any]:
-    """Returns the extraction schema in defaults/schema.yaml."""
-    with _SCHEMA_PATH.open(encoding="utf-8") as fh:
-        return yaml.safe_load(fh)
+def load_schema(path: pathlib.Path | None = None) -> dict[str, Any]:
+    """Returns the extraction schema in defaults/schema.yaml, or one of your own.
+
+    Args:
+        path: A YAML file with a whole schema, laid out as
+            defaults/schema.yaml, to use in its place.
+
+    Raises:
+        SettingsError: The file can't be read or holds no schema.
+    """
+    try:
+        schema = yaml.safe_load((path or _SCHEMA_PATH).read_text(encoding="utf-8"))
+    except (OSError, yaml.YAMLError) as exc:
+        raise SettingsError(f"can't read {path}: {exc}") from exc
+    if not isinstance(schema, dict) or not isinstance(schema.get("properties"), dict):
+        raise SettingsError(f"{path} has no fields under `properties`")
+    return schema

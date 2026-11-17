@@ -56,6 +56,25 @@ The first release.
 - `gentrex normalize` reads dates with a time of day or a two-digit year,
   and a date such as 25/03/2020, where 25 can only be the day. With
   `normalize.day_first`, it reads 03/04/2020 as April 3.
+- `gentrex run` runs `gentrex transcribe`, `gentrex select`,
+  `gentrex extract` and `gentrex normalize` in a row, and starts and stops
+  the model server of each with a script that you name with `--serve`.
+- `--schema` names an extraction schema of your own for `gentrex extract`.
+- `gentrex extract` sets each variant's `page` to the first page whose text
+  has its DNA change. The model's page stays where no page has it.
+- With ClinVar's file, `gentrex normalize` compares each protein change with
+  the one in ClinVar's name of the variant (`clinvar_hgvs_p`,
+  `clinvar_hgvs_p_status`).
+- `gentrex load` stores the HGVS statuses, the ClinVar ID and ClinVar's
+  protein change in version 4 of its tables. `gentrex export omop-extended`
+  keeps them in `genomic_variant`.
+- The FHIR Bundles and the Phenopackets carry the ClinVar ID. Both take a
+  c. change as an HGVS expression only if `gentrex normalize` didn't mark it
+  `invalid`.
+- `evaluation/mondo_normalization.py` measures the MONDO matching of
+  `gentrex normalize` on ClinVar's condition names.
+- The scores of a benchmark run with `--serve` record how long each model
+  server took to start.
 
 HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
 Health Level Seven International and their use does not constitute

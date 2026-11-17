@@ -219,8 +219,11 @@ def _genomic_interpretation(
             "valueId": gene["hgnc_id"],
             "symbol": gene["gene_symbol"],
         }
+    if gene.get("clinvar_variation_id"):
+        descriptor["xrefs"] = [f"clinvar:{gene['clinvar_variation_id']}"]
     expressions = []
-    if hgvs_c and (":" in hgvs_c or variant.get("transcript")):
+    valid = gene.get("hgvs_c_status") != "invalid"
+    if hgvs_c and valid and (":" in hgvs_c or variant.get("transcript")):
         expression = hgvs_c if ":" in hgvs_c else f"{variant['transcript']}:{hgvs_c}"
         expressions.append({"syntax": "hgvs.c", "value": expression})
     if array:

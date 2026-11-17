@@ -24,10 +24,20 @@ def _variant(
 ) -> dict[str, Any]:
     """Returns the normalized values of one variant."""
     gene = hgnc.normalize(variant.get("gene_symbol"))
-    found = {"clinvar_variation_id": None, "clinvar_status": None}
+    found: dict[str, str | None] = dict.fromkeys(
+        (
+            "clinvar_variation_id",
+            "clinvar_status",
+            "clinvar_hgvs_p",
+            "clinvar_hgvs_p_status",
+        )
+    )
     if clinvar is not None:
         found = clinvar.normalize(
-            gene["gene_symbol"], variant.get("transcript"), variant.get("hgvs_c")
+            gene["gene_symbol"],
+            variant.get("transcript"),
+            variant.get("hgvs_c"),
+            variant.get("hgvs_p"),
         )
     return {
         **gene,

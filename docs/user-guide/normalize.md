@@ -236,13 +236,15 @@ with one more field, `normalized`. Shortened, a record looks like this:
         "gene_symbol": "BRCA2", "hgnc_id": "HGNC:1101", "gene_status": "approved",
         "disease_id": "MONDO:0003582", "disease_label": "hereditary breast ovarian cancer syndrome", "disease_status": "synonym",
         "hgvs_c_status": "valid", "hgvs_p_status": "valid",
-        "clinvar_variation_id": "9325", "clinvar_status": "found"
+        "clinvar_variation_id": "9325", "clinvar_status": "found",
+        "clinvar_hgvs_p": "p.Ser1982fs", "clinvar_hgvs_p_status": "same"
       },
       {
         "gene_symbol": "ATM", "hgnc_id": "HGNC:795", "gene_status": "approved",
         "disease_id": "MONDO:0008840", "disease_label": "ataxia telangiectasia", "disease_status": "label",
         "hgvs_c_status": "valid", "hgvs_p_status": "missing",
-        "clinvar_variation_id": "135734", "clinvar_status": "found"
+        "clinvar_variation_id": "135734", "clinvar_status": "found",
+        "clinvar_hgvs_p": null, "clinvar_hgvs_p_status": "missing"
       }
     ]
   },
@@ -264,7 +266,7 @@ belongs to `data.variants[0]`.
 | `overall_result_basis` | `wording` if the category comes from the result statement, `overall_result_raw`. `variants` if it comes from the variants' classifications. `null` if `overall_result` is `null`. |
 | `overall_result_conflict` | `true` if the result statement and the classifications give different categories. Check these reports against their PDFs. |
 | `patient_phenotypes` | One HPO match per clinical feature, or `null` after a run with `--no-hpo`. |
-| `variants` | One entry per variant, with the approved symbol, the HGNC ID and `gene_status`, the MONDO ID, label and `disease_status` of the disease in `associated_phenotype`, `hgvs_c_status` and `hgvs_p_status`, and the ClinVar ID with `clinvar_status`. |
+| `variants` | One entry per variant, with the approved symbol, the HGNC ID and `gene_status`, the MONDO ID, label and `disease_status` of the disease in `associated_phenotype`, `hgvs_c_status` and `hgvs_p_status`, the ClinVar ID with `clinvar_status`, and ClinVar's protein change with `clinvar_hgvs_p_status`. |
 
 Each HPO match has these fields:
 
@@ -334,9 +336,19 @@ without ClinVar's file.
 | `unmapped` | ClinVar has no variant with this change in this gene. |
 | `missing` | The variant has no approved gene symbol or no `hgvs_c`. |
 
-`gentrex load` keeps the two statuses and the ClinVar ID in its `record`
-column ([See what each table holds](load.md#see-what-each-table-holds)).
-The exports don't carry them.
+`clinvar_hgvs_p` is the protein change in ClinVar's name of the variant, and
+`clinvar_hgvs_p_status` compares it with the report's `hgvs_p`:
+
+| `clinvar_hgvs_p_status` | Meaning |
+| --- | --- |
+| `same` | Both give the same protein change. |
+| `different` | They differ. A digit of `hgvs_c` or `hgvs_p` may be wrong, so check the variant against its PDF. |
+| `missing` | The report or ClinVar gives no protein change, or the variant wasn't found in ClinVar. |
+
+`gentrex load` has a column for each of these values in its
+[`variants` table](database-tables.md#variants). The FHIR Bundles and the
+Phenopackets carry the ClinVar ID, and take a c. change as an HGVS
+expression only if its status isn't `invalid`.
 
 To count the variants per `disease_status`:
 
@@ -495,6 +507,13 @@ transcript. The transcript's version doesn't count, so `NM_007294.3` matches
 `NM_007294.4`. Without a transcript in the report, Gentrex takes the change
 on whichever transcript ClinVar names it on. Only c. changes are looked up.
 Copy-number changes, repeat sizes and `m.` changes get the status `missing`.
+
+ClinVar's name of a variant ends with its protein change, as in
+`NM_007294.4(BRCA1):c.5266dup (p.Gln1756fs)`. Gentrex compares it with the
+report's `hgvs_p`. Parentheses don't count, and neither does the one-letter
+or three-letter code, so `p.(Arg412Trp)` equals `p.R412W`. ClinVar names a
+frameshift by its first amino acid only, so `p.Gln1756Profs*74` equals
+`p.Gln1756fs`.
 
 ### HPO terms
 

@@ -8,6 +8,8 @@ This folder holds the results of the evaluations in
 | `pipeline.ipynb` | A notebook that follows one benchmark report through Gentrex's four commands, and shows the accuracy, time and tokens of a benchmark run, as a whole and for each command |
 | `hpo-matching.md` | [What the HPO matching of `gentrex normalize` got right](hpo-matching.md) on GSC+, and what that means for Gentrex |
 | `hpo_normalization.md`, `hpo_normalization.json` | The tables and the details of that run |
+| `mondo-matching.md` | [What the MONDO matching of `gentrex normalize` got right](mondo-matching.md) on ClinVar's condition names, and what that means for Gentrex |
+| `mondo_normalization.md`, `mondo_normalization.json` | The tables and the details of that run |
 
 ## Read the pipeline notebook
 

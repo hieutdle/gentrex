@@ -572,6 +572,12 @@ def markdown(scores: dict[str, Any]) -> str:
         f" {performance['seconds_per_1000_files']} seconds and"
         f" {performance['gpu_hours_per_1000_files']} GPU-hours per 1,000 PDFs.",
     ]
+    starts = [c.get("server_start_seconds") for c in performance["commands"].values()]
+    if any(starts):
+        parts.append(
+            f"The model servers took {sum(filter(None, starts)):.0f} seconds more to"
+            " start, which these numbers leave out."
+        )
     return "\n\n".join(parts) + "\n"
 
 

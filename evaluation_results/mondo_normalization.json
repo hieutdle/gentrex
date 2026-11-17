@@ -1,0 +1,196 @@
+{
+  "run": {
+    "date": "2026-11-17",
+    "clinvar": "variant_summary_2026-11.txt.gz",
+    "clinvar_sha256": "7c39f2d875f3cd1ccd2d568662f06a7df647dd91fc0f51a072a758b08004c72e",
+    "mondo_version": "2026-11-03",
+    "names": 9278,
+    "variants": 2847782,
+    "names_with_an_outdated_id": 3
+  },
+  "names": {
+    "same ID": 95.2,
+    "unmapped": 4.5,
+    "other ID": 0.2,
+    "ambiguous": 0.0
+  },
+  "variants": {
+    "same ID": 88.0,
+    "unmapped": 11.9,
+    "other ID": 0.1,
+    "ambiguous": 0.0
+  },
+  "matched_by": {
+    "label": 94.8,
+    "synonym": 5.2
+  },
+  "most_frequent_without_a_match": [
+    {
+      "name": "Hereditary cancer-predisposing syndrome",
+      "mondo_id": "MONDO:0015356",
+      "variants": 216347
+    },
+    {
+      "name": "Jeune thoracic dystrophy",
+      "mondo_id": "MONDO:0018770",
+      "variants": 4698
+    },
+    {
+      "name": "Polycystic kidney disease, adult type",
+      "mondo_id": "MONDO:0008263",
+      "variants": 4502
+    },
+    {
+      "name": "Primary dilated cardiomyopathy",
+      "mondo_id": "MONDO:0005021",
+      "variants": 4048
+    },
+    {
+      "name": "Cardiac arrhythmia",
+      "mondo_id": "MONDO:0007263",
+      "variants": 4033
+    },
+    {
+      "name": "Malignant lymphoma, large B-cell, diffuse",
+      "mondo_id": "MONDO:0018905",
+      "variants": 3697
+    },
+    {
+      "name": "Oto-palato-digital syndrome, type II",
+      "mondo_id": "MONDO:0010571",
+      "variants": 3142
+    },
+    {
+      "name": "Microcephaly, normal intelligence and immunodeficiency",
+      "mondo_id": "MONDO:0009623",
+      "variants": 3106
+    },
+    {
+      "name": "Progressive sclerosing poliodystrophy",
+      "mondo_id": "MONDO:0008758",
+      "variants": 3024
+    },
+    {
+      "name": "Walker-Warburg congenital muscular dystrophy",
+      "mondo_id": "MONDO:0000171",
+      "variants": 2613
+    },
+    {
+      "name": "Hereditary pheochromocytoma and paraganglioma",
+      "mondo_id": "MONDO:0017366",
+      "variants": 2521
+    },
+    {
+      "name": "Primary familial hypertrophic cardiomyopathy",
+      "mondo_id": "MONDO:0024573",
+      "variants": 2359
+    },
+    {
+      "name": "Congenital hyperammonemia, type I",
+      "mondo_id": "MONDO:0009376",
+      "variants": 2043
+    },
+    {
+      "name": "Deficiency of alpha-mannosidase",
+      "mondo_id": "MONDO:0009561",
+      "variants": 1836
+    },
+    {
+      "name": "Cutis laxa, X-linked",
+      "mondo_id": "MONDO:0010572",
+      "variants": 1666
+    }
+  ],
+  "most_frequent_with_another_id": [
+    {
+      "name": "Histiocytic medullary reticulosis",
+      "clinvar": "MONDO:0011338",
+      "gentrex": "MONDO:0004612",
+      "variants": 689
+    },
+    {
+      "name": "Hypohidrotic X-linked ectodermal dysplasia",
+      "clinvar": "MONDO:0010585",
+      "gentrex": "MONDO:0016535",
+      "variants": 571
+    },
+    {
+      "name": "ALG2-congenital disorder of glycosylation",
+      "clinvar": "MONDO:0011933",
+      "gentrex": "MONDO:1060320",
+      "variants": 312
+    },
+    {
+      "name": "Kartagener syndrome",
+      "clinvar": "MONDO:0009484",
+      "gentrex": "MONDO:0016575",
+      "variants": 249
+    },
+    {
+      "name": "Myosin storage myopathy",
+      "clinvar": "MONDO:0008409",
+      "gentrex": "MONDO:0018889",
+      "variants": 231
+    },
+    {
+      "name": "Premature ovarian failure",
+      "clinvar": "MONDO:0005387",
+      "gentrex": "MONDO:0001119",
+      "variants": 168
+    },
+    {
+      "name": "Euthyroid goiter",
+      "clinvar": "MONDO:0007681",
+      "gentrex": "MONDO:0001658",
+      "variants": 135
+    },
+    {
+      "name": "Mucopolysaccharidosis, MPS-I-S",
+      "clinvar": "MONDO:0011760",
+      "gentrex": "MONDO:0011759",
+      "variants": 120
+    },
+    {
+      "name": "Aarskog syndrome",
+      "clinvar": "MONDO:0010589",
+      "gentrex": "MONDO:0021005",
+      "variants": 102
+    },
+    {
+      "name": "Congenital central hypoventilation",
+      "clinvar": "MONDO:0800031",
+      "gentrex": "MONDO:0800026",
+      "variants": 88
+    },
+    {
+      "name": "Mesangiocapillary glomerulonephritis",
+      "clinvar": "MONDO:0002461",
+      "gentrex": "MONDO:0018904",
+      "variants": 31
+    },
+    {
+      "name": "Nephroblastoma",
+      "clinvar": "MONDO:0006058",
+      "gentrex": "MONDO:0019004",
+      "variants": 19
+    },
+    {
+      "name": "Symphalangism-brachydactyly syndrome",
+      "clinvar": "MONDO:0008519",
+      "gentrex": "MONDO:0017923",
+      "variants": 12
+    },
+    {
+      "name": "Familial chronic mucocutaneous candidiasis",
+      "clinvar": "MONDO:0013140",
+      "gentrex": "MONDO:0015279",
+      "variants": 7
+    },
+    {
+      "name": "Xeroderma pigmentosum group G/Cockayne syndrome",
+      "clinvar": "MONDO:0800314",
+      "gentrex": "MONDO:0010216",
+      "variants": 4
+    }
+  ]
+}

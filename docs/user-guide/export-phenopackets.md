@@ -129,6 +129,7 @@ Its fields come from the record of `gentrex normalize`:
 | `acmgPathogenicityClassification` | `classification` in capitals. `other` has no ACMG class and is left out. |
 | `geneContext` | `hgnc_id` and `gene_symbol`. |
 | `expressions` | `transcript` and `hgvs_c` as one HGVS expression, and an array result from `dna_change_raw` as an ISCN expression. |
+| `xrefs` | `clinvar_variation_id`, as `clinvar:17677`. |
 | `structuralType` | Whether `copy_number` is a gain or a loss of copies, as a term of the Sequence Ontology (SO). |
 | `allelicState` | `zygosity` as a term of the Genotype Ontology (GENO). |
 | `label` | The gene symbol, `hgvs_c` or `dna_change_raw`, and `hgvs_p`. |
@@ -221,7 +222,8 @@ laboratory's own assessment is in `acmgPathogenicityClassification` and the
 
 An HGVS expression needs a reference sequence. `hgvs_c` becomes one when it
 starts with a reference sequence, as in `NM_000059.4:c.5946del`, or when the
-report names the `transcript`. The protein change goes only into the `label`,
+report names the `transcript`. A change that `gentrex normalize` marked
+`invalid` gets no expression. The protein change goes only into the `label`,
 because reports rarely print the protein's reference sequence. So does a
 change without a c. notation, such as a mitochondrial change or a deletion of
 whole exons, as printed in `dna_change_raw`.

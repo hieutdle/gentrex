@@ -137,6 +137,10 @@ before you start the next one.
 3. [Extract report data](docs/user-guide/extract.md)
 4. [Normalize report data](docs/user-guide/normalize.md)
 
+Once you know the four commands, `gentrex run` runs them in a row and starts
+and stops each model server itself.
+[Run all four commands](docs/user-guide/run.md) shows how.
+
 Then load or export the records:
 
 - [Load report data into a database](docs/user-guide/load.md)
@@ -209,6 +213,7 @@ for what they have in common:
 - [Select the pages to keep](docs/user-guide/select.md)
 - [Extract report data](docs/user-guide/extract.md)
 - [Normalize report data](docs/user-guide/normalize.md)
+- [Run all four commands](docs/user-guide/run.md)
 - [Load report data into a database](docs/user-guide/load.md)
   - [Database tables](docs/user-guide/database-tables.md)
 - [Export report data as Phenopackets](docs/user-guide/export-phenopackets.md)
@@ -228,6 +233,7 @@ Working on Gentrex itself:
 - [Release a new version](docs/development/release.md)
 - [Evaluate Gentrex](evaluation/README.md)
 - [Evaluate HPO matching](evaluation/hpo-matching.md)
+- [Evaluate MONDO matching](evaluation/mondo-matching.md)
 - [Benchmark design](docs/development/benchmark.md)
 - [How the benchmark generator works](docs/development/benchmark-generator.md)
 - [Generate benchmark reports](docs/development/generate-benchmark-reports.md)

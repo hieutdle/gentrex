@@ -19,6 +19,7 @@ _LOINC = "http://loinc.org"
 _SNOMED = "http://snomed.info/sct"
 _HGNC = "http://www.genenames.org"
 _HGVS = "http://varnomen.hgvs.org"
+_CLINVAR = "http://www.ncbi.nlm.nih.gov/clinvar"
 _REFSEQ = "http://www.ncbi.nlm.nih.gov/refseq"
 # The system of ISCN expressions in the IG's examples.
 _ISCN = "https://iscn.karger.com"
@@ -49,6 +50,7 @@ _VARIANT: Code = (_LOINC, "69548-6", "Genetic variant assessment")
 _IMPLICATION: Code = (_IG_CODES, "diagnostic-implication", "Diagnostic Implication")
 _GENE: Code = (_LOINC, "48018-6", "Gene studied [ID]")
 _TRANSCRIPT: Code = (_LOINC, "51958-7", "Transcript reference sequence [ID]")
+_VARIATION: Code = (_LOINC, "81252-9", "Discrete genetic variant")
 _DNA_CHANGE: Code = (_LOINC, "48004-6", "DNA change (c.HGVS)")
 _PROTEIN_CHANGE: Code = (_LOINC, "48005-3", "Amino acid change (pHGVS)")
 _CYTOGENOMIC: Code = (_LOINC, "81291-7", "Variant ISCN")
@@ -369,8 +371,9 @@ def _variant(
     """Returns the Observation of one variant, in the IG's variant profile.
 
     The IG takes HGVS changes only as valid HGVS expressions, with their
-    reference sequence. Changes without one go into a note, as printed. An
-    array result in ISCN, which starts with arr, gets a component of its own.
+    reference sequence. Changes without one, and those that `gentrex
+    normalize` found invalid, go into a note, as printed. An array result in
+    ISCN, which starts with arr, gets a component of its own.
     """
     components = []
     notes = []
@@ -384,19 +387,23 @@ def _variant(
         )
     elif variant.get("gene_symbol"):
         components.append(_component(_GENE, {"text": variant["gene_symbol"]}))
+    if gene.get("clinvar_variation_id"):
+        clinvar = (_CLINVAR, gene["clinvar_variation_id"], None)
+        components.append(_component(_VARIATION, _concept(clinvar)))
     transcript = variant.get("transcript")
     if transcript:
         components.append(
             _component(_TRANSCRIPT, _concept((_REFSEQ, transcript, None)))
         )
     hgvs_c = variant.get("hgvs_c")
-    if hgvs_c and (":" in hgvs_c or transcript):
+    valid_c = gene.get("hgvs_c_status") != "invalid"
+    if hgvs_c and valid_c and (":" in hgvs_c or transcript):
         expression = hgvs_c if ":" in hgvs_c else f"{transcript}:{hgvs_c}"
         components.append(_component(_DNA_CHANGE, _concept((_HGVS, expression, None))))
     elif hgvs_c:
         notes.append(f"DNA change: {hgvs_c}")
     hgvs_p = variant.get("hgvs_p")
-    if hgvs_p and ":" in hgvs_p:
+    if hgvs_p and ":" in hgvs_p and gene.get("hgvs_p_status") != "invalid":
         components.append(_component(_PROTEIN_CHANGE, _concept((_HGVS, hgvs_p, None))))
     elif hgvs_p:
         notes.append(f"Protein change: {hgvs_p}")

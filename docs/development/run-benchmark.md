@@ -366,6 +366,11 @@ reads them from there. The time is that of the command alone, without the
 minutes a server takes to load its model. GPU-hours are each command's time
 multiplied by its GPUs from `--gpus`, per 1,000 PDFs.
 
+With `--serve`, `scores.json` also has the seconds that each model server
+took to start, as `server_start_seconds` of each command under
+`performance`, and `scores.md` gives their sum. They don't count in the
+GPU-hours, because a server starts once however many PDFs a run reads.
+
 [Benchmark design](benchmark.md#scorer) gives the reasons for these rules.
 
 ## Options

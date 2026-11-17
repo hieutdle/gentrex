@@ -23,6 +23,7 @@ evaluation can run on any computer that can serve Gentrex's models.
 | `download_reference_files.sh` | Downloads ClinVar, HPO, MONDO and HGNC. The other scripts call it. |
 | `settings.yaml` | The settings of the evaluation that differ from Gentrex's defaults |
 | `hpo_normalization.py` | Measures the HPO matching of `gentrex normalize` on its own, which [Evaluate HPO matching](hpo-matching.md) describes |
+| `mondo_normalization.py` | Measures the MONDO matching of `gentrex normalize` on its own, which [Evaluate MONDO matching](mondo-matching.md) describes |
 
 ## Before you start
 

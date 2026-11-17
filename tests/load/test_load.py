@@ -141,6 +141,30 @@ def test_loading_a_file_again_replaces_its_rows(engine, tmp_path):
     assert _select(engine, "SELECT count(*) FROM patient_phenotypes") == [(0,)]
 
 
+def test_what_normalize_found_about_a_change_is_in_the_variants_table(engine, tmp_path):
+    """A query finds the variants to check, and joins ClinVar by its ID."""
+    checks = {
+        "hgvs_c_status": "valid",
+        "hgvs_p_status": "missing",
+        "clinvar_variation_id": "17677",
+        "clinvar_status": "found",
+        "clinvar_hgvs_p": "p.Gln1756fs",
+        "clinvar_hgvs_p_status": "missing",
+    }
+    report = records.NormalizedReport(
+        "a.pdf",
+        [1],
+        {"variants": [{"gene_symbol": "BRCA1", "hgvs_c": "c.5266dupC"}]},
+        {"variants": [checks]},
+    )
+
+    _load(engine, tmp_path, [report])
+
+    assert _select(engine, f"SELECT {', '.join(checks)} FROM variants") == [
+        tuple(checks.values())
+    ]
+
+
 def test_a_report_that_fails_to_load_keeps_its_earlier_rows(engine, tmp_path):
     """Each report is one transaction, so its failure costs no rows of others."""
     earlier = records.NormalizedReport("a.pdf", [1], {"variants": [{"page": 1}]}, None)

@@ -204,6 +204,11 @@ Gentrex sends all kept pages of a report in one request, in page order. Each
 page starts with a line like `--- PAGE 2 ---`, so the model can tell which page
 a variant is on.
 
+A variant's `page` is then set to the first page whose text has its DNA
+change, from `hgvs_c` or `dna_change_raw`. The page that the model wrote
+stays where the variant has no DNA change, or where no page has it. The text
+is compared as for `not_in_pages`, below.
+
 The fields of the record are defined in the extraction schema,
 [`schema.yaml`](../../src/gentrex/defaults/schema.yaml). Gentrex sends it as
 JSON after the instruction (`extract.instruction` in settings.yaml), and the
@@ -244,6 +249,18 @@ The instruction, the model and the other settings are under `extract` in
 [`src/gentrex/defaults/settings.yaml`](../../src/gentrex/defaults/settings.yaml).
 A comment above each value explains it. To change one, name it in a
 [settings file of your own](runs-and-results.md#change-the-settings).
+
+To change the fields, copy `schema.yaml`, edit the copy and name it with
+`--schema`:
+
+```bash
+uv run --env-file .env gentrex extract --schema my-schema.yaml
+```
+
+The file replaces the whole schema, and `run.yaml` records it. The other
+commands read the fields of Gentrex's own schema by name. A field that you
+add stays in `data` and in the `record` column of `gentrex load`, and a field
+that you remove comes out empty in the tables and exports.
 
 The schema is a [JSON Schema](https://json-schema.org/). The report-level
 fields are under `properties`, and the fields of each variant are under

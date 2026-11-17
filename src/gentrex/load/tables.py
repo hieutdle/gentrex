@@ -23,7 +23,7 @@ _JSON = sa.JSON().with_variant(postgresql.JSONB(), "postgresql")
 # The version of these tables, kept in schema_version. `gentrex load` never
 # changes a table that exists already, so raise the version whenever a column
 # changes, and `gentrex load` then refuses a database with the old tables.
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 metadata = sa.MetaData()
 
@@ -83,6 +83,12 @@ variants = sa.Table(
     sa.Column("transcript", sa.Text),
     sa.Column("hgvs_c", sa.Text),
     sa.Column("hgvs_p", sa.Text),
+    sa.Column("hgvs_c_status", sa.Text),
+    sa.Column("hgvs_p_status", sa.Text),
+    sa.Column("clinvar_variation_id", sa.Text),
+    sa.Column("clinvar_status", sa.Text),
+    sa.Column("clinvar_hgvs_p", sa.Text),
+    sa.Column("clinvar_hgvs_p_status", sa.Text),
     sa.Column("dna_change_raw", sa.Text),
     sa.Column("chromosomal_position", sa.Text),
     sa.Column("copy_number", sa.Integer),
