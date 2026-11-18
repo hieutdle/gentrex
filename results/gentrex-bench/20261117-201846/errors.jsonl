@@ -1,0 +1,354 @@
+{"report": "SYN-0001", "field": "date_of_birth", "result": "wrong", "truth": "3 Apr 1986", "found": "4 Apr 1986", "command": "extract", "cause": null, "flagged": true}
+{"report": "SYN-0001", "field": "normalized.date_of_birth", "result": "wrong", "truth": "1986-04-03", "found": "1986-04-04", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0001", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0002", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Short stature", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0002", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "congenital heart disease", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0002", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0004322", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0002", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001627", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0003", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "1500293345", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0003", "field": "received_date", "result": "missed", "truth": "12/28/2023", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0003", "field": "report_date", "result": "wrong", "truth": "2/14/2024", "found": "2/15/2024", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0003", "field": "normalized.received_date", "result": "missed", "truth": "2023-12-28", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0003", "field": "normalized.report_date", "result": "wrong", "truth": "2024-02-14", "found": "2024-02-15", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0004", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0005", "field": "clinical_indication", "result": "wrong", "truth": "Global developmental delay", "found": "Diagnostic evaluation", "command": "extract", "cause": null, "flagged": true}
+{"report": "SYN-0005", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Global developmental delay", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0005", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001263", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0006", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "0241692957", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0006", "field": "received_date", "result": "missed", "truth": "9/8/2023", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0006", "field": "report_date", "result": "wrong", "truth": "10/8/2023", "found": "10/9/2023", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0006", "field": "normalized.received_date", "result": "missed", "truth": "2023-09-08", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0006", "field": "normalized.report_date", "result": "wrong", "truth": "2023-10-08", "found": "2023-10-09", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0007", "field": "mrn", "result": "missed", "truth": "HP24-51666", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0007", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "HP24-51666", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0007", "field": "lab_accession_number", "result": "wrong", "truth": "080-934-9702-0", "found": "YU54-62042 G", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0007", "field": "variants.chromosomal_position", "result": "extra", "truth": null, "found": "16p11.2(28,603,729-29,037,107)", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0007", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0007", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "duplication", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0008", "field": "variants", "result": "extra", "truth": null, "found": "trisomy 21", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0009", "field": "mrn", "result": "missed", "truth": "TV08-06533", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0009", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "TV08-06533", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0009", "field": "lab_accession_number", "result": "wrong", "truth": "483-342-1429-5", "found": "YU75-88859 G", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0010", "field": "date_of_birth", "result": "missed", "truth": "01/02/2024", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0010", "field": "normalized.date_of_birth", "result": "missed", "truth": "2024-01-02", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0010", "field": "variants", "result": "extra", "truth": null, "found": "trisomy 21", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0011", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0011", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "frameshift change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0012", "field": "variants.classification_raw", "result": "wrong", "truth": "Pathogenic Mutation", "found": "Pathogenic", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0012", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0012", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "nonsense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0012", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0012", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0013", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "2138799050", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0013", "field": "received_date", "result": "missed", "truth": "10/27/2020", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0013", "field": "report_date", "result": "wrong", "truth": "12/7/2020", "found": "12/8/2020", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0013", "field": "normalized.received_date", "result": "missed", "truth": "2020-10-27", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0013", "field": "normalized.report_date", "result": "wrong", "truth": "2020-12-07", "found": "2020-12-08", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0014", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0014", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0014", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "frameshift insertion", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0015", "field": "mrn", "result": "missed", "truth": "20276444", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0015", "field": "submitter_patient_id", "result": "wrong", "truth": "335631656, 029068202", "found": "20276444", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0015", "field": "variants", "result": "extra", "truth": null, "found": "FMR1 26 and 31 CGG repeats", "command": "extract", "cause": "distractor", "flagged": false}
+{"report": "SYN-0015", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Autism spectrum disorder", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0015", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0000729", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0016", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "8791338553", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0016", "field": "received_date", "result": "missed", "truth": "12/6/2018", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0016", "field": "report_date", "result": "wrong", "truth": "1/10/2019", "found": "1/11/2019", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0016", "field": "normalized.received_date", "result": "missed", "truth": "2018-12-06", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0016", "field": "normalized.report_date", "result": "wrong", "truth": "2019-01-10", "found": "2019-01-11", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0016", "field": "variants.transcript", "result": "missed", "truth": "NM_138691.3", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0016", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0017", "field": "mrn", "result": "extra", "truth": null, "found": "17197555", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0017", "field": "submitter_patient_id", "result": "missed", "truth": "377052334", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0017", "field": "variants.dna_change_raw", "result": "extra", "truth": null, "found": "SMN1 copy number: 0", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0017", "field": "variants.classification_raw", "result": "extra", "truth": null, "found": "POSITIVE: AFFECTED", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0017", "field": "variants.classification", "result": "extra", "truth": null, "found": "pathogenic", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0017", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0018", "field": "specimen_type", "result": "wrong", "truth": "Saliva (Oragene)", "found": "Saliva", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0018", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0018", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Hypoplasia of the corpus callosum", "command": "extract", "cause": "distractor", "flagged": false}
+{"report": "SYN-0018", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0002079", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0019", "field": "lab_accession_number", "result": "missed", "truth": "3690-805-802", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0019", "field": "variants", "result": "extra", "truth": null, "found": "UBE3A loss of the expected biparental methylation pattern", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0020", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0021", "field": "report_date", "result": "missed", "truth": "May 02, 2025", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0021", "field": "normalized.report_date", "result": "missed", "truth": "2025-05-02", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0022", "field": "test_name", "result": "wrong", "truth": "TGFBR1 Gene Sequencing and Deletion/Duplication Analysis", "found": "TGFBR1 Analysis", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0022", "field": "variants.zygosity_raw", "result": "wrong", "truth": "heterozygote", "found": "heterozygous", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0022", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0023", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0024", "field": "mrn", "result": "missed", "truth": "LR02-19425", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0024", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "LR02-19425", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0024", "field": "lab_accession_number", "result": "wrong", "truth": "283-668-6278-5", "found": "YU92-31214 G", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0024", "field": "variants.chromosomal_position", "result": "extra", "truth": null, "found": "16p13.11(15,281,187-16,375,091)", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0024", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0024", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "duplication", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0025", "field": "variants.associated_phenotype", "result": "wrong", "truth": "autosomal recessive limb-girdle muscular dystrophy type 2I", "found": "Autosomal limb-girdle muscular dystrophy type 2I", "command": "extract", "cause": null, "flagged": true}
+{"report": "SYN-0025", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0025", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0025", "field": "normalized.variants.disease_id", "result": "missed", "truth": "MONDO:0011787", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0026", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0026", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Global developmental delay", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0026", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001263", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0027", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Short stature", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0027", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "congenital heart disease", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0027", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0004322", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0027", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001627", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0028", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0029", "field": "mrn", "result": "missed", "truth": "68926WWJKF", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0029", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "68926WWJKF", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0030", "field": "test_name", "result": "wrong", "truth": "HearingScan", "found": "HearingScan: Analyses of 9 Genes Associated with Hearing Loss", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0030", "field": "variants.classification_raw", "result": "wrong", "truth": "Variant, Likely Pathogenic", "found": "Likely Pathogenic", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0030", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0030", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0030", "field": "variants.classification_raw", "result": "wrong", "truth": "Variant, Unknown Significance", "found": "Unknown Significance", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0030", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0030", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0030", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "hearing loss", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0030", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0000365", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0031", "field": "variants.associated_phenotype", "result": "extra", "truth": null, "found": "autism spectrum disorder", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0031", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0031", "field": "normalized.variants.disease_id", "result": "extra", "truth": null, "found": "MONDO:0005258", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0032", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0032", "field": "variants.parental_origin_raw", "result": "extra", "truth": null, "found": "inherited maternally", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0032", "field": "variants.parental_origin", "result": "extra", "truth": null, "found": "maternal", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0033", "field": "mrn", "result": "missed", "truth": "07488FXBDT", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0033", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "07488FXBDT", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0033", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "splice site change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0034", "field": "lab_accession_number", "result": "missed", "truth": "5385-033-789", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0034", "field": "variants.associated_phenotype", "result": "wrong", "truth": "frontotemporal dementia and/or amyotrophic lateral sclerosis 1", "found": "frontotemporal dementia and/or amyotrophic lateral sclerosis", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0034", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0034", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "hexanucleotide repeat expansion", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0034", "field": "normalized.variants.disease_id", "result": "wrong", "truth": "MONDO:0007105", "found": "MONDO:0030923", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0035", "field": "received_date", "result": "missed", "truth": "1/6/2023", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0035", "field": "report_date", "result": "wrong", "truth": "1/30/2023", "found": "1/31/2023", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0035", "field": "normalized.received_date", "result": "missed", "truth": "2023-01-06", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0035", "field": "normalized.report_date", "result": "wrong", "truth": "2023-01-30", "found": "2023-01-31", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0036", "field": "test_name", "result": "wrong", "truth": "KCNT1 Gene Sequencing and Deletion/Duplication Analysis", "found": "KCNT1 Analysis", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0036", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0037", "field": "mrn", "result": "missed", "truth": "02788888", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0037", "field": "submitter_patient_id", "result": "wrong", "truth": "850684194, 335565534", "found": "02788888", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0037", "field": "variants.classification_raw", "result": "wrong", "truth": "Full mutation allele", "found": "POSITIVE: FULL MUTATION", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0037", "field": "variants.zygosity_raw", "result": "extra", "truth": null, "found": "Full mutation allele", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0037", "field": "variants.zygosity", "result": "extra", "truth": null, "found": "hemizygous", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0037", "field": "variants.mode_of_inheritance_raw", "result": "wrong", "truth": "x-linked dominant", "found": "x-linked dominant manner", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0037", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0037", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "Full mutation", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0038", "field": "mrn", "result": "missed", "truth": "05812068", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0038", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "05812068", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0038", "field": "test_started_date", "result": "extra", "truth": null, "found": "12/19/2022", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0038", "field": "normalized.test_started_date", "result": "extra", "truth": null, "found": "2022-12-19", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0038", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0039", "field": "clinical_indication", "result": "wrong", "truth": "Global developmental delay", "found": "Diagnostic evaluation", "command": "extract", "cause": null, "flagged": true}
+{"report": "SYN-0039", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Global developmental delay", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0039", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001263", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0042", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0042", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0043", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Short stature", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0043", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "congenital heart disease", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0043", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0004322", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0043", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001627", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0044", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "8784306831", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0044", "field": "received_date", "result": "missed", "truth": "10/24/2023", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0044", "field": "report_date", "result": "wrong", "truth": "11/13/2023", "found": "11/14/2023", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0044", "field": "normalized.received_date", "result": "missed", "truth": "2023-10-24", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0044", "field": "normalized.report_date", "result": "wrong", "truth": "2023-11-13", "found": "2023-11-14", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0045", "field": "mrn", "result": "missed", "truth": "CX56-12062", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0045", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "CX56-12062", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0045", "field": "lab_accession_number", "result": "wrong", "truth": "095-230-4113-4", "found": "YU41-20197 G", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0045", "field": "variants.chromosomal_position", "result": "extra", "truth": null, "found": "2p11.2(86,301,091-86,478,346)", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0045", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0045", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "DUPLICATION", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0046", "field": "lab_accession_number", "result": "wrong", "truth": "85023775", "found": "062501", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0046", "field": "specimen_type", "result": "extra", "truth": null, "found": "Blood", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0046", "field": "test_name", "result": "wrong", "truth": "Chromosome Analysis, Blood", "found": "Chromosome Analysis", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0046", "field": "normalized.specimen_type", "result": "extra", "truth": null, "found": "whole_blood", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0046", "field": "variants", "result": "extra", "truth": null, "found": "extra X chromosome", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0046", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Infertility", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0046", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0000789", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0048", "field": "lab_accession_number", "result": "missed", "truth": "0965-150-598", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0048", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0048", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "CAG repeat expansion", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0049", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0050", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0050", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "frameshift duplication", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0050", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0050", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0051", "field": "specimen_type", "result": "wrong", "truth": "Whole blood (EDTA)", "found": "Whole blood", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0051", "field": "test_name", "result": "wrong", "truth": "NoonanScan", "found": "NoonanScan: Analyses of 11 Genes Associated with Noonan Spectrum", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0051", "field": "variants.classification_raw", "result": "wrong", "truth": "Pathogenic Mutation", "found": "Pathogenic", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0051", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0051", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0051", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0051", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0052", "field": "test_type", "result": "wrong", "truth": "panel", "found": "single_gene", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0053", "field": "test_name", "result": "wrong", "truth": "ExomeScan-Trio", "found": "Exome Sequencing and Interpretation", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0053", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0054", "field": "mrn", "result": "missed", "truth": "XV03-30317", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0054", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "XV03-30317", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0054", "field": "lab_accession_number", "result": "wrong", "truth": "668-578-0481-1", "found": "YU55-12917 G", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0054", "field": "variants.chromosomal_position", "result": "extra", "truth": null, "found": "16p11.2(29,819,553-30,173,854)", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0054", "field": "variants.associated_phenotype", "result": "extra", "truth": null, "found": "neurodevelopmental differences and autism spectrum disorder", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0054", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0054", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "354 KB DELETION", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0055", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0055", "field": "variants.associated_phenotype", "result": "wrong", "truth": "Emery-Dreifuss muscular dystrophy 2, autosomal dominant", "found": "Emery-Dreifuss muscular dystrophy 2", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0055", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0055", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0055", "field": "normalized.variants.disease_id", "result": "missed", "truth": "MONDO:0021569", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0056", "field": "mrn", "result": "missed", "truth": "WR36-96329", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0056", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "WR36-96329", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0056", "field": "lab_accession_number", "result": "wrong", "truth": "309-520-4877-5", "found": "YU06-23996 G", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0058", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0058", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "frameshift deletion", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0060", "field": "test_name", "result": "wrong", "truth": "ExomeScan-Trio", "found": "Exome Sequencing and Interpretation", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0060", "field": "variants.classification_raw", "result": "wrong", "truth": "Variant, Likely Pathogenic", "found": "Likely Pathogenic", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0060", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0060", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "frameshift", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0060", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0060", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0060", "field": "normalized.variants.hgnc_id", "result": "missed", "truth": "HGNC:7133", "found": null, "command": "normalize", "cause": null, "flagged": null}
+{"report": "SYN-0060", "field": "normalized.variants.clinvar_variation_id", "result": "missed", "truth": "3574820", "found": null, "command": "normalize", "cause": null, "flagged": null}
+{"report": "SYN-0060", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "intellectual disability", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0060", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001249", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0061", "field": "test_type", "result": "wrong", "truth": "panel", "found": "single_gene", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0062", "field": "mrn", "result": "missed", "truth": "94670075", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0062", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "94670075", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0062", "field": "test_name", "result": "wrong", "truth": "MYO7A Gene Sequencing and Deletion/Duplication Analysis", "found": "MYO7A Gene Sequencing and Deletion/Duplication", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0062", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0063", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0064", "field": "received_date", "result": "missed", "truth": "Sep 04, 2023", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0064", "field": "test_started_date", "result": "missed", "truth": "Sep 06, 2023", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0064", "field": "report_date", "result": "missed", "truth": "Oct 25, 2023", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0064", "field": "normalized.received_date", "result": "missed", "truth": "2023-09-04", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0064", "field": "normalized.test_started_date", "result": "missed", "truth": "2023-09-06", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0064", "field": "normalized.report_date", "result": "missed", "truth": "2023-10-25", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0064", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Congenital hearing loss", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0064", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0008527", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0065", "field": "variants.zygosity_raw", "result": "wrong", "truth": "HET", "found": "One copy", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0065", "field": "variants.mode_of_inheritance_raw", "result": "wrong", "truth": "AR", "found": "autosomal recessive", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0065", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0066", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0068", "field": "test_name", "result": "wrong", "truth": "NoonanScan", "found": "NoonanScan: Analyses of 11 Genes Associated with Noonan Spectrum", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0068", "field": "variants.classification_raw", "result": "wrong", "truth": "Variant, Unknown Significance", "found": "Unknown Significance", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0068", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0069", "field": "specimen_type", "result": "wrong", "truth": "Saliva (Oragene)", "found": "Saliva", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0069", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0069", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "frameshift change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0070", "field": "mrn", "result": "missed", "truth": "60296603", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0070", "field": "submitter_patient_id", "result": "wrong", "truth": "700738661, 662329069", "found": "60296603", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0070", "field": "variants.dna_change_raw", "result": "extra", "truth": null, "found": "SMN1 copy number: 0", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0070", "field": "variants.classification_raw", "result": "extra", "truth": null, "found": "POSITIVE: AFFECTED", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0070", "field": "variants.classification", "result": "extra", "truth": null, "found": "pathogenic", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0070", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0071", "field": "lab_accession_number", "result": "missed", "truth": "0534-979-172", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0071", "field": "variants", "result": "extra", "truth": null, "found": "UBE3A Only the paternal methylation pattern was present", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0072", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0073", "field": "test_type", "result": "wrong", "truth": "panel", "found": "single_gene", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0073", "field": "report_date", "result": "wrong", "truth": "27 January 2020", "found": "9 December 2019", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0073", "field": "normalized.report_date", "result": "wrong", "truth": "2020-01-27", "found": "2019-12-09", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0073", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0074", "field": "mrn", "result": "missed", "truth": "16285585", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0074", "field": "submitter_patient_id", "result": "wrong", "truth": "609691286, 943153988", "found": "16285585", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0074", "field": "variants.dna_change_raw", "result": "extra", "truth": null, "found": "SMN1 copy number: 1", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0074", "field": "variants.classification_raw", "result": "extra", "truth": null, "found": "Predicted to be a carrier of spinal muscular atrophy", "command": "extract", "cause": null, "flagged": true}
+{"report": "SYN-0074", "field": "variants.classification", "result": "extra", "truth": null, "found": "other", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0074", "field": "variants.zygosity_raw", "result": "extra", "truth": null, "found": "CARRIER", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0074", "field": "variants.zygosity", "result": "extra", "truth": null, "found": "heterozygous", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0074", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0075", "field": "lab_accession_number", "result": "missed", "truth": "1368-181-069", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0075", "field": "variants.chromosomal_position", "result": "extra", "truth": null, "found": "2q33.1(202402014_202761492)", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0075", "field": "variants.associated_phenotype", "result": "extra", "truth": null, "found": "neurodevelopmental differences and seizures", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0075", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0076", "field": "test_name", "result": "wrong", "truth": "DFNB12 Gene Sequencing and Deletion/Duplication Analysis", "found": "DFNB12 Gene Sequencing and Deletion/Duplication", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0076", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0077", "field": "test_type", "result": "wrong", "truth": "panel", "found": "single_gene", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0077", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0078", "field": "variants.classification_raw", "result": "wrong", "truth": "Variant, Likely Pathogenic", "found": "Likely Pathogenic", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0078", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0078", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0078", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0078", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0079", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0080", "field": "specimen_type", "result": "extra", "truth": null, "found": "Blood", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0080", "field": "test_name", "result": "wrong", "truth": "Chromosome Analysis, Blood", "found": "Chromosome Analysis", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0080", "field": "normalized.specimen_type", "result": "extra", "truth": null, "found": "whole_blood", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0080", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Developmental delay", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0080", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001263", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0081", "field": "mrn", "result": "missed", "truth": "20011JSYXF", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0081", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "20011JSYXF", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0081", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0081", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "non-coding change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0082", "field": "test_name", "result": "wrong", "truth": "NoonanScan", "found": "NoonanScan: Analyses of 11 Genes Associated with Noonan Spectrum", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0082", "field": "variants.classification_raw", "result": "wrong", "truth": "Pathogenic Mutation", "found": "Pathogenic", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0082", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0082", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0082", "field": "variants.classification_raw", "result": "wrong", "truth": "Variant, Unknown Significance", "found": "Unknown Significance", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0082", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0082", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0083", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0084", "field": "test_name", "result": "wrong", "truth": "NeurodevelopmentalScan", "found": "NeurodevelopmentalScan: Analyses of 10 Genes Associated with Neurodevelopmental", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0084", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0084", "field": "variants.classification_raw", "result": "wrong", "truth": "Pathogenic Mutation", "found": "Pathogenic", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0084", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0084", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "frameshift change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0085", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Developmental delay", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0085", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "intellectual disability", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0085", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001263", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0085", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001249", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0086", "field": "mrn", "result": "missed", "truth": "50479CLPJS", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0086", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "50479CLPJS", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0086", "field": "variants.associated_phenotype", "result": "wrong", "truth": "autosomal recessive limb-girdle muscular dystrophy type 2I", "found": "limb-girdle muscular dystrophy type 2I", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0086", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "protein-truncating change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0086", "field": "normalized.variants.disease_id", "result": "missed", "truth": "MONDO:0011787", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0087", "field": "received_date", "result": "missed", "truth": "Sep 5 2019", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0087", "field": "report_date", "result": "wrong", "truth": "Sep 24 2019", "found": "Sep 25 2019", "command": "select", "cause": null, "flagged": false}
+{"report": "SYN-0087", "field": "normalized.received_date", "result": "missed", "truth": "2019-09-05", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0087", "field": "normalized.report_date", "result": "wrong", "truth": "2019-09-24", "found": "2019-09-25", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0087", "field": "variants.transcript", "result": "missed", "truth": "NM_022124.6", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0087", "field": "variants.mode_of_inheritance_raw", "result": "missed", "truth": "Autosomal recessive", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0087", "field": "variants.mode_of_inheritance", "result": "missed", "truth": "autosomal_recessive", "found": null, "command": "select", "cause": null, "flagged": null}
+{"report": "SYN-0087", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0088", "field": "mrn", "result": "missed", "truth": "80274UVYSD", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0088", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "80274UVYSD", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0088", "field": "specimen_type", "result": "extra", "truth": null, "found": "germline DNA", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0088", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0089", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0090", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0091", "field": "variants.associated_phenotype", "result": "extra", "truth": null, "found": "neurodevelopmental differences and congenital anomalies", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0091", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0093", "field": "mrn", "result": "missed", "truth": "65067DVBNH", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0093", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "65067DVBNH", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0093", "field": "variants.associated_phenotype", "result": "wrong", "truth": "autosomal recessive nonsyndromic hearing loss 4", "found": "nonsyndromic hearing loss 4", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0093", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0093", "field": "normalized.variants.disease_id", "result": "missed", "truth": "MONDO:0010933", "found": null, "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0094", "field": "mrn", "result": "missed", "truth": "66357529", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0094", "field": "submitter_patient_id", "result": "extra", "truth": null, "found": "66357529", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0094", "field": "test_name", "result": "wrong", "truth": "Gene-specific Carrier Screening", "found": "Lilac Molecular Gene-specific Carrier Screening", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0094", "field": "test_type", "result": "wrong", "truth": "panel", "found": "single_gene", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0095", "field": "normalized.date_of_birth", "result": "missed", "truth": "1991-06-02", "found": null, "command": "normalize", "cause": null, "flagged": null}
+{"report": "SYN-0095", "field": "normalized.collection_date", "result": "missed", "truth": "2022-08-05", "found": null, "command": "normalize", "cause": null, "flagged": null}
+{"report": "SYN-0095", "field": "normalized.received_date", "result": "missed", "truth": "2022-08-07", "found": null, "command": "normalize", "cause": null, "flagged": null}
+{"report": "SYN-0095", "field": "normalized.report_date", "result": "missed", "truth": "2022-10-04", "found": null, "command": "normalize", "cause": null, "flagged": null}
+{"report": "SYN-0095", "field": "variants", "result": "extra", "truth": null, "found": "45,XY,der(13;14)(q10;q10)", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0096", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0096", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "nucleotide substitution", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0097", "field": "specimen_type", "result": "wrong", "truth": "Saliva (Oragene)", "found": "Saliva", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0097", "field": "genome_build", "result": "missed", "truth": "GRCh38", "found": null, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0097", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0097", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0097", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0097", "field": "variants.variant_type_raw", "result": "extra", "truth": null, "found": "missense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0098", "field": "test_type", "result": "wrong", "truth": "panel", "found": "single_gene", "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0098", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0099", "field": "variants.is_secondary_finding", "result": "extra", "truth": null, "found": false, "command": "extract", "cause": null, "flagged": null}
+{"report": "SYN-0099", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Global developmental delay", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0099", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001263", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0100", "field": "variants.zygosity_raw", "result": "wrong", "truth": "HET", "found": "heterozygous", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0100", "field": "variants.mode_of_inheritance_raw", "result": "wrong", "truth": "AD", "found": "autosomal dominant", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0100", "field": "variants.variant_type_raw", "result": "wrong", "truth": "stop_gained", "found": "nonsense change", "command": "extract", "cause": null, "flagged": false}
+{"report": "SYN-0100", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "Short stature", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0100", "field": "patient_phenotypes", "result": "extra", "truth": null, "found": "congenital heart disease", "command": "extract", "cause": "hallucination", "flagged": false}
+{"report": "SYN-0100", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0001627", "command": null, "cause": null, "flagged": null}
+{"report": "SYN-0100", "field": "normalized.patient_phenotypes", "result": "extra", "truth": null, "found": "HP:0004322", "command": "normalize", "cause": null, "flagged": null}
