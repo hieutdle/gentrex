@@ -240,3 +240,5 @@ serving/
 # LSF job scripts of your own. Those of the evaluation are kept.
 *.lsf
 !/evaluation/minerva/*.lsf
+# Skills that an assistant tool writes into the folder.
+skills/
