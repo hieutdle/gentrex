@@ -13,12 +13,15 @@ docs/development/generate-benchmark-reports.md explains them.
 """
 
 import argparse
+import datetime
 import hashlib
 import json
 import logging
 import os
 import pathlib
+import subprocess
 import sys
+import threading
 from concurrent import futures
 from typing import Any
 
@@ -39,6 +42,8 @@ _BASE_URL_ENV = "GENTREX_BENCH_BASE_URL"
 _API_KEY_ENV = "GENTREX_BENCH_API_KEY"
 _SETTINGS_PATH = pathlib.Path(__file__).with_name("settings.yaml")
 _SOURCES = ("clinvar", "hpo", "hpoa", "mondo", "hgnc")
+# Reports are built eight at a time, and each attempt adds a line to one file.
+_ATTEMPTS_LOCK = threading.Lock()
 
 
 def _sha256(path: pathlib.Path) -> str:
@@ -47,6 +52,34 @@ def _sha256(path: pathlib.Path) -> str:
         for chunk in iter(lambda: fh.read(1 << 20), b""):
             digest.update(chunk)
     return digest.hexdigest()
+
+
+def _source() -> dict[str, Any]:
+    """Returns the commit of the generator and whether its files differ from it.
+
+    Empty if the generator doesn't run from a git clone.
+    """
+    folder = pathlib.Path(__file__).resolve().parent
+
+    def git(*args: str) -> str:
+        return subprocess.run(
+            ["git", "-C", str(folder), *args],
+            capture_output=True,
+            text=True,
+            check=True,
+        ).stdout.strip()
+
+    try:
+        changed = git("status", "--porcelain", "--untracked-files=no", "--", ".")
+        return {"commit": git("rev-parse", "HEAD"), "modified": bool(changed)}
+    except (OSError, subprocess.CalledProcessError):
+        return {}
+
+
+def _log_attempt(out: pathlib.Path, line: dict[str, Any]) -> None:
+    """Adds one attempt at a report to attempts.jsonl in the version folder."""
+    with _ATTEMPTS_LOCK, (out / "attempts.jsonl").open("a", encoding="utf-8") as fh:
+        fh.write(json.dumps(line, ensure_ascii=False) + "\n")
 
 
 def _write_json(path: pathlib.Path, value) -> None:
@@ -122,6 +155,10 @@ def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
             "canary": fill.CANARY,
             "version": args.version,
             "generator": sample._VERSION,
+            "sampled": {
+                "date": datetime.datetime.now().isoformat(timespec="seconds"),
+                **_source(),
+            },
             "settings": settings,
             **sources_used,
         },
@@ -192,6 +229,15 @@ def _build_one(
             raise
         except Exception as exc:
             _logger.warning("%s, attempt %d: %r", case_id, attempt, exc)
+            _log_attempt(
+                out,
+                {
+                    "case": case_id,
+                    "attempt": attempt,
+                    "passed": False,
+                    "errors": [repr(exc)],
+                },
+            )
     _logger.error("%s failed all %d attempts", case_id, settings["attempts"])
     return False
 
@@ -220,11 +266,24 @@ def _attempt(
     render.print_pdf(chrome, html, native)
     writer = {k: response[k] for k in ("model", "prompt_sha256", "date")}
     writer["max_tokens"] = settings["max_tokens"]
+    writer["output_tokens"] = response["output_tokens"]
     writer["attempt"] = attempt
     writer["chrome"] = chrome_version
+    writer["generator"] = settings.get("source") or {}
     result = check.check(case, native, writer)
     for warning in result.warnings:
         _logger.info("%s: %s", case_id, warning)
+    _log_attempt(
+        out,
+        {
+            "case": case_id,
+            "attempt": attempt,
+            "passed": result.truth is not None,
+            "errors": result.errors,
+            "warnings": result.warnings,
+            "output_tokens": response["output_tokens"],
+        },
+    )
     if result.truth is None:
         for error in result.errors:
             _logger.warning("%s, attempt %d: %s", case_id, attempt, error)
@@ -274,6 +333,7 @@ def _build(args: argparse.Namespace, settings: dict[str, Any]) -> int:
     client = llm.make_client(
         base_url, os.environ.get(_API_KEY_ENV, "EMPTY"), settings["timeout_seconds"]
     )
+    settings = {**settings, "source": _source()}
     todo = [p for p in paths if not (out / "truth" / p.name).exists()]
     failed = []
     with futures.ThreadPoolExecutor(settings["concurrency"]) as pool:

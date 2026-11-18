@@ -175,6 +175,40 @@ def named_builds(pages: list[str]) -> set[str]:
     }
 
 
+# The kinds of variant, in the order that tables list them.
+VARIANT_KINDS = (
+    "sequence",
+    "exon_deletion_duplication",
+    "mitochondrial",
+    "copy_number",
+    "gene_copy_number",
+    "repeat",
+    "uniparental_disomy",
+)
+
+
+def variant_kind(variant: dict[str, Any]) -> str:
+    """Returns the kind of a variant of a record, from how the report gives it.
+
+    A c. change of whole exons, whose ends are ranges, is a deletion or
+    duplication of exons. A copy number without a DNA change is that of a
+    gene, as SMN1's.
+    """
+    change = variant.get("hgvs_c") or ""
+    other = (variant.get("dna_change_raw") or "").casefold()
+    if change:
+        return "exon_deletion_duplication" if change.startswith("c.(") else "sequence"
+    if "m." in other:
+        return "mitochondrial"
+    if other.startswith("arr"):
+        return "copy_number"
+    if "repeat" in other:
+        return "repeat"
+    if "uniparental disomy" in other:
+        return "uniparental_disomy"
+    return "gene_copy_number"
+
+
 def _printed(record: dict[str, Any]) -> list[tuple[str, str]]:
     """Returns (path, value) of every value of the record that is printed as text."""
     values = [
@@ -256,7 +290,10 @@ def check(case: dict[str, Any], pdf_path, writer: dict[str, Any]) -> Result:
                     "tags",
                 )
             }
-            | {"writer": writer},
+            | {
+                "writer": writer,
+                "variant_kinds": [variant_kind(v) for v in record["variants"]],
+            },
             "record": record,
             "normalized": case["normalized"],
             "pages": [{"page": n, "text": text} for n, text in enumerate(raw, 1)],

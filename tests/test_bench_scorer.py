@@ -240,6 +240,17 @@ def test_a_feature_from_the_reason_for_testing_is_no_extra_feature():
     ]
 
 
+def test_a_feature_without_an_hpo_term_is_missed_and_not_also_extra():
+    """gentrex normalize gives no term below its similarity threshold."""
+    report = _report(_truth())
+    report["normalized"]["patient_phenotypes"] = [{"hpo_id": None}]
+
+    outcomes = compare.compare(_truth(), report, _PAGES, _PAGES, config.load_schema())
+
+    wrong = [(o.field, o.result) for o in outcomes if o.result != "correct"]
+    assert wrong == [("normalized.patient_phenotypes", "missed")]
+
+
 def test_a_reference_before_an_m_change_matches():
     """The schema's own example writes an m. change after its reference."""
     assert compare.key("dna_change_raw", "NC_012920.1:m.3243A>G") == compare.key(
@@ -301,7 +312,7 @@ def test_the_check_of_copied_values_is_scored_against_the_truth(tmp_path):
     scores, _ = score.score(truth_dir, run_dir, "dev")
 
     # The made-up variant is named, and the wrong MRN is not.
-    check = scores["not_in_pages"]
+    check = scores["checks"]["not_in_pages"]
     assert (check["flagged"], check["not_right"]) == (1, 2)
     assert (check["precision"], check["recall"]) == (1, 0.5)
 
@@ -338,6 +349,273 @@ def test_only_clinical_errors_make_a_report_wrong(tmp_path, field, value, right)
     scores, _ = score.score(truth_dir, run_dir, "dev")
 
     assert scores["main"]["report_accuracy"]["value"] == right
+
+
+def test_value_numbers_count_only_stated_and_written_values(tmp_path):
+    """A field that a report rightly leaves empty would flatter the accuracy,
+    so precision, recall and F1 leave it out. One wrong value that isn't
+    clinical keeps the report right and its record incomplete."""
+    truth = _truth()
+    truth["pages"] = [{"page": n, "text": text} for n, text in enumerate(_PAGES, 1)]
+    report = _report(truth)
+    report["data"]["specimen_type"] = "Blood"
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    main = {name: number["value"] for name, number in scores["main"].items()}
+    assert (main["report_accuracy"], main["record_accuracy"]) == (1, 0)
+    assert main["value_recall"] == main["value_precision"] < 1
+    assert scores["fields"]["karyotype"]["stated"] == 0
+    assert scores["fields"]["karyotype"]["f1"] is None
+    assert scores["fields"]["specimen_type"]["f1"] == 0
+    funnel = scores["funnel"]
+    assert funnel["lost"] == {"transcribe": 0, "select": 0, "extract": 1}
+    assert funnel["stated"] == funnel["right"] + 1
+    assert scores["groups"]["pages"] == {"2": {"reports": 1, "report_accuracy": 1.0}}
+    assert scores["by_report"]["SYN-0001"]["case"]["lab"] == "exome-box"
+
+
+def test_ocr_words_are_compared_with_the_true_page_whatever_their_order():
+    """OCR reads the columns of a page in another order than the PDF's text.
+
+    The first page is the only one that prints the MRN, so gentrex select
+    must keep it, and the second page is one it may drop.
+    """
+    true_pages = [(1, "MRN 12 Sex Female"), (2, "Methods")]
+    truths = {
+        "a": {
+            "pages": [{"page": page, "text": text} for page, text in true_pages],
+            "record": {"mrn": "12", "variants": [], "patient_phenotypes": []},
+        }
+    }
+    scanned = {"file": "a.pdf", "page": 1, "source": "scanned"}
+    native = {"file": "a.pdf", "page": 2, "source": "native", "text": "Methods"}
+    pages = [scanned | {"text": "**Sex** Female MRN 72 x"}, native]
+
+    found = score._pages(truths, ["a"], pages, pages[:1])
+
+    assert (found["total"], found["ocr"], found["kept"]) == (2, 1, 1)
+    assert found["ocr_word_recall"] == 0.75
+    assert found["ocr_word_precision"] == 0.6
+    assert (found["needed"], found["needed_kept"]) == (1, 1)
+    assert (found["other"], found["other_dropped"]) == (1, 1)
+
+
+@pytest.mark.parametrize(
+    ("field", "found", "kind"),
+    [
+        # The true value is "Saliva".
+        ("specimen_type", "Saliva in Oragene", "partial"),
+        # The MRN in the field of the date of birth.
+        ("date_of_birth", "SYN-MRN-0001", "other_value"),
+        # A variant that the report cites from the literature.
+        ("specimen_type", "c.100C>T", "other_value"),
+        ("specimen_type", "Buccal swab", "not_in_pages"),
+        ("specimen_type", "Pathogenic variant detected", "other_text"),
+    ],
+)
+def test_a_wrong_text_is_told_by_where_it_comes_from(field, found, kind):
+    """Each kind of error needs another fix: a longer copy, a sharper field,
+    or a model that copies instead of writing."""
+    report = _report(_truth())
+    report["data"][field] = found
+
+    wrong = _compare(report)
+
+    assert wrong[field].cause == kind
+
+
+def test_categories_are_counted_by_what_they_were_written_as(tmp_path):
+    """A confusion of pathogenic with likely pathogenic differs from one with
+    benign, which the accuracy alone doesn't show."""
+    truth = _truth()
+    report = _report(truth)
+    report["data"]["variants"][0]["classification"] = "likely_pathogenic"
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    confusions = scores["confusions"]
+    assert confusions["variants.classification"] == {
+        "pathogenic": {"likely_pathogenic": 1}
+    }
+    assert confusions["normalized.overall_result"] == {"positive": {"positive": 1}}
+    assert scores["fields"]["variants.classification"]["kinds"] == {"category": 1}
+
+
+def test_checks_are_scored_by_value_and_by_report(tmp_path):
+    """A check is worth a person's time if the reports that it flags are the
+    wrong ones."""
+    truths = [_truth("SYN-0001"), _truth("SYN-0002")]
+    right, wrong = _report(truths[0]), _report(truths[1])
+    right["normalized"]["overall_result_conflict"] = True
+    wrong["normalized"]["overall_result_conflict"] = False
+    wrong["normalized"]["overall_result"] = "negative"
+    wrong["normalized"]["variants"][0]["hgvs_c_status"] = "invalid"
+    truth_dir, run_dir = _write_run(tmp_path, truths, [right, wrong])
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    conflict = scores["checks"]["result_conflict"]
+    assert (conflict["values"], conflict["flagged"], conflict["not_right"]) == (2, 1, 1)
+    assert conflict["flagged_and_not_right"] == 0
+    assert scores["checks"]["hgvs_invalid"]["flagged"] == 1
+    assert scores["by_report"]["SYN-0001"]["flags"] == ["result_conflict"]
+    assert scores["by_report"]["SYN-0002"]["flags"] == ["hgvs_invalid"]
+    review = scores["review"]
+    assert (review["reports"], review["wrong"]) == (2, 1)
+    assert review["checks"]["any"] == {
+        "flagged": 2,
+        "flagged_and_wrong": 1,
+        "precision": 0.5,
+        "recall": 1.0,
+    }
+
+
+def test_variants_are_scored_by_their_kind(tmp_path):
+    """A pipeline that reads sequence variants may still miss copy numbers."""
+    truth = _truth()
+    truth["record"]["variants"].append(
+        truth["record"]["variants"][0]
+        | {"gene_symbol": "SMN1", "hgvs_c": None, "copy_number": 0}
+    )
+    truth["normalized"]["variants"].append({"hgnc_id": "HGNC:11117"})
+    report = _report(truth)
+    del report["data"]["variants"][1]
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    kinds = scores["variant_kinds"]
+    assert (kinds["sequence"]["found"], kinds["sequence"]["classification"]) == (1, 1)
+    assert (
+        kinds["gene_copy_number"]["stated"],
+        kinds["gene_copy_number"]["found"],
+    ) == (
+        1,
+        0,
+    )
+
+
+def _terms(*ids: str | None, first: str | None = "HP:0000001") -> list[dict]:
+    """Returns the HPO term of one feature, with candidates in the given order."""
+    candidates = [{"hpo_id": hpo_id} for hpo_id in ids]
+    return [{"hpo_id": first, "models_agree": False, "candidates": candidates}]
+
+
+@pytest.mark.parametrize(
+    ("term", "numbers"),
+    [
+        # The true term, HP:0002515, is the second candidate.
+        (_terms("HP:0000001", "HP:0002515"), (0, 0, 1, 0)),
+        (_terms("HP:0002515", first="HP:0002515"), (1, 1, 1, 0)),
+        # Too unlike every HPO name: no term, though the first candidate is right.
+        (_terms("HP:0002515", first=None), (0, 1, 1, 1)),
+    ],
+)
+def test_hpo_terms_are_scored_at_the_first_place_and_among_the_candidates(
+    tmp_path, term, numbers
+):
+    """A person who checks the candidates finds the term even when the first
+    one is wrong, so the paper gives both."""
+    truth = _truth()
+    report = _report(truth)
+    report["normalized"]["patient_phenotypes"] = term
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    hpo = scores["hpo"]["all"]
+    names = ("top_1", "first_candidate", "top_5", "no_term")
+    assert tuple(hpo[name] for name in names) == numbers
+    assert scores["hpo"]["models disagree"]["features"] == 1
+
+
+def test_genes_are_scored_by_whether_the_report_prints_the_approved_symbol(tmp_path):
+    """An older symbol is the hard case of the HGNC lookup."""
+    truth = _truth()
+    truth["record"]["variants"][0]["gene_symbol"] = "COCA2"
+    truth["normalized"]["variants"][0]["gene_symbol"] = "MLH1"
+    report = _report(truth)
+    report["normalized"]["variants"][0]["hgnc_id"] = None
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    older = scores["normalize"]["normalized.variants.hgnc_id (older symbol)"]
+    assert (older["values"], older["right"], older["given_right_source"]) == (1, 0, 0)
+    assert "normalized.variants.hgnc_id (approved symbol)" not in scores["normalize"]
+
+
+def test_page_selection_is_scored_at_the_run_and_at_other_thresholds(tmp_path):
+    """The second page is the only one with the variant, so dropping it loses
+    the variant. A lower threshold would keep it, which the sweep shows."""
+    truth = _truth()
+    truth["pages"] = [{"page": n, "text": text} for n, text in enumerate(_PAGES, 1)]
+    report = _report(truth)
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+    select_dir = run_dir.parents[1] / "select" / run_dir.name
+    answers = [(1, 0.9, True), (2, 0.3, False)]
+    (select_dir / "decisions.jsonl").write_text(
+        "".join(
+            json.dumps(
+                {"file": "SYN-0001.pdf", "page": page, "p_yes": {"q": p}, "keep": keep}
+            )
+            + "\n"
+            for page, p, keep in answers
+        )
+    )
+    run = yaml.safe_load((select_dir / "run.yaml").read_text())
+    run["settings"]["keep_threshold"] = 0.5
+    (select_dir / "run.yaml").write_text(yaml.safe_dump(run))
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    select = scores["select"]
+    assert (select["needed_kept"], select["needed_dropped"]) == (1, 1)
+    assert select["values_reachable"] < select["values"]
+    sweep = {row["threshold"]: row for row in select["sweep"]}
+    assert sweep[0.5]["needed_kept"] == 0.5
+    assert (sweep[0.2]["needed_kept"], sweep[0.2]["values_reachable"]) == (1, 1)
+    assert select["only_by"] == {"q": {"pages": 1, "needed": 1}}
+
+
+def test_extract_is_also_scored_on_the_values_that_reached_it(tmp_path):
+    """A value on a dropped page is select's loss, not extract's."""
+    truth = _truth()
+    report = _report(truth)
+    report["data"]["specimen_type"] = None
+    kept = [_PAGES[0]]
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+    select_dir = run_dir.parents[1] / "select" / run_dir.name
+    (select_dir / "pages.jsonl").write_text(
+        json.dumps({"file": "SYN-0001.pdf", "page": 1, "text": kept[0]}) + "\n"
+    )
+
+    scores, _ = score.score(truth_dir, run_dir, "dev")
+
+    funnel = scores["funnel"]
+    assert funnel["lost"]["select"] >= 1
+    assert funnel["extract_recall"] > funnel["right"] / funnel["stated"]
+    specimen = scores["fields"]["specimen_type"]
+    assert (specimen["recall"], specimen["recall_given_input"]) == (0, None)
+
+
+def test_runs_are_listed_by_their_setup(tmp_path):
+    """The label tells two runs on the same copy apart, as two models."""
+    truth = _truth()
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [_report(truth)])
+    scores, errors = score.score(truth_dir, run_dir, "dev", label="Qwen")
+    out = tmp_path / "scored" / "20261118-120000"
+    out.mkdir(parents=True)
+    score.write(out, scores, errors)
+
+    (line,) = score.list_runs(tmp_path / "scored")
+
+    assert score.setup(scores) == "native, Qwen"
+    assert line.startswith("20261118-120000  dev ")
+    assert "report accuracy 100.0%" in line
 
 
 def test_a_report_without_a_record_counts_as_missed(tmp_path):

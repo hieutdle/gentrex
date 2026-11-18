@@ -43,6 +43,13 @@ _NORMALIZED = (
     "report_date",
     "specimen_type",
 )
+# Where a wrong or extra copied text comes from: part of the true value,
+# another value that the report prints, text that the pages don't have, or
+# other text of the pages.
+ERROR_KINDS = ("partial", "other_value", "not_in_pages", "other_text")
+# The checks of Gentrex that flag values for a person to look at, besides
+# not_in_pages of gentrex extract.
+CHECKS = ("hpo_models_disagree", "result_conflict", "hgvs_invalid")
 # What gentrex normalize adds to a variant, and the field it reads it from.
 _NORMALIZED_VARIANT = {"hgnc_id": "gene_symbol", "disease_id": "associated_phenotype"}
 # The shortest test name that counts as part of a longer one.
@@ -64,8 +71,21 @@ class Outcome:
         command: The command that lost or added the value. None for a correct
             value, and for a normalized value whose source was already wrong.
         cause: For an extra variant or feature, distractor or hallucination.
+            For a wrong or extra copied text, where it comes from, one of
+            ERROR_KINDS.
         flagged: Whether gentrex extract named the value in not_in_pages.
             None for a value that it didn't check, such as a missed one.
+        checks: Whether each other check of Gentrex flagged the value, by
+            the check's name, one of CHECKS.
+        kind: The kind of variant of a variant and its fields, as
+            check.variant_kind gives it.
+        subgroup: For the HGNC ID of a gene, whether the report prints the
+            gene's approved symbol or an older one. For the HPO term of a
+            clinical feature whose text was found, whether gentrex normalize
+            gave the feature a term.
+        rank: For the HPO term of a clinical feature whose text was found,
+            the place of the true term among the candidates, from 1, or None
+            if it isn't one of them.
     """
 
     field: str
@@ -76,6 +96,10 @@ class Outcome:
     command: str | None = None
     cause: str | None = None
     flagged: bool | None = None
+    checks: dict[str, bool] = dataclasses.field(default_factory=dict)
+    kind: str | None = None
+    subgroup: str | None = None
+    rank: int | None = None
 
 
 def key(field: str, value: Any) -> Any:
@@ -216,6 +240,25 @@ def compare(
         ("select", [check.page_lines(text) for text in kept]),
     ]
     outcomes: list[Outcome] = []
+    # The values that the report prints, which a wrong value can be.
+    printed = {key("", value) for _, value in check._printed(truth["record"])}
+    printed |= {key("", d["text"]) for d in truth["distractors"]}
+    sent = [(1, "\n".join(kept))]
+
+    def error_kind(field: str, expected: Any, found: Any) -> str | None:
+        """Returns where a wrong or extra copied text comes from."""
+        if not isinstance(found, str):
+            return None
+        wanted, got = key(field, expected), key(field, found)
+        if wanted and got and (wanted in got or got in wanted):
+            return "partial"
+        written = key("", found)
+        if written in printed and written != key("", expected):
+            return "other_value"
+        if extract_check.first_page(found, sent) is None:
+            return "not_in_pages"
+        return "other_text"
+
     # None for a run from before gentrex extract checked the copied values.
     not_in_pages = (report or {}).get("not_in_pages")
     checked = {path for path, _ in extract_check.copied_values(data, schema)}
@@ -233,14 +276,23 @@ def compare(
                     return command
         return "extract"
 
-    def add(field: str, expected: Any, found: Any, source: Any, path: str) -> str:
+    def add(
+        field: str,
+        expected: Any,
+        found: Any,
+        source: Any,
+        path: str,
+        kind: str | None = None,
+    ) -> str:
         """Adds a value of the record, and returns its result."""
         result = _result(field, expected, found)
-        command = None
+        command = cause = None
         if result in ("missed", "wrong"):
             command = charge(source)
         elif result == "extra":
             command = "extract"
+        if result in ("wrong", "extra") and "enum" not in _schema_field(field):
+            cause = error_kind(field, expected, found)
         outcomes.append(
             Outcome(
                 field,
@@ -249,12 +301,27 @@ def compare(
                 expected,
                 found,
                 command,
+                cause,
                 flagged=flagged(path),
+                kind=kind,
             )
         )
         return result
 
-    def add_normalized(field: str, expected: Any, found: Any, source_ok: bool) -> None:
+    def _schema_field(field: str) -> dict[str, Any]:
+        """Returns the schema of a field of the record or of a variant."""
+        if field.startswith("variants."):
+            items = schema["properties"]["variants"]["items"]["properties"]
+            return items.get(field.removeprefix("variants."), {})
+        return schema["properties"].get(field, {})
+
+    def add_normalized(
+        field: str,
+        expected: Any,
+        found: Any,
+        source_ok: bool,
+        subgroup: str | None = None,
+    ) -> None:
         result = _result(field, expected, found)
         command = "normalize" if result != "correct" and source_ok else None
         outcomes.append(
@@ -265,6 +332,7 @@ def compare(
                 expected,
                 found,
                 command,
+                subgroup=subgroup,
             )
         )
 
@@ -303,6 +371,9 @@ def compare(
         command = (
             "normalize" if statement_ok else charge(record.get("overall_result_raw"))
         )
+    conflict = {}
+    if "overall_result_conflict" in normalized:
+        conflict = {"result_conflict": bool(normalized["overall_result_conflict"])}
     outcomes.append(
         Outcome(
             "normalized.overall_result",
@@ -311,8 +382,17 @@ def compare(
             truth["normalized"].get("overall_result"),
             normalized.get("overall_result"),
             command,
+            checks=conflict,
         )
     )
+
+    def hgvs_check(index: int) -> dict[str, bool]:
+        """Returns whether gentrex normalize marked a variant's HGVS invalid."""
+        ids = (normalized.get("variants") or [])[index : index + 1]
+        if not ids or not isinstance(ids[0], dict):
+            return {}
+        statuses = (ids[0].get("hgvs_c_status"), ids[0].get("hgvs_p_status"))
+        return {"hgvs_invalid": "invalid" in statuses}
 
     variant_properties = properties["variants"]["items"]["properties"]
     found_variants = list(enumerate(data.get("variants") or []))
@@ -324,23 +404,39 @@ def compare(
             (f for f in found_variants if _same_variant(f[1], expected, approved)),
             None,
         )
+        kind = check.variant_kind(expected)
         if match is None:
             lost = _change(expected)[1] or expected.get("gene_symbol")
             outcomes.append(
                 Outcome(
-                    "variants", "missed", False, _label(expected), None, charge(lost)
+                    "variants",
+                    "missed",
+                    False,
+                    _label(expected),
+                    None,
+                    charge(lost),
+                    kind=kind,
                 )
             )
             continue
         found_variants.remove(match)
         index, found = match
+        printed_gene = expected.get("gene_symbol")
         if key("gene_symbol", found.get("gene_symbol")) != key(
             "gene_symbol", expected.get("gene_symbol")
         ):
             # Written as the approved symbol, which is as right as the printed one.
             expected = expected | {"gene_symbol": found["gene_symbol"]}
         outcomes.append(
-            Outcome("variants", "correct", True, _label(expected), _label(found))
+            Outcome(
+                "variants",
+                "correct",
+                True,
+                _label(expected),
+                _label(found),
+                checks=hgvs_check(index),
+                kind=kind,
+            )
         )
         variant_results = {
             field: add(
@@ -349,16 +445,22 @@ def compare(
                 found.get(field),
                 _source(variant_properties, field, expected),
                 f"variants[{index}].{field}",
+                kind,
             )
             for field, value in expected.items()
         }
         ids = (normalized.get("variants") or [])[index : index + 1]
+        printed_symbol = key("gene_symbol", printed_gene)
+        old = printed_symbol != key("gene_symbol", expected_ids.get("gene_symbol"))
         for field, source in _NORMALIZED_VARIANT.items():
             add_normalized(
                 f"variants.{field}",
                 expected_ids.get(field),
                 ids[0].get(field) if ids else None,
                 variant_results.get(source) == "correct",
+                ("older symbol" if old else "approved symbol")
+                if field == "hgnc_id" and expected_ids.get("gene_symbol")
+                else None,
             )
         # ClinVar is looked up by gene and c. change only.
         has_id = "clinvar_variation_id" in expected_ids
@@ -387,10 +489,12 @@ def compare(
                     f"variants[{index}].gene_symbol",
                     f"variants[{index}].{_change(extra)[0]}",
                 ),
+                hgvs_check(index),
+                check.variant_kind(extra),
             )
         )
 
-    printed = {key("", d["text"]) for d in truth["distractors"]}
+    distractors = {key("", d["text"]) for d in truth["distractors"]}
     found_features = list(enumerate(data.get("patient_phenotypes") or []))
     by_text: dict[int, int] = {}
     for number, expected in enumerate(record["patient_phenotypes"]):
@@ -444,7 +548,7 @@ def compare(
     for index, extra in found_features:
         if index in in_indication:
             continue
-        cause = "distractor" if key("", extra.get("text")) in printed else None
+        cause = "distractor" if key("", extra.get("text")) in distractors else None
         outcomes.append(
             Outcome(
                 "patient_phenotypes",
@@ -465,6 +569,16 @@ def compare(
             match = next((f for f in found_ids if f[1] == expected["hpo_id"]), None)
             if match is not None:
                 found_ids.remove(match)
+            # Whether the embedding models disagreed on the feature's term.
+            place = by_text.get(number)
+            term = terms[place] if place is not None and place < len(terms) else None
+            agree = (term or {}).get("models_agree")
+            candidates = [c.get("hpo_id") for c in (term or {}).get("candidates") or []]
+            subgroup = rank = None
+            if term is not None:
+                subgroup = "term" if term.get("hpo_id") else "no term"
+                if expected["hpo_id"] in candidates:
+                    rank = candidates.index(expected["hpo_id"]) + 1
             outcomes.append(
                 Outcome(
                     "normalized.patient_phenotypes",
@@ -473,6 +587,9 @@ def compare(
                     expected["hpo_id"],
                     match[1] if match else None,
                     None if match or number not in by_text else "normalize",
+                    checks={} if agree is None else {"hpo_models_disagree": not agree},
+                    subgroup=subgroup,
+                    rank=rank,
                 )
             )
         outcomes += [
@@ -485,6 +602,7 @@ def compare(
                 "normalize" if index in by_text.values() else None,
             )
             for index, hpo_id in found_ids
-            if index not in in_indication
+            # A feature without an HPO term is missed, as above, not extra.
+            if hpo_id is not None and index not in in_indication
         ]
     return outcomes

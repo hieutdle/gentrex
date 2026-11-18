@@ -74,6 +74,11 @@ class ReportExtraction:
             the request failed.
         not_in_pages: The copied values of `data` that are not in the text
             of `pages`, by path, as `variants[0].hgvs_c`; None without data.
+        seconds: How long the report's request took, with its retries; None
+            without a request.
+        prompt_tokens: Tokens that the model read for the answer; None
+            without an answer, or if the server doesn't count them.
+        completion_tokens: Tokens that the model wrote for the answer.
     """
 
     file: str
@@ -81,6 +86,9 @@ class ReportExtraction:
     data: dict[str, Any] | None
     error: str | None = None
     not_in_pages: list[str] | None = None
+    seconds: float | None = None
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
 
     def to_json(self) -> str:
         """Returns the record as one JSONL line, without the newline."""

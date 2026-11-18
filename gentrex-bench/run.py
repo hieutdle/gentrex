@@ -253,7 +253,9 @@ def main() -> int:
             return 1
         run_dir = found
 
-    scores, errors = score.score(version_dir / "truth", run_dir, args.split, args.gpus)
+    scores, errors = score.score(
+        version_dir / "truth", run_dir, args.split, args.gpus, args.label
+    )
     scores["performance"]["server_versions"] = versions
     scores["performance"]["gpu_names"] = _gpu_names() if args.serve else []
     # The time a server took to load its model, which `seconds` leaves out.

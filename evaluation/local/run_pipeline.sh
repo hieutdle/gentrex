@@ -54,4 +54,6 @@ case " $* " in
   *" --no-select "*) ;;
   *) for copy in ${NO_SELECT-native}; do run --copy "$copy" --no-select; done ;;
 esac
+# Every scored run, so that the output ends with the results.
+uv run python gentrex-bench/scorer/score.py --list
 exit $status

@@ -189,7 +189,8 @@ cases that failed:
 
 | Path | Contents |
 | --- | --- |
-| `manifest.json` | The settings of `sample`, and the name and checksum of each reference file |
+| `manifest.json` | The settings of `sample`, the name and checksum of each reference file, and when and from which commit of Gentrex the cases were sampled |
+| `attempts.jsonl` | One line per attempt at a report: the case, the attempt, whether it passed the check, the check's errors and warnings, and the model's output tokens |
 | `cases/<case>.json` | The sampled case, with its truth and the card that the model got |
 | `responses/<case>-<attempt>.json` | The model's text for the report, with the model's name and token counts |
 | `html/<case>.html` | The report's template, filled with the case and the model's text |
@@ -204,7 +205,7 @@ A truth file has six keys:
 
 | Key | Holds |
 | --- | --- |
-| `case` | The split, template, test, result, challenge tags and writing model |
+| `case` | The split, template, test, result, challenge tags, the kind of each variant, and the writing model with the attempt that passed |
 | `record` | What `gentrex extract` should write, with the page of each variant |
 | `normalized` | What `gentrex normalize` should add, such as ISO dates and HGNC, MONDO and HPO IDs |
 | `pages` | The text of each page of the native PDF |
@@ -275,4 +276,4 @@ so that all reports of a version are made the same way.
 | `the answer isn't JSON` or `2 variant details for 1 variants` | The model's text doesn't fit the case, and the next attempt asks again. If every case fails this way, vLLM may run without `--reasoning-parser muse_glimmer` (step 3), or the server may not support JSON schemas in `response_format`. |
 | `Chrome or Chromium is not installed; pass --chrome` | Install Chrome, or give the path of its program with `--chrome`, after `build`. |
 | `... already has cases; choose another --version` | `sample` never overwrites a version. Use a new name, or delete the old folder. |
-| A case fails all attempts | The log says why, such as a DNA change in the model's text that the case doesn't have. Run `build` again with that case ID, or leave the case out. |
+| A case fails all attempts | The log and `attempts.jsonl` say why, such as a DNA change in the model's text that the case doesn't have. Run `build` again with that case ID, or leave the case out. |

@@ -121,8 +121,8 @@ Each line of `extractions.jsonl` is one report's JSON object, in input order,
 shown here with most of `data` left out:
 
 ```json
-{"file": "report-01.pdf", "pages": [1, 2], "data": {"mrn": "SYN-MRN-0001", "test_name": "Developmental Disorders Panel", "variants": [{"page": 1, "gene_symbol": "SCN2A", "hgvs_c": "c.2815G>A", "classification_raw": "VUS", "classification": "uncertain_significance"}]}, "error": null, "not_in_pages": []}
-{"file": "report-02.pdf", "pages": [1, 3], "data": {"mrn": null, "test_name": "Inherited Arrhythmia Panel", "variants": []}, "error": "page 2: transcribe: APITimeoutError: Request timed out.", "not_in_pages": ["test_name"]}
+{"file": "report-01.pdf", "pages": [1, 2], "data": {"mrn": "SYN-MRN-0001", "test_name": "Developmental Disorders Panel", "variants": [{"page": 1, "gene_symbol": "SCN2A", "hgvs_c": "c.2815G>A", "classification_raw": "VUS", "classification": "uncertain_significance"}]}, "error": null, "not_in_pages": [], "seconds": 7.84, "prompt_tokens": 6120, "completion_tokens": 412}
+{"file": "report-02.pdf", "pages": [1, 3], "data": {"mrn": null, "test_name": "Inherited Arrhythmia Panel", "variants": []}, "error": "page 2: transcribe: APITimeoutError: Request timed out.", "not_in_pages": ["test_name"], "seconds": 5.12, "prompt_tokens": 4380, "completion_tokens": 298}
 ```
 
 | Field | Meaning |
@@ -132,6 +132,8 @@ shown here with most of `data` left out:
 | `data` | The record, with one entry per field of the schema. `null` if the report got no answer. |
 | `error` | The pages left out because of an error from `gentrex transcribe`, and why the request failed. `null` when nothing went wrong. |
 | `not_in_pages` | The copied values of `data` that are not in the text of `pages`, each named by its place in the record, as `test_name` or `variants[0].hgvs_c`. `[]` when all of them are there, and `null` without `data`. |
+| `seconds` | How long the model took for the report, with the retries of a failed request. `null` for a report without a request. |
+| `prompt_tokens`, `completion_tokens` | The tokens that the model read and wrote for the report's answer. `null` without an answer. |
 
 `data` and `error` together tell you how complete a record is:
 

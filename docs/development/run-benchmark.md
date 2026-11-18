@@ -181,7 +181,9 @@ layout:
 | Measure | Value | 95% interval |
 | --- | --- | --- |
 | Report accuracy | 91.0% | 85.0% to 96.0% |
+| Reports with every value right | 42.0% | 32.0% to 52.0% |
 | MRN and date of birth both right | 98.0% | 95.0% to 100.0% |
+| Value F1 | 97.1% | 96.4% to 97.7% |
 | Variant F1 | 94.7% | 91.2% to 97.6% |
 ```
 
@@ -189,10 +191,16 @@ layout:
   The result category and the karyotype are right, every variant is found
   with its gene, DNA change, copy number, classification and zygosity, and
   no variant is extra.
+- **Reports with every value right** is the share of reports whose whole
+  record is right, with the identifiers, the dates and the standard values.
 - **MRN and date of birth both right** is the share of reports that would be
   filed under the right patient.
-- **Variant F1** combines the share of true variants that Gentrex found with
-  the share of Gentrex's variants that are true.
+- **Value F1** counts every value that a report states and every value that
+  a record holds. Recall is the share of the stated values that are right in
+  the record, and precision the share of the record's values that are right.
+  A field that a report doesn't state and the record leaves empty counts
+  nowhere.
+- **Variant F1** is the same for whole variants.
 
 The 95% interval says how far a number could be off because the benchmark
 has only so many reports. A difference between two runs that is smaller than
@@ -204,8 +212,9 @@ The tables below the main numbers answer what to fix:
 | --- | --- |
 | Variants and clinical features | How many were found, missed and extra. Missed ones are split by the command that lost them. Extra ones are split into distractors, which the report prints, and hallucinations, which it doesn't. |
 | Where errors come from | The missed, wrong and extra values of each command |
-| Values not in the pages | How many copied values `gentrex extract` named in `not_in_pages`, how many of those were wrong or extra, and what share of all wrong or extra copied values it named |
-| Fields | The accuracy of every field of the record |
+| Checks | For each check of Gentrex, how many values it flagged, how many of those were wrong, and what share of the wrong values it flagged. Then how many reports a person would look at, and how many of the wrong reports are among them. |
+| Pages | The pages that went to OCR and the pages that `gentrex select` kept. The share of the words of the scanned pages that OCR wrote, against the truth files. How many stated values each command lost. |
+| Fields | The accuracy and the F1 of every field of the record |
 | Groups | Report accuracy by template, test, result, challenge tag and number of variants, and for the templates that the dev set doesn't have |
 | Speed and cost | The time, requests and tokens of each command |
 
@@ -267,13 +276,12 @@ uv run --group notebook jupyter lab evaluation_results/analysis.ipynb
 ```
 
 `--group notebook` installs JupyterLab, pandas and matplotlib on the first
-run. The notebook compares the newest run of each setup, which is a copy of
-the reports with or without `gentrex select`. It gives the difference
-between two runs with its interval, the errors, time and tokens of each
-command, and a plot of accuracy against GPU-hours. Then it goes through one
-run: the reports that count as wrong, the accuracy of every field and of
-every kind of report, and every value that isn't right. It computes no
-scores itself, so its numbers are those of `scores.md`.
+run. The notebook has the tables and figures of a results section, for the
+newest run of each setup, which is a copy of the reports with or without
+`gentrex select`. It writes each table as CSV and LaTeX and each figure as
+PDF and PNG to `evaluation_results/paper/`.
+[The notebooks](../../evaluation_results/README.md#read-the-notebooks) lists
+them.
 
 `evaluation_results/walkthrough.ipynb` follows one report of a run through
 the four commands.
@@ -345,14 +353,69 @@ An extra value is charged to the command that wrote it. A normalized value
 that is wrong because its record value was already wrong isn't charged a
 second time.
 
-### Values not in the pages
+### Checks
 
-`gentrex extract` names the copied values that it didn't find in the pages'
-text ([Extract report data](../user-guide/extract.md#how-it-works)). The
-scorer counts how useful that is. Of the values it named, the first share
-says how many were wrong or extra. The second share says how many of all
-wrong or extra copied values it named. Missed values don't count, because a
-value that wasn't written can't be checked.
+Gentrex flags values for a person to look at, and the scorer counts how
+useful each flag is. Of the values that a check flagged, precision is the
+share that were wrong or extra. Of the wrong or extra values that it looked
+at, recall is the share that it flagged.
+
+| Check | Flags | Looks at |
+| --- | --- | --- |
+| `not_in_pages` | A copied value that `gentrex extract` didn't find in the pages' text ([Extract report data](../user-guide/extract.md#how-it-works)) | Every copied value that it wrote. A missed value can't be checked. |
+| `hgvs_invalid` | A variant whose c. or p. change `gentrex normalize` marked `invalid` | Every variant that it found or added |
+| `result_conflict` | A result whose wording and classifications disagree (`overall_result_conflict`) | The result of every report with a record |
+| `hpo_models_disagree` | A clinical feature whose two embedding models chose different HPO terms | Every feature that was found |
+
+A report is flagged if a check flagged one of its values. `scores.json`
+gives the flags of each report, and under `review` how many reports each
+check flags and how many of the wrong reports are among them.
+
+### Kinds of error
+
+A wrong or extra text value is put in one of four kinds, so that the fix is
+clear:
+
+| Kind | The value is |
+| --- | --- |
+| `partial` | Part of the true value, or the true value with more around it |
+| `other_value` | A value that the report prints for another field, or a distractor |
+| `not_in_pages` | Text that the pages that `gentrex extract` read don't have |
+| `other_text` | Other text of those pages |
+
+`errors.jsonl` gives the kind of each value under `cause`, and `scores.json`
+counts the kinds of each field under `kinds`. A wrong category or number
+counts as `category`. `confusions` in `scores.json` counts, for each field
+with a fixed list of categories, how often each true category was written as
+each category.
+
+### Each command on its own
+
+Besides the end-to-end numbers, the scorer measures each command on what
+the command before gave it, so that a loss upstream doesn't count against
+it. `scores.json` has these under:
+
+| Key | What it holds |
+| --- | --- |
+| `pages` | The pages that went to OCR, and the share of the true words of those pages that OCR wrote, whatever their order |
+| `select` | The pages that `gentrex select` kept and dropped, split into needed pages, which are the only page to print a stated value, and the others. `sweep` gives the same at other values of `select.keep_threshold`, from the probabilities of "yes" in `decisions.jsonl`. `only_by` counts the pages that only one question kept. |
+| `funnel` | Of the values that reached `gentrex extract`, the share that it got right (`extract_recall`). `fields` gives the same for each field as `recall_given_input`. |
+| `normalize` | Each standard value, end to end and given a right source, with the HGNC IDs split by whether the report prints the approved symbol |
+| `hpo` | For the clinical features whose text was found: the share whose term is right, whose true term is the first candidate or among the five, and that got no term, also split by whether the two embedding models agreed |
+
+The benchmark prints each clinical feature as an HPO label or synonym and
+each condition as its MONDO label, so its HPO and MONDO numbers are close to
+an upper bound. The evaluations on real wording are in
+[`evaluation_results/hpo-matching.md`](../../evaluation_results/hpo-matching.md)
+and
+[`evaluation_results/mondo-matching.md`](../../evaluation_results/mondo-matching.md).
+
+### Kinds of variant
+
+Each variant also has a kind, from how the report gives it: a sequence
+variant, an exon deletion or duplication, a mitochondrial variant, a
+copy-number change, the copy number of a gene, a repeat expansion or a
+uniparental disomy. `variant_kinds` in `scores.json` scores each kind.
 
 ### Intervals
 
@@ -393,12 +456,17 @@ GPU-hours, because a server starts once however many PDFs a run reads.
 | `--no-select` | off | Skips `gentrex select`, so that `gentrex extract` reads every page |
 | `--from-run` | none | A finished run folder of `gentrex transcribe`, `gentrex select` or `gentrex extract`. The run starts with the command after it. |
 
-`score.py` takes `--split` and `--gpus` as well, and these two:
+Both take `--label`, a name of the run's setup that the scores keep, as in
+`--label qwen` for a run with another model. The notebook then compares the
+run as a setup of its own instead of as a newer run of the same copy.
+
+`score.py` takes `--split`, `--gpus` and `--label` as well, and these:
 
 | Option | Default | What it does |
 | --- | --- | --- |
 | `--truth` | `data/gentrex-bench/v1/truth` | The folder of truth files |
 | `--run` | `results/normalize/latest` | The run folder of `gentrex normalize` to score |
+| `--list` | off | Lists the scored runs in `results/gentrex-bench/` instead, one line each |
 
 `scores.json` keeps the settings of every command with the scores, as the
 commands used them.

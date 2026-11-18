@@ -740,7 +740,8 @@ logs `passed on attempt 1`, or why the attempt failed. The PDFs go to
 [Check the result](../development/generate-benchmark-reports.md#check-the-result)
 lists what else the folder holds.
 
-Then submit without `CASES`:
+Then submit without `CASES`. To build all reports right away, skip the two
+cases and submit only this command:
 
 ```bash
 bsub < evaluation/minerva/generate_reports.lsf

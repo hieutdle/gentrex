@@ -32,6 +32,22 @@ class ExtractConfig:
     schema: dict[str, Any]
 
 
+@dataclasses.dataclass(frozen=True)
+class Answer:
+    """The model's record of one report, with the tokens of its request.
+
+    Attributes:
+        data: The record, following the extraction schema.
+        prompt_tokens: Tokens that the model read, or None if the server
+            doesn't count them.
+        completion_tokens: Tokens that the model wrote, or None.
+    """
+
+    data: dict[str, Any]
+    prompt_tokens: int | None = None
+    completion_tokens: int | None = None
+
+
 def _require_all(node: dict[str, Any]) -> None:
     """Marks every property in `node`, nested ones too, as required.
 
@@ -59,9 +75,7 @@ class ReportExtractor:
         self._answer_schema = copy.deepcopy(config.schema)
         _require_all(self._answer_schema)
 
-    def extract_or_error(
-        self, pages: list[records.PageRecord]
-    ) -> dict[str, Any] | Exception:
+    def extract_or_error(self, pages: list[records.PageRecord]) -> Answer | Exception:
         """Returns the record of the report, or the error that prevented it.
 
         An answer that was cut off at max_tokens or is not a JSON object is
@@ -76,7 +90,7 @@ class ReportExtractor:
         """
         return llm.result_or_error(lambda: self._request(pages))
 
-    def _request(self, pages: list[records.PageRecord]) -> dict[str, Any]:
+    def _request(self, pages: list[records.PageRecord]) -> Answer:
         text = "\n\n".join(f"--- PAGE {page.page} ---\n{page.text}" for page in pages)
         response = self._client.chat.completions.create(
             model=self.config.model,
@@ -99,4 +113,9 @@ class ReportExtractor:
         data = json.loads(choice.message.content or "")
         if not isinstance(data, dict):
             raise ValueError("answer is not a JSON object")
-        return data
+        usage = response.usage
+        return Answer(
+            data,
+            usage.prompt_tokens if usage else None,
+            usage.completion_tokens if usage else None,
+        )

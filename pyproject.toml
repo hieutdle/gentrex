@@ -91,7 +91,12 @@ venvPath = "."
 venv = ".venv"
 pythonVersion = "3.12"
 typeCheckingMode = "standard"
-extraPaths = ["gentrex-bench", "gentrex-bench/generator", "gentrex-bench/scorer"]
+extraPaths = [
+    "gentrex-bench",
+    "gentrex-bench/generator",
+    "gentrex-bench/scorer",
+    "evaluation_results",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

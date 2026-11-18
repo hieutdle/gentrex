@@ -502,15 +502,53 @@ def test_one_page_report_has_no_scanned_page_in_its_mixed_copy():
     assert len(scan.mixed_pages("SYN-0001", 3)) == 1
 
 
-def test_error_in_one_report_does_not_end_the_build(monkeypatch):
-    """A template or Chrome error fails the report's attempts like a failed check."""
+def test_error_in_one_report_does_not_end_the_build(tmp_path, monkeypatch):
+    """A template or Chrome error fails the report's attempts like a failed
+    check, and each attempt is logged with its error."""
 
     def attempt(*args):
         raise RuntimeError("Chrome did not write the PDF")
 
     monkeypatch.setattr(generate, "_attempt", attempt)
     case = {"case_id": "SYN-0001"}
-    assert not generate._build_one(case, None, {"attempts": 2}, None, "", "")  # pyright: ignore[reportArgumentType]
+    assert not generate._build_one(case, tmp_path, {"attempts": 2}, None, "", "")
+    lines = (tmp_path / "attempts.jsonl").read_text().splitlines()
+    logged = [generate.json.loads(line) for line in lines]
+    assert [(line["attempt"], line["passed"]) for line in logged] == [
+        (1, False),
+        (2, False),
+    ]
+    assert "Chrome did not write the PDF" in logged[0]["errors"][0]
+
+
+def test_every_variant_of_the_cases_has_a_kind(refs):
+    """The kinds split the scores, so a variant of a new kind must get one."""
+    kinds = {
+        check.variant_kind(variant)
+        for case in sample.sample(refs, "seed", 60, 120)
+        for variant in case["record"]["variants"]
+    }
+    assert kinds <= set(check.VARIANT_KINDS)
+    assert {"sequence", "copy_number", "repeat", "gene_copy_number"} <= kinds
+
+
+@pytest.mark.parametrize(
+    ("variant", "kind"),
+    [
+        ({"hgvs_c": "c.5266dup"}, "sequence"),
+        ({"hgvs_c": "c.(?_5299)_(5572_?)del"}, "exon_deletion_duplication"),
+        ({"dna_change_raw": "NC_012920.1:m.3243A>G"}, "mitochondrial"),
+        ({"dna_change_raw": "arr[GRCh38] 10q26.3(1_2)x1"}, "copy_number"),
+        ({"dna_change_raw": "31 and 101 CGG repeats"}, "repeat"),
+        (
+            {"dna_change_raw": "6p25.3q27 paternal uniparental disomy"},
+            "uniparental_disomy",
+        ),
+        ({"gene_symbol": "SMN1", "copy_number": 0}, "gene_copy_number"),
+    ],
+)
+def test_a_variant_kind_follows_how_the_report_gives_the_change(variant, kind):
+    assert check.variant_kind(variant) == kind
 
 
 def test_recheck_renews_the_truth_of_reports_that_print_their_new_case(

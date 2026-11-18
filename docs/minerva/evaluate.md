@@ -103,6 +103,11 @@ cd /path/to/gentrex
 CASES="SYN-0001 SYN-0002" bsub < evaluation/minerva/generate_reports.lsf
 ```
 
+The two reports test the setup before the job builds all 300. To build all
+of them right away, leave `CASES` out of the command. The job then works as
+this step describes, and [step 4](#step-4-generate-all-reports) describes
+how it ends.
+
 The job asks for one H100 GPU and one hour. It serves the writing model, has
 it write the text of each report, prints the report with Chrome and checks
 that the PDF holds every value of the truth. A report that fails the check
@@ -123,15 +128,16 @@ Each case logs a line like this, or why an attempt failed:
 Look at the two PDFs in `data/gentrex-bench/v1/pdf/native/` before you go
 on. Copy them to your own computer with `scp` to open them.
 
-## Step 4: Generate the rest
+## Step 4: Generate all reports
 
 ```bash
 bsub < evaluation/minerva/generate_reports.lsf
 ```
 
 The hour that the job asks for is enough for the 300 reports. Without
-`CASES`, the job builds every case that has no truth file yet. So if the job
-ends in `TERM_RUNLIMIT`, submit it again and it goes on where it stopped.
+`CASES`, the job builds every case that has no truth file yet, so it keeps
+the two reports of step 3. If the job ends in `TERM_RUNLIMIT`, submit it
+again and it goes on where it stopped.
 
 The log ends with a count:
 
@@ -180,6 +186,15 @@ a line that gives its report accuracy and the folder with its scores:
 ```
 2026-11-10 11:02:11,306 report accuracy 91.0% on 100 reports; wrote results/gentrex-bench/20261110-103752
 ```
+
+The log ends with every scored run, one line each:
+
+```
+20261110-103752  dev   native                     100 reports  report accuracy  91.0%  value F1  97.1%
+```
+
+`.venv/bin/python gentrex-bench/scorer/score.py --list` prints the same
+list at any time.
 
 Use the dev reports to decide on prompts and settings. Run one such job at a
 time in a Gentrex folder, because the job finds each command's run through
@@ -233,7 +248,7 @@ uv run --group notebook jupyter lab evaluation_results/analysis.ipynb
 
 | Notebook | Shows |
 | --- | --- |
-| `analysis.ipynb` | All runs side by side: the accuracy of each copy, what scanning and faxing cost, the pipeline with and without `gentrex select`, the errors and time of each command, and one run in detail |
+| `analysis.ipynb` | The tables and figures of the results: the accuracy of each copy, what scanning and faxing cost, where values are lost, the pipeline with and without `gentrex select`, every field and kind of report, and time and cost. It also writes them as files to `evaluation_results/paper/`. |
 | `walkthrough.ipynb` | One report through the four commands, with what each command read and wrote |
 
 All of this is synthetic. Results of real reports must stay on Minerva.
@@ -245,6 +260,14 @@ leave the clinical features without HPO terms:
 
 ```bash
 OPTIONS=--no-hpo bsub < evaluation/minerva/run_pipeline.lsf
+```
+
+To compare another setup, such as a prompt or a model, give its runs a
+label. The notebook then shows them as a setup of their own next to the
+default one:
+
+```bash
+OPTIONS="--label new-prompt" COPIES=native NO_SELECT= bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 To change a setting of Gentrex, add it to `evaluation/settings.yaml`, which

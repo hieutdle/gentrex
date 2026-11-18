@@ -75,6 +75,30 @@ The first release.
   `gentrex normalize` on ClinVar's condition names.
 - The scores of a benchmark run with `--serve` record how long each model
   server took to start.
+- `gentrex extract` records how long the model took for each report and the
+  tokens of its answer, as `seconds`, `prompt_tokens` and
+  `completion_tokens` in `extractions.jsonl`.
+- The benchmark's scorer adds the value F1, the share of reports with every
+  value right, the F1 of every field, how many stated values each command
+  lost, the share of the words of scanned pages that OCR wrote, and the
+  report accuracy by number of pages.
+- The benchmark's scorer tells where each wrong value comes from, counts how
+  each category was written, scores each kind of variant and each check
+  that flags values for a person, and finds the pages that `gentrex select`
+  must keep. It also scores each command on what the command before gave
+  it: the pages that `gentrex select` kept and what other thresholds would
+  keep, the values that reached `gentrex extract`, the standard values given
+  a right source, and the HPO terms at the first place and among the five
+  candidates. `--label` names a run's setup, and `score.py --list` lists the
+  scored runs. A clinical feature without an HPO term no longer also counts
+  as an extra term.
+- The benchmark generator records each attempt at a report in
+  `attempts.jsonl`, the kind of each variant in the truth files, and the
+  date and commit of the sampling in `manifest.json`.
+- `evaluation_results/analysis.ipynb` has the tables and figures of the
+  benchmark results and writes them as files for a paper.
+  `evaluation_results/walkthrough.ipynb` follows one report through the
+  four commands.
 - `gentrex select` asks a third question, `has_dates`, which keeps a page
   that lists the dates of the specimen and the report.
 - `not_in_pages` no longer names a value that wraps in a table cell or a

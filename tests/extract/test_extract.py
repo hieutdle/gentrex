@@ -5,6 +5,7 @@ from unittest import mock
 
 import openai
 import pytest
+from openai.types import completion_usage
 from openai.types.chat import chat_completion
 from openai.types.chat import chat_completion_message
 
@@ -107,6 +108,27 @@ def test_pages_of_a_report_go_in_one_request_in_page_order(tmp_path):
         ),
         ("b.pdf", [2], "--- PAGE 2 ---\nResult: negative"),
     ]
+
+
+def test_record_keeps_the_time_and_tokens_of_its_request(tmp_path):
+    """The benchmark reports the cost of each report, not only of the run."""
+    client = _client()
+    answer = client.chat.completions.create.side_effect
+
+    def with_usage(**kwargs) -> chat_completion.ChatCompletion:
+        usage = completion_usage.CompletionUsage(
+            prompt_tokens=1200, completion_tokens=80, total_tokens=1280
+        )
+        return answer(**kwargs).model_copy(update={"usage": usage})
+
+    client.chat.completions.create.side_effect = with_usage
+
+    _, (extraction,) = _run(
+        tmp_path, client, records.PageRecord("a.pdf", 1, "native", "Result: negative")
+    )
+
+    assert (extraction["prompt_tokens"], extraction["completion_tokens"]) == (1200, 80)
+    assert extraction["seconds"] >= 0
 
 
 def test_copied_value_that_the_pages_lack_is_named(tmp_path):

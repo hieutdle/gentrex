@@ -40,19 +40,24 @@ def _extract(
     Pages with an error from `gentrex transcribe` are left out and named in
     the record's error. A report without page text gets no request. The
     record names the copied values that aren't in the text of the pages sent,
-    and each variant gets the page that prints its DNA change.
+    and each variant gets the page that prints its DNA change. It also keeps
+    the time and the tokens of the request.
     """
     sent = [page for page in pages if page.text]
     errors = [
         f"page {page.page}: transcribe: {page.error}" for page in pages if page.error
     ]
-    data = not_in_pages = None
+    data = not_in_pages = seconds = None
+    tokens: tuple[int | None, int | None] = (None, None)
     if sent:
+        started = time.perf_counter()
         result = extractor.extract_or_error(sent)
+        seconds = round(time.perf_counter() - started, 2)
         if isinstance(result, Exception):
             errors.append(f"{type(result).__name__}: {result}")
         else:
-            data = result
+            data = result.data
+            tokens = (result.prompt_tokens, result.completion_tokens)
             _locate_variants(data, sent)
             not_in_pages = check.not_in_pages(
                 data, extractor.config.schema, [page.text for page in sent]
@@ -63,6 +68,9 @@ def _extract(
         data,
         error="; ".join(errors) or None,
         not_in_pages=not_in_pages,
+        seconds=seconds,
+        prompt_tokens=tokens[0],
+        completion_tokens=tokens[1],
     )
 
 

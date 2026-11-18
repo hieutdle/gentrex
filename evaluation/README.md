@@ -71,7 +71,8 @@ Muse Glimmer 30B, builds the two reports and stops vLLM. The first start
 downloads the model's weights, about 60 GB.
 
 Open `data/gentrex-bench/v1/pdf/native/SYN-0001.pdf`. It should read like a
-lab report, with a synthetic footer on every page. Then build the rest:
+lab report, with a synthetic footer on every page. Then build the rest. To
+build all reports right away, skip the two and run only this command:
 
 ```bash
 evaluation/local/generate_reports.sh
@@ -186,7 +187,8 @@ CASES="SYN-0001 SYN-0002" bsub < evaluation/minerva/generate_reports.lsf
 LSF passes `SERVING` and `CASES` to the job. Follow the job with `bjobs` and
 `tail -f generate-reports.*.log`. Each case logs `passed on attempt 1`, or
 why the attempt failed. Look at the two PDFs in
-`data/gentrex-bench/v1/pdf/native/`, and then build the rest:
+`data/gentrex-bench/v1/pdf/native/`, and then build the rest. To build all
+reports right away, skip the two and submit only this command:
 
 ```bash
 bsub < evaluation/minerva/generate_reports.lsf

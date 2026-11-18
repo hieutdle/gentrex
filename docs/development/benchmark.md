@@ -24,7 +24,7 @@ whether gentrex-bench does it yet.
 | TPC-H | Every published result comes with a [Full Disclosure Report](https://www.tpc.org/results/fdr/tpch/hpe~tpch~30000~hpe_proliant_compute_dl580_gen12~fdr~2026-06-11~v02.pdf) of the hardware, the settings and the price. | `manifest.json` records the settings and a checksum of each reference file. Each truth file records the model that wrote the report and the Chrome version. `scores.json` keeps the `run.yaml` of every command with the scores. | yes |
 | TPC-H | Its run rules forbid code that only exists to win the benchmark. | Nothing in Gentrex may react to what only synthetic reports have, such as their footer. | rule only |
 | [Artificial Analysis](https://artificialanalysis.ai/methodology/intelligence-benchmarking), for LLMs | It runs every model itself with the same test setup, repeats the tests whose scores vary, and gives 95% confidence intervals. | Every model goes through the same Gentrex commands on the same frozen test set, three times, with bootstrap confidence intervals. | the intervals |
-| Artificial Analysis | It shows each model's accuracy next to its speed and price. | A plot of report accuracy against GPU-hours per 1,000 reports, in `evaluation_results/analysis.ipynb`. | yes |
+| Artificial Analysis | It shows each model's accuracy next to its speed and price. | A table of report accuracy next to GPU-hours per 1,000 reports, in `evaluation_results/analysis.ipynb`. | yes |
 | [GIAB and GA4GH](https://pmc.ncbi.nlm.nih.gov/articles/PMC6699627), for variant calling | Every tool's variants are matched and counted the same way. A variant found with the wrong genotype counts apart from one not found. | The scorer matches variants by gene and DNA change first, and then scores zygosity, classification and the rest. | yes |
 | GIAB and GA4GH | Results are split by variant type and region. | Every case records its lab, test, result and challenge tags, so results can be split by each. Each tag is in 11 to 17 of the 200 test cases, and each template in 8 to 12. | yes |
 | GIAB and GA4GH | Only regions where the truth is certain are scored. | Where a real report is ambiguous, the annotators give both readings and either one counts. | no |
@@ -209,8 +209,13 @@ is extra.
 
 The scorer also gives the variant F1, with misses and extras split by cause,
 and the share of reports with both the MRN and the date of birth right,
-because a wrong MRN files the result under another patient. A table gives
-the accuracy of every field.
+because a wrong MRN files the result under another patient.
+
+Two numbers look at every value and not only the clinical ones. The value
+F1 counts each value that a report states and each value that a record
+holds, so a field that is rightly left empty doesn't raise it. The share of
+reports with every value right is the strictest number. A table gives the
+accuracy and the F1 of every field.
 
 ### Where errors come from
 
