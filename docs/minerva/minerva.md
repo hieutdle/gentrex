@@ -659,18 +659,26 @@ commands in order, and this section explains what the scripts do.
 
 ### Prepare in an interactive session
 
+Name your allocation and your serving folder once, on a login node. The
+commands of this section and the next read the two names, and `~/.bashrc`
+keeps them for later sessions:
+
+```bash
+export LSB_DEFAULTPROJECT=acc_xxx
+export SERVING=/path/to/serving
+```
+
 The downloads take a while, so do them in a session before the jobs, which
 then spend none of their GPU time on them. Start the session on a login node:
 
 ```bash
-bsub -P acc_xxx -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
+bsub -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
 ```
 
-In the session, go to the `gentrex` folder and run the script with the path
-of your serving folder:
+In the session, go to the `gentrex` folder and run the script:
 
 ```bash
-SERVING=/path/to/serving evaluation/minerva/prepare.sh
+evaluation/minerva/prepare.sh
 ```
 
 The script gets everything that the jobs of this section and the next need,
@@ -704,13 +712,12 @@ Build two cases first, and look at their PDFs before you build the rest:
 
 ```bash
 cd /path/to/gentrex
-SERVING=/path/to/serving CASES="SYN-0001 SYN-0002" \
-  bsub -P acc_xxx < evaluation/minerva/generate_reports.lsf
+CASES="SYN-0001 SYN-0002" bsub < evaluation/minerva/generate_reports.lsf
 ```
 
 LSF passes your environment to the job, so `SERVING` and `CASES` reach the
-script. `-P` charges the job to your allocation. The script has no `-P`
-line of its own, so you don't have to change it.
+script. The script has no `-P` line of its own, so `bsub` charges the job to
+the allocation in `LSB_DEFAULTPROJECT`.
 
 `generate_reports.lsf` works like the job script of
 [`gentrex transcribe`](#write-the-job-script), with these differences:
@@ -733,17 +740,15 @@ logs `passed on attempt 1`, or why the attempt failed. The PDFs go to
 [Check the result](../development/generate-benchmark-reports.md#check-the-result)
 lists what else the folder holds.
 
-Then submit without `CASES` and with more time. `-W` on the command line
-replaces the hour that the script asks for:
+Then submit without `CASES`:
 
 ```bash
-SERVING=/path/to/serving bsub -P acc_xxx -W 8:00 < evaluation/minerva/generate_reports.lsf
+bsub < evaluation/minerva/generate_reports.lsf
 ```
 
-A case that already has a truth file is skipped. If the job ends in
-`TERM_RUNLIMIT`, submit it again and it goes on where it stopped. The log of
-the two test cases shows how long a case takes. The full build writes several
-cases at once, so it needs less time per case than the test did.
+The hour that the script asks for is enough for the 300 reports. A case
+that already has a truth file is skipped. If the job ends in
+`TERM_RUNLIMIT`, submit it again and it goes on where it stopped.
 
 ### When the job fails
 
@@ -771,7 +776,7 @@ benchmark version in `data/gentrex-bench/`, from
 
 ```bash
 cd /path/to/gentrex
-SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
+bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 The `#BSUB` lines of `run_pipeline.lsf` ask for what
@@ -799,8 +804,7 @@ and `SPLIT` the split. The test set has twice as many reports, so give its
 job more time:
 
 ```bash
-SERVING=/path/to/serving SPLIT=test \
-  bsub -P acc_xxx -W 10:00 < evaluation/minerva/run_pipeline.lsf
+SPLIT=test bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf
 ```
 
 `OPTIONS` passes more options to every run of `run.py`

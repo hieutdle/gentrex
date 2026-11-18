@@ -15,11 +15,9 @@ interactive session and two as batch jobs. The reports hold no patient data.
 You need:
 
 - A Minerva account and an allocation. Allocation names start with `acc_`,
-  and `mybalance` on a login node lists yours. The commands below write it
-  as `acc_xxx`.
+  and `mybalance` on a login node lists yours.
 - A serving folder with about 215 GB free, for vLLM and four models. Pick a
-  folder in your work directory. The commands below write it as
-  `/path/to/serving`.
+  folder in your work directory.
 - About 2 GB more for the reference files and the reports, in the Gentrex
   folder.
 - A [Hugging Face](https://huggingface.co) account that has accepted
@@ -29,6 +27,18 @@ You need:
 
 If you're off campus, connect to the Mount Sinai VPN. Then log in to a
 Minerva login node with `ssh`.
+
+Name your allocation and your serving folder once, in place of `acc_xxx`
+and `/path/to/serving`. Every command of this page reads the two names:
+
+```bash
+export LSB_DEFAULTPROJECT=acc_xxx
+export SERVING=/path/to/serving
+```
+
+`bsub` charges a job to `LSB_DEFAULTPROJECT` when the command has no `-P`.
+The names last until you log out. Add the two lines to `~/.bashrc` to have
+them in every session.
 
 ## Step 1: Install Gentrex
 
@@ -51,16 +61,16 @@ jobs then spend none of their time on them. Start the session on a login
 node:
 
 ```bash
-bsub -P acc_xxx -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
+bsub -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
 ```
 
 In the session, log in to Hugging Face, go to the Gentrex folder and run the
-script with the path of your serving folder:
+script:
 
 ```bash
 uvx --from huggingface_hub hf auth login
 cd /path/to/gentrex
-SERVING=/path/to/serving evaluation/minerva/prepare.sh
+evaluation/minerva/prepare.sh
 ```
 
 The script gets these, and keeps what is already there:
@@ -90,8 +100,7 @@ node. Build two reports first:
 
 ```bash
 cd /path/to/gentrex
-SERVING=/path/to/serving CASES="SYN-0001 SYN-0002" \
-  bsub -P acc_xxx < evaluation/minerva/generate_reports.lsf
+CASES="SYN-0001 SYN-0002" bsub < evaluation/minerva/generate_reports.lsf
 ```
 
 The job asks for one H100 GPU and one hour. It serves the writing model, has
@@ -117,13 +126,12 @@ on. Copy them to your own computer with `scp` to open them.
 ## Step 4: Generate the rest
 
 ```bash
-SERVING=/path/to/serving bsub -P acc_xxx -W 8:00 < evaluation/minerva/generate_reports.lsf
+bsub < evaluation/minerva/generate_reports.lsf
 ```
 
-`-W 8:00` on the command line replaces the hour that the script asks for.
-Without `CASES`, the job builds every case that has no truth file yet. So if
-the job ends in `TERM_RUNLIMIT`, submit it again and it goes on where it
-stopped.
+The hour that the job asks for is enough for the 300 reports. Without
+`CASES`, the job builds every case that has no truth file yet. So if the job
+ends in `TERM_RUNLIMIT`, submit it again and it goes on where it stopped.
 
 The log ends with a count:
 
@@ -151,7 +159,7 @@ every run, and scores compare only on the same reports.
 ## Step 5: Run Gentrex on the dev reports
 
 ```bash
-SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
+bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 The job asks for two H100 GPUs and six hours. This one job makes every run
@@ -182,8 +190,7 @@ copies to read once more without `gentrex select`. This makes only the first
 run:
 
 ```bash
-SERVING=/path/to/serving COPIES=native NO_SELECT= \
-  bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
+COPIES=native NO_SELECT= bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 ## Step 6: Run Gentrex on the test reports
@@ -193,8 +200,7 @@ only for the numbers that you report. `SPLIT` names the split, and the job
 makes the same six runs:
 
 ```bash
-SERVING=/path/to/serving SPLIT=test \
-  bsub -P acc_xxx -W 10:00 < evaluation/minerva/run_pipeline.lsf
+SPLIT=test bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf
 ```
 
 To show how much runs differ, submit the same job three times, each after
@@ -238,8 +244,7 @@ All of this is synthetic. Results of real reports must stay on Minerva.
 leave the clinical features without HPO terms:
 
 ```bash
-SERVING=/path/to/serving OPTIONS=--no-hpo \
-  bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
+OPTIONS=--no-hpo bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 To change a setting of Gentrex, add it to `evaluation/settings.yaml`, which
@@ -295,6 +300,7 @@ Both jobs take their settings from environment variables:
 | Variable | Default | Read by | What it sets |
 | --- | --- | --- | --- |
 | `SERVING` | none | all three scripts | The serving folder |
+| `LSB_DEFAULTPROJECT` | none | `bsub` | The allocation that a job is charged to |
 | `VERSION` | `v1` | all three scripts | The benchmark version, a folder under `data/gentrex-bench/` |
 | `CASES` | all without a truth file | `generate_reports.lsf` | The cases to build |
 | `COPIES` | all five | `run_pipeline.lsf` | The copies to read, of `native`, `scan`, `fax`, `mixed` and `image` |
@@ -303,8 +309,9 @@ Both jobs take their settings from environment variables:
 | `OPTIONS` | none | `run_pipeline.lsf` | More options of `run.py`, for every run |
 
 Options of `bsub` on the command line replace the `#BSUB` lines of a job
-script, as `-W 8:00` does above. The scripts have no `-P` line, so you don't
-have to edit them.
+script, as `-W 10:00` does above. The scripts have no `-P` line, so `bsub`
+takes the allocation from `LSB_DEFAULTPROJECT`, or from `-P acc_xxx` on the
+command line.
 
 The GPU-hours in the scores count one GPU for the models of
 `gentrex transcribe` and `gentrex select` and two for the model of
@@ -315,7 +322,8 @@ its model, which `scores.json` gives as `server_start_seconds`.
 
 | Problem | What to do |
 | --- | --- |
-| `set SERVING to the serving folder` | Put `SERVING=/path/to/serving` before the command. |
+| `set SERVING to the serving folder` | Run `export SERVING=/path/to/serving` again. A new login has lost it, unless the line is in `~/.bashrc`. |
+| `bsub` asks for a project or an allocation | Run `export LSB_DEFAULTPROJECT=acc_xxx` again, or add `-P acc_xxx` after `bsub`. |
 | `submit the job from the gentrex folder` | Run `cd /path/to/gentrex` before `bsub`. |
 | `module: command not found` in `prepare.sh` | Run `module load apptainer` and start the script again. |
 | Hugging Face refuses a download | Accept Google's terms on the model's page, run `uvx --from huggingface_hub hf auth login` and start `prepare.sh` again. |

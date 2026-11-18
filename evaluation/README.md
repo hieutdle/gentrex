@@ -140,18 +140,26 @@ on one page, from the installation to the scores.
 
 ### Step 1: Prepare
 
+Name your allocation and your serving folder once, on a login node. The
+commands below read the two names, and `~/.bashrc` keeps them for later
+sessions:
+
+```bash
+export LSB_DEFAULTPROJECT=acc_xxx
+export SERVING=/path/to/serving
+```
+
 Download everything first, in an interactive session, so that the GPU jobs
 spend none of their time on downloads. Start a session on a login node:
 
 ```bash
-bsub -P acc_xxx -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
+bsub -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
 ```
 
-`-P` names your allocation. In the session, go to the Gentrex folder and run
-the script with the path of your serving folder:
+In the session, go to the Gentrex folder and run the script:
 
 ```bash
-SERVING=/path/to/serving evaluation/minerva/prepare.sh
+evaluation/minerva/prepare.sh
 ```
 
 It installs the packages of `gentrex normalize`, downloads the reference
@@ -172,27 +180,26 @@ first:
 
 ```bash
 cd /path/to/gentrex
-SERVING=/path/to/serving CASES="SYN-0001 SYN-0002" \
-  bsub -P acc_xxx < evaluation/minerva/generate_reports.lsf
+CASES="SYN-0001 SYN-0002" bsub < evaluation/minerva/generate_reports.lsf
 ```
 
 LSF passes `SERVING` and `CASES` to the job. Follow the job with `bjobs` and
 `tail -f generate-reports.*.log`. Each case logs `passed on attempt 1`, or
 why the attempt failed. Look at the two PDFs in
-`data/gentrex-bench/v1/pdf/native/`, and then build the rest with more time:
+`data/gentrex-bench/v1/pdf/native/`, and then build the rest:
 
 ```bash
-SERVING=/path/to/serving bsub -P acc_xxx -W 8:00 < evaluation/minerva/generate_reports.lsf
+bsub < evaluation/minerva/generate_reports.lsf
 ```
 
-`-W 8:00` on the command line replaces the hour that the script asks for. A
-case that already has a truth file is skipped, so a job that ends in
-`TERM_RUNLIMIT` can be submitted again and goes on where it stopped.
+The hour that the job asks for is enough for the 300 reports. A case that
+already has a truth file is skipped, so a job that ends in `TERM_RUNLIMIT`
+can be submitted again and goes on where it stopped.
 
 ### Step 3: Run the pipeline
 
 ```bash
-SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
+bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 The job makes the same six runs of the dev reports as the script on your
@@ -205,8 +212,7 @@ report accuracy and the folder with its scores.
 twice as many reports, so give its job more time:
 
 ```bash
-SERVING=/path/to/serving SPLIT=test \
-  bsub -P acc_xxx -W 10:00 < evaluation/minerva/run_pipeline.lsf
+SPLIT=test bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf
 ```
 
 `OPTIONS` passes options to every run of `gentrex-bench/run.py`, as in
@@ -283,7 +289,7 @@ The scripts read these environment variables:
 | `PORT` | `8000` | `local/generate_reports.sh` | The port of the vLLM that the script starts |
 
 On Minerva, options of `bsub` on the command line replace the `#BSUB` lines
-of a job script, as `-W 8:00` does above.
+of a job script, as `-W 10:00` does above.
 
 The two `serve.sh` scripts hold vLLM's options for each model, which are
 those of the commands' own pages. They give the model of `gentrex extract`
@@ -304,7 +310,7 @@ again, because the jobs serve only the models in the serving folder.
 
 | Problem | What to do |
 | --- | --- |
-| `set SERVING to the serving folder` | Put `SERVING=/path/to/serving` before the command, as in the steps above. |
+| `set SERVING to the serving folder` | Run `export SERVING=/path/to/serving` again, as in step 1. |
 | `submit the job from the gentrex folder` | Run `cd /path/to/gentrex` before `bsub`. |
 | `vLLM stopped; see above` or `serve.sh ended before ... was ready` | vLLM couldn't start. Its own messages are right above this line. Often the model doesn't fit on the GPU, or its download is incomplete. |
 | `serve.sh has no options for ...` | A settings file names a model that `serve.sh` doesn't know. Add a line for it. |
