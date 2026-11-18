@@ -76,13 +76,21 @@ def _line_by_line(parts: list[str], page: str) -> bool:
     """Whether the parts of a value run across the page's lines in order.
 
     pdfplumber reads a wrapped table cell line by line across the whole row,
-    so a cell's later lines come after text from the neighbouring cells.
+    so a cell's later lines come after text from the neighbouring cells. A
+    line can hold two parts with such text between them, because page_lines
+    joins the line after a hyphen to it.
     """
     i = 0
     for line in page.split("\n"):
-        for j in range(len(parts), i, -1):
-            if "".join(parts[i:j]).strip() in line:
-                i = j
+        start = 0
+        while i < len(parts):
+            for j in range(len(parts), i, -1):
+                at = line.find("".join(parts[i:j]).strip(), start)
+                if at >= 0:
+                    start = at + len("".join(parts[i:j]).strip())
+                    i = j
+                    break
+            else:
                 break
         if i == len(parts):
             return True

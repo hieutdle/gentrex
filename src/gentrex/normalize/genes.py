@@ -74,7 +74,7 @@ class HgncIndex:
             return _result(None, "missing")
         if key in self._approved:
             return _result(self._approved[key], "approved")
-        matches = self._aliases.get(key, set()) | self._previous.get(key, set())
+        matches = self._matches(key)
         if len(matches) != 1:
             return _result(None, "ambiguous" if matches else "unmapped")
         if key in self._aliases and key in self._previous:
@@ -82,6 +82,19 @@ class HgncIndex:
         else:
             status = "alias" if key in self._aliases else "previous"
         return _result(next(iter(matches)), status)
+
+    def candidates(self, raw_symbol: str | None) -> list[dict[str, str | None]]:
+        """Returns the genes that an ambiguous symbol can stand for.
+
+        Each has the `gene_status` clinvar, for the caller that finds the
+        report's variant in ClinVar under one of them only.
+        """
+        matches = self._matches((raw_symbol or "").strip().upper())
+        ordered = sorted(matches, key=lambda gene: gene.symbol)
+        return [_result(gene, "clinvar") for gene in ordered]
+
+    def _matches(self, key: str) -> set[_Gene]:
+        return self._aliases.get(key, set()) | self._previous.get(key, set())
 
 
 def _result(gene: _Gene | None, status: str) -> dict[str, str | None]:

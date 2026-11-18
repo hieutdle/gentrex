@@ -75,6 +75,31 @@ The first release.
   `gentrex normalize` on ClinVar's condition names.
 - The scores of a benchmark run with `--serve` record how long each model
   server took to start.
+- `gentrex select` asks a third question, `has_dates`, which keeps a page
+  that lists the dates of the specimen and the report.
+- `not_in_pages` no longer names a value that wraps in a table cell or a
+  column of the page.
+- With ClinVar's file, `gentrex normalize` settles a symbol of several
+  genes, such as MLL2, by the gene that has the variant in ClinVar
+  (`gene_status` is then `clinvar`).
+- `gentrex normalize` reads dates with periods, such as 08.27.2026, by the
+  rule for dates with slashes. The month comes first unless
+  `normalize.day_first` is set.
+- The extraction schema says more exactly what goes in `mrn`,
+  `submitter_patient_id`, `lab_accession_number`, `report_date`,
+  `genome_build` and `variants`, and when `classification_raw`,
+  `zygosity_raw`, `variant_type_raw`, `dna_change_raw` and
+  `chromosomal_position` stay empty. A karyotype finding, a normal result
+  and a methylation pattern are no variants.
+- The benchmark's scorer accepts a test name with or without its subtitle,
+  `is_secondary_finding` as `false` where a report labels no finding, and a
+  clinical feature that the reason for testing names.
+- The benchmark's reports print a date with periods month first, as
+  12.25.2026, and the trio table of one template keeps a protein change on
+  one line.
+- A carrier test of one gene is a `single_gene` test in the benchmark's
+  truth. `generate.py recheck` renews the truth files of reports that are
+  already built.
 
 HL7®, FHIR® and the FHIR [FLAME DESIGN] are the registered trademarks of
 Health Level Seven International and their use does not constitute

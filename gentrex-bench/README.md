@@ -20,7 +20,7 @@ It has these parts:
 
 The scripts in [`evaluation/`](../evaluation/README.md) run the generator
 and `run.py` with one command each, on your own machine or on Minerva, and
-[`evaluation_results/pipeline.ipynb`](../evaluation_results/pipeline.ipynb)
+[`evaluation_results/analysis.ipynb`](../evaluation_results/analysis.ipynb)
 shows the scores of all runs as tables and plots.
 
 ## What the synthetic reports test

@@ -109,8 +109,10 @@ def _reference_files(folder: pathlib.Path, truths: dict[str, dict]) -> dict:
 def _is_challenge(error: dict, truth: dict) -> bool:
     """Whether the truth's own record can't get the value right, by design.
 
-    gentrex normalize doesn't read every date of the unusual_date_format tag,
-    and a result cell that says "See Note" names no category.
+    The karyotype example prints dates such as 7.12.2024 with the day first,
+    as the unusual_date_format tag once did. gentrex normalize reads them
+    month first, as US laboratories print them. A result cell that says
+    "See Note" names no category.
     """
     field = error["field"].removeprefix("normalized.")
     if field == "overall_result":

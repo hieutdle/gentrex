@@ -33,7 +33,7 @@
     "collection_date": "23 March 2020",
     "received_date": "28 March 2020",
     "test_name": "Cystic Fibrosis Carrier Test",
-    "test_type": "panel",
+    "test_type": "single_gene",
     "test_started_date": null,
     "report_date": "23 April 2020",
     "overall_result_raw": "Carrier of cystic fibrosis",

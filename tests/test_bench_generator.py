@@ -1,6 +1,7 @@
 """Tests of the synthetic report generator in gentrex-bench/generator/."""
 
 import collections
+import datetime
 import gzip
 import html
 import os
@@ -27,6 +28,7 @@ import sources  # noqa: E402
 import write  # noqa: E402
 
 from gentrex import config  # noqa: E402
+from gentrex.normalize import rules  # noqa: E402
 from gentrex.transcribe import native  # noqa: E402
 
 _MODES = {
@@ -511,6 +513,60 @@ def test_error_in_one_report_does_not_end_the_build(monkeypatch):
     assert not generate._build_one(case, None, {"attempts": 2}, None, "", "")  # pyright: ignore[reportArgumentType]
 
 
+def test_recheck_renews_the_truth_of_reports_that_print_their_new_case(
+    tmp_path, monkeypatch
+):
+    """A fix to the sampler reaches the truth without printing a report again."""
+
+    def case(name, test_type):
+        return {"case_id": name, "record": {"test_type": test_type}}
+
+    def truth(name, test_type):
+        scans = {"mixed_scanned_pages": [2], "image_document_code": "RPT-1"}
+        return {
+            "canary": fill.CANARY,
+            "case": {"case_id": name, "writer": {"attempt": 1}} | scans,
+            "record": {"test_type": test_type},
+        }
+
+    def checked(new, pdf_path, writer):
+        if new["case_id"] == "SYN-0002":
+            return check.Result(["'c.1A>G' is not in the PDF text"], [], None)
+        renewed = {"case": {"case_id": new["case_id"], "writer": writer}}
+        return check.Result([], [], renewed | {"record": new["record"]})
+
+    for name in ("SYN-0001", "SYN-0002"):
+        generate._write_json(tmp_path / "v1" / "cases" / f"{name}.json", {})
+        generate._write_json(
+            tmp_path / "v1" / "truth" / f"{name}.json", truth(name, "panel")
+        )
+    cases = [case(f"SYN-000{n}", "single_gene") for n in (1, 2, 3)]
+    monkeypatch.setattr(generate, "_sampled", lambda settings: (cases, {}))
+    monkeypatch.setattr(check, "check", checked)
+    args = generate.argparse.Namespace(out=tmp_path, version="v1")
+
+    assert generate._recheck(args, {}) == 1
+
+    def read(folder, name):
+        return generate.json.loads((tmp_path / "v1" / folder / name).read_text())
+
+    assert read("truth", "SYN-0001.json") == truth("SYN-0001", "single_gene")
+    assert read("cases", "SYN-0001.json")["record"] == {"test_type": "single_gene"}
+    # The report that doesn't print its new case keeps its case and truth.
+    assert read("truth", "SYN-0002.json") == truth("SYN-0002", "panel")
+    assert read("cases", "SYN-0002.json") == {}
+    # A case without a report yet is built from the new case.
+    assert read("cases", "SYN-0003.json")["record"] == {"test_type": "single_gene"}
+
+
+def test_a_carrier_test_of_one_gene_is_a_single_gene_test(refs):
+    """A cystic fibrosis carrier test sequences CFTR alone, so it is no panel."""
+    one_gene = {lab.key for lab in labs.LABS if len(lab.carrier_genes or ()) == 1}
+    carrier = [c for c in sample.sample(refs, "seed", 60, 60) if c["kind"] == "carrier"]
+    kinds = {(c["lab"] in one_gene, c["record"]["test_type"]) for c in carrier}
+    assert kinds == {(True, "single_gene"), (False, "panel")}
+
+
 def test_image_copy_goes_to_ocr():
     """The image copy's only text, a document code, is longer than
     transcribe.native_min_chars, so only its full-page image sends it to OCR."""
@@ -561,11 +617,25 @@ def test_locate_finds_whole_values_and_wrapped_cells():
         check.page_lines("Sex: Female\nTest: Whole-\nexome sequencing"),
         check.page_lines("Peripheral blood, Other cell\nEDTA text"),
         check.page_lines("c.1A>G limb- HET\ngirdle dystrophy AR"),
+        # The cell wraps after the hyphen, before the next cell's line.
+        check.page_lines("inherited in an x-\n(p.Lys461Asn). linked recessive manner"),
     ]
     assert check.locate("Male", pages) == ([], [])
     assert check.locate("Whole-exome sequencing", pages) == ([1], [])
     assert check.locate("Peripheral blood, EDTA", pages) == ([], [2])
     assert check.locate("limb-girdle dystrophy", pages) == ([], [3])
+    assert check.locate("x-linked recessive", pages) == ([], [4])
+    assert check.locate("x-linked dominant", pages) == ([], [])
+
+
+@pytest.mark.parametrize(
+    "day", [datetime.date(1987, 3, 4), datetime.date(2024, 12, 25)]
+)
+def test_gentrex_reads_every_date_format_of_the_reports(day):
+    """The reports are for US laboratories, so no format has the day first
+    where a month could stand."""
+    for name, printed in labs.date_formats().items():
+        assert rules.parse_date(printed(day)) == day.isoformat(), name
 
 
 def test_scan_is_reproducible():

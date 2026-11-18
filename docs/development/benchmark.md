@@ -24,7 +24,7 @@ whether gentrex-bench does it yet.
 | TPC-H | Every published result comes with a [Full Disclosure Report](https://www.tpc.org/results/fdr/tpch/hpe~tpch~30000~hpe_proliant_compute_dl580_gen12~fdr~2026-06-11~v02.pdf) of the hardware, the settings and the price. | `manifest.json` records the settings and a checksum of each reference file. Each truth file records the model that wrote the report and the Chrome version. `scores.json` keeps the `run.yaml` of every command with the scores. | yes |
 | TPC-H | Its run rules forbid code that only exists to win the benchmark. | Nothing in Gentrex may react to what only synthetic reports have, such as their footer. | rule only |
 | [Artificial Analysis](https://artificialanalysis.ai/methodology/intelligence-benchmarking), for LLMs | It runs every model itself with the same test setup, repeats the tests whose scores vary, and gives 95% confidence intervals. | Every model goes through the same Gentrex commands on the same frozen test set, three times, with bootstrap confidence intervals. | the intervals |
-| Artificial Analysis | It shows each model's accuracy next to its speed and price. | A plot of report accuracy against GPU-hours per 1,000 reports, in `evaluation_results/pipeline.ipynb`. | yes |
+| Artificial Analysis | It shows each model's accuracy next to its speed and price. | A plot of report accuracy against GPU-hours per 1,000 reports, in `evaluation_results/analysis.ipynb`. | yes |
 | [GIAB and GA4GH](https://pmc.ncbi.nlm.nih.gov/articles/PMC6699627), for variant calling | Every tool's variants are matched and counted the same way. A variant found with the wrong genotype counts apart from one not found. | The scorer matches variants by gene and DNA change first, and then scores zygosity, classification and the rest. | yes |
 | GIAB and GA4GH | Results are split by variant type and region. | Every case records its lab, test, result and challenge tags, so results can be split by each. Each tag is in 11 to 17 of the 200 test cases, and each template in 8 to 12. | yes |
 | GIAB and GA4GH | Only regions where the truth is certain are scored. | Where a real report is ambiguous, the annotators give both readings and either one counts. | no |
@@ -175,6 +175,21 @@ and trailing punctuation, and accepts HGVS written another way, such as
 table of fields also gives the share of strict matches. Fields with a fixed
 list of values compare the category. `overall_result_raw` is compared through its category, because
 there's no single right place for the copied text to end.
+
+Three more values count as correct:
+
+- A `test_name` that holds the true name, or that is its start, if the
+  shorter of the two has at least 10 characters. A report prints
+  `NoonanScan` in a table and `NoonanScan: Analyses of 11 Genes` as a
+  heading, and both name the test.
+- `is_secondary_finding` as `false` where the truth is `null`. A report that
+  labels no finding as primary or secondary gives nothing to tell the two
+  apart.
+- A clinical feature that the true `clinical_indication` names, such as
+  `Short stature` from `Short stature and congenital heart disease`. The
+  schema sends the patient's features to `patient_phenotypes`, so the
+  feature isn't counted as extra. It isn't counted as found either, because
+  the truth doesn't list it.
 
 Variants are matched one to one by gene and DNA change, and each matched pair
 is then scored on its other fields. A variant with a wrong DNA change

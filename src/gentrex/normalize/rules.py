@@ -14,10 +14,10 @@ _DATE_FORMATS = (
     "%b %d %Y",
     "%Y/%m/%d",
 )
-# A date of numbers with slashes or dashes fits one of these. Where both fit,
-# as for 03/04/2020, the setting normalize.day_first decides.
-_MONTH_FIRST = ("%m/%d/%Y", "%m-%d-%Y")
-_DAY_FIRST = ("%d/%m/%Y", "%d-%m-%Y")
+# A date of numbers with slashes, dashes or periods fits one of these. Where
+# both fit, as for 03/04/2020, the setting normalize.day_first decides.
+_MONTH_FIRST = ("%m/%d/%Y", "%m-%d-%Y", "%m.%d.%Y")
+_DAY_FIRST = ("%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y")
 # A time of day after the date, as in "29-Jul-25 08:27" or "10:15 AM EST".
 _TIME = re.compile(
     r",?[ T]\s*\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]m)?(?:\s*[a-z]{1,4})?$",
@@ -80,7 +80,7 @@ def parse_date(raw: str | None, day_first: bool = False) -> str | None:
 
     Args:
         raw: The date as printed.
-        day_first: Whether a date with slashes that can be read both ways,
+        day_first: Whether a date of numbers that can be read both ways,
             as 03/04/2020, has the day first.
     """
     text = _TIME.sub("", (raw or "").strip())

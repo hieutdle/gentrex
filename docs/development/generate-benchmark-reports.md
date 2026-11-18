@@ -221,6 +221,30 @@ The scanned and faxed copies have no text and carry none.
 [Run the benchmark](run-benchmark.md) shows how to run Gentrex on the
 reports and score its records against the truth files.
 
+## Renew the truth after a fix
+
+A fix to the sampler can change what is true about a report without
+changing what the report prints. The kind of test is an example, because no
+report prints it. `recheck` brings such a fix to the reports that are
+already built:
+
+```bash
+uv run python gentrex-bench/generator/generate.py --version v1 recheck
+```
+
+It samples the cases again, so it needs the reference files of step 1 and
+no model server. For each report it checks the native PDF against the new
+case, as `build` does, and writes the case and the truth file again. The
+PDFs stay as they are. The last line counts the truth files that changed:
+
+```text
+2026-11-18 09:31:07,412 renewed the truth of 13 reports; reports that don't print their new case: none
+```
+
+A report that doesn't print a value of its new case is named in that line
+and keeps its old case and truth. Then the fix changed the report's text,
+and the report has to be built again. Delete its truth file and run `build`.
+
 ## Settings
 
 The settings are in `gentrex-bench/generator/settings.yaml`, with a comment

@@ -178,6 +178,68 @@ def test_other_spellings_match_but_are_not_exact():
     assert not by_field["specimen_type"].strict
 
 
+def test_a_finding_not_flagged_as_secondary_is_false_or_empty():
+    """A report that labels no finding as primary leaves nothing to tell apart."""
+    truth = _truth()
+    truth["record"]["variants"][0]["is_secondary_finding"] = None
+    report = _report(truth)
+    report["data"]["variants"][0]["is_secondary_finding"] = False
+
+    outcomes = compare.compare(truth, report, _PAGES, _PAGES, config.load_schema())
+
+    assert {o.result for o in outcomes} == {"correct"}
+    report["data"]["variants"][0]["is_secondary_finding"] = True
+    outcomes = compare.compare(truth, report, _PAGES, _PAGES, config.load_schema())
+    wrong = {o.field: o.result for o in outcomes if o.result != "correct"}
+    assert wrong == {"variants.is_secondary_finding": "wrong"}
+
+
+@pytest.mark.parametrize(
+    ("found", "result"),
+    [
+        ("NoonanScan: Analyses of 11 Genes", "correct"),
+        ("DMD Gene Sequencing and Deletion/Duplication", "wrong"),
+        ("NoonanScan", "correct"),
+        ("Noonan", "wrong"),
+        ("Analyses of 11 Genes", "wrong"),
+    ],
+)
+def test_a_test_name_cut_at_another_place_is_the_same_name(found, result):
+    """A heading prints the name with a subtitle, and a table without one."""
+    truth = _truth()
+    truth["record"]["test_name"] = "NoonanScan: Analyses"
+    report = _report(truth)
+    report["data"]["test_name"] = found
+
+    outcomes = compare.compare(truth, report, _PAGES, _PAGES, config.load_schema())
+
+    by_field = {o.field: o.result for o in outcomes}
+    assert by_field["test_name"] == result
+
+
+def test_a_feature_from_the_reason_for_testing_is_no_extra_feature():
+    """The schema sends a feature named as the indication to the features."""
+    truth = _truth()
+    truth["record"]["clinical_indication"] = "Short stature and seizures"
+    report = _report(truth)
+    report["data"]["patient_phenotypes"] += [
+        {"text": "short stature", "present": True},
+        {"text": "Ataxia", "present": True},
+    ]
+    report["normalized"]["patient_phenotypes"] += [
+        {"hpo_id": "HP:0004322"},
+        {"hpo_id": "HP:0001251"},
+    ]
+
+    outcomes = compare.compare(truth, report, _PAGES, _PAGES, config.load_schema())
+
+    extra = [(o.field, o.found) for o in outcomes if o.result == "extra"]
+    assert extra == [
+        ("patient_phenotypes", "Ataxia"),
+        ("normalized.patient_phenotypes", "HP:0001251"),
+    ]
+
+
 def test_a_reference_before_an_m_change_matches():
     """The schema's own example writes an m. change after its reference."""
     assert compare.key("dna_change_raw", "NC_012920.1:m.3243A>G") == compare.key(

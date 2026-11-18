@@ -44,11 +44,11 @@ DATE_FORMATS: dict[str, Callable[[datetime.date], str]] = {
     "dd-mon-yy hh:mm": lambda d: f"{d.strftime('%d-%b-%y')} {_clock(d)}",
 }
 
-# Formats for the unusual_date_format tag, which `gentrex normalize` doesn't
-# read, so the truth's ISO dates test whether it says so.
+# Formats for the unusual_date_format tag, which few laboratories print. All
+# have the month before the day, as US laboratories print dates.
 UNUSUAL_DATE_FORMATS: dict[str, Callable[[datetime.date], str]] = {
     "yyyy/mm/dd": lambda d: d.strftime("%Y/%m/%d"),
-    "d.m.yyyy": lambda d: f"{d.day}.{d.month}.{d.year}",
+    "m.d.yyyy": lambda d: f"{d.month}.{d.day}.{d.year}",
     "mon d yyyy": lambda d: f"{d.strftime('%b')} {d.day} {d.year}",
 }
 

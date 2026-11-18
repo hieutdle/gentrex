@@ -37,6 +37,8 @@ h2.rule { border-bottom: 1px solid #428bca; padding-bottom: 2pt; }
 table.grid { width: 100%; margin: 4pt 0 8pt; }
 table.grid th { color: #428bca; text-align: left; font-weight: normal; vertical-align: bottom; padding: 3pt 4pt; border: 1px solid #ccc; }
 table.grid td { vertical-align: top; padding: 3pt 4pt; border: 1px solid #ccc; color: #000; }
+/* A protein change that wraps after "p." is no longer one value in the text. */
+.nb { white-space: nowrap; }
 ul { padding-left: 14pt; margin: 4pt 0; }
 li { margin-bottom: 4pt; }
 .notes { font-size: 7pt; }
@@ -103,7 +105,7 @@ li { margin-bottom: 4pt; }
 <table class="grid">
   <thead><tr><th>Gene<br>(RefSeq ID)</th><th>Characterized/<br>Uncharacterized Gene</th><th>Relevant Associated Syndrome</th><th>Mode of<br>Inheritance</th><th>Genotype</th><th>Variant</th><th>Variant<br>Classification</th></tr></thead>
   {% for v in primary %}
-  <tr{% if v.split %} class="split"{% endif %}><td><i>{{ v.gene_symbol }}</i><br>({{ v.transcript }})</td><td>Characterized</td><td>{{ v.associated_phenotype }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.zygosity_raw }}{% if v.parental_origin_raw %},<br><i>{{ v.parental_origin_raw }}</i>{% endif %}</td><td>{{ v.change }}{% if v.hgvs_p %}<br>({{ v.hgvs_p }}){% endif %}</td><td>{{ v.classification_raw }}</td></tr>
+  <tr{% if v.split %} class="split"{% endif %}><td><i>{{ v.gene_symbol }}</i><br>({{ v.transcript }})</td><td>Characterized</td><td>{{ v.associated_phenotype }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.zygosity_raw }}{% if v.parental_origin_raw %},<br><i>{{ v.parental_origin_raw }}</i>{% endif %}</td><td>{{ v.change }}{% if v.hgvs_p %}<br><span class="nb">({{ v.hgvs_p }})</span>{% endif %}</td><td>{{ v.classification_raw }}</td></tr>
   {% endfor %}
 </table>
 {% else %}
@@ -115,7 +117,7 @@ li { margin-bottom: 4pt; }
 <table class="grid">
   <thead><tr><th>Gene<br>(RefSeq ID)</th><th>Relevant Associated Syndrome</th><th>Mode of<br>Inheritance</th><th>Genotype</th><th>Variant</th><th>Variant<br>Classification</th></tr></thead>
   {% for v in secondary %}
-  <tr><td><i>{{ v.gene_symbol }}</i><br>({{ v.transcript }})</td><td>{{ v.associated_phenotype }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.change }}{% if v.hgvs_p %}<br>({{ v.hgvs_p }}){% endif %}</td><td>{{ v.classification_raw }}</td></tr>
+  <tr><td><i>{{ v.gene_symbol }}</i><br>({{ v.transcript }})</td><td>{{ v.associated_phenotype }}</td><td>{{ v.mode_of_inheritance_raw }}</td><td>{{ v.zygosity_raw }}</td><td>{{ v.change }}{% if v.hgvs_p %}<br><span class="nb">({{ v.hgvs_p }})</span>{% endif %}</td><td>{{ v.classification_raw }}</td></tr>
   {% endfor %}
 </table>
 {% endif %}

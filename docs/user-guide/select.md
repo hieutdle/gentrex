@@ -6,12 +6,15 @@ to read. The command scores every page from `gentrex transcribe` and writes the
 scores, with a copy of the kept pages, to `results/select/`.
 
 The scores come from yes/no questions that a language model, Gemma 4 26B-A4B,
-answers about each page. By default there are two:
+answers about each page. By default there are three:
 
 - `has_result` asks whether the page states the patient's test result or lists
   the variants found in the patient.
 - `has_phenotype` asks whether the page describes the patient's own symptoms,
   clinical features or reason for testing.
+- `has_dates` asks whether the page lists when the specimen was collected or
+  received, or when the result was reported. Some reports list these dates
+  only in a table at the end, on a page without the result.
 
 A page is kept when, for at least one question, the model answers yes with a
 probability of 0.5 or more. [How it works](#how-it-works) explains where the
@@ -130,8 +133,8 @@ The run folder has four files:
 `decisions.jsonl` has one line per page, in input order, each a JSON object:
 
 ```json
-{"file": "report-01.pdf", "page": 1, "p_yes": {"has_result": 0.98, "has_phenotype": 0.93}, "keep": true, "error": null}
-{"file": "report-01.pdf", "page": 5, "p_yes": {"has_result": 0.02, "has_phenotype": 0.01}, "keep": false, "error": null}
+{"file": "report-01.pdf", "page": 1, "p_yes": {"has_result": 0.98, "has_phenotype": 0.93, "has_dates": 0.97}, "keep": true, "error": null}
+{"file": "report-01.pdf", "page": 5, "p_yes": {"has_result": 0.02, "has_phenotype": 0.01, "has_dates": 0.00}, "keep": false, "error": null}
 ```
 
 | Field | Meaning |
@@ -245,9 +248,10 @@ say so in the question, as `has_result` does with
 "Answer No if the page only ...".
 
 Don't ask about something every page shows, like the patient's name or date
-of birth. Page headers repeat them, so every page would be kept. If too many
-pages are kept, look for the question with a high `p_yes` on them, and reword
-or remove it.
+of birth. Page headers repeat them, so every page would be kept. `has_dates`
+keeps every page of a report whose footer repeats the report date. If too
+many pages are kept, look for the question with a high `p_yes` on them, and
+reword or remove it.
 
 Lower `keep_threshold` to keep more pages. Fewer result pages are missed, but
 `gentrex extract` has more to read. Raise it to keep fewer pages.

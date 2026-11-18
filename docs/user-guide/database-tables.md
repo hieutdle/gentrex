@@ -126,7 +126,7 @@ One row per reported variant. The key is `file` and `variant_number`.
 | `gene_symbol` | text | yes | Approved HGNC symbol, or null when the printed symbol matches no gene or more than one. |
 | `gene_symbol_raw` | text | yes | Gene symbol as printed, like `BRCA1`. |
 | `hgnc_id` | text | yes | HGNC ID, like `HGNC:1100`. |
-| `gene_status` | text | yes | How the printed symbol matched, one of `approved`, `alias`, `previous`, `alias_or_previous`, `ambiguous`, `unmapped` or `missing`. [Normalize report data](normalize.md#check-the-result) explains the values. |
+| `gene_status` | text | yes | How the printed symbol matched, one of `approved`, `alias`, `previous`, `alias_or_previous`, `clinvar`, `ambiguous`, `unmapped` or `missing`. [Normalize report data](normalize.md#check-the-result) explains the values. |
 | `transcript` | text | yes | Reference transcript, like `NM_007294.4`. |
 | `hgvs_c` | text | yes | Coding DNA change, copied verbatim, like `c.5266dupC`. |
 | `hgvs_p` | text | yes | Protein change, copied verbatim, like `p.(Gln1756Profs*74)`. |

@@ -129,6 +129,28 @@ def test_copied_value_that_the_pages_lack_is_named(tmp_path):
     assert extractions[0]["not_in_pages"] == ["variants[1].gene_symbol"]
 
 
+def test_value_that_wraps_in_a_column_is_in_the_pages(tmp_path):
+    """A wrapped cell continues below the text of its neighbours, and counts
+    as printed. Words that are far apart on the page don't."""
+
+    def answer(pages: str) -> tuple[str, str]:
+        record = {
+            "specimen_type": "Extracted DNA from outside laboratory",
+            "test_name": "Hearing loss panel",
+        }
+        return json.dumps(record), "stop"
+
+    text = (
+        "Specimen Type: Extracted DNA from outside Lab ID: 19\n"
+        "laboratory Hearing\nSex: Male\nDOB: 01/02/2001\nAge: 25\nMRN: 1\nloss panel"
+    )
+    _, extractions = _run(
+        tmp_path, _client(answer), records.PageRecord("a.pdf", 1, "native", text)
+    )
+
+    assert extractions[0]["not_in_pages"] == ["test_name"]
+
+
 def test_variant_gets_the_page_that_prints_its_change(tmp_path):
     """The page text settles where a variant is, whatever page the model names.
     A variant whose change no page prints keeps the model's page."""

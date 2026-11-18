@@ -45,6 +45,8 @@ _NORMALIZED = (
 )
 # What gentrex normalize adds to a variant, and the field it reads it from.
 _NORMALIZED_VARIANT = {"hgnc_id": "gene_symbol", "disease_id": "associated_phenotype"}
+# The shortest test name that counts as part of a longer one.
+_NAME_LENGTH = 10
 
 
 @dataclasses.dataclass
@@ -83,8 +85,11 @@ def key(field: str, value: Any) -> Any:
     counts as no value. A c. or m. change also loses the reference sequence
     before it, so NC_012920.1:m.3243A>G equals m.3243A>G. A c. change loses
     the bases after del or dup, so c.5266dupC equals c.5266dup. A protein
-    change loses its parentheses.
+    change loses its parentheses. A finding that isn't flagged as secondary
+    is the same whether the record says false or nothing.
     """
+    if field.rpartition(".")[2] == "is_secondary_finding":
+        return bool(value)
     if not isinstance(value, str):
         return value
     text = "".join(unicodedata.normalize("NFKC", value).split()).casefold()
@@ -99,9 +104,23 @@ def key(field: str, value: Any) -> Any:
     return text or None
 
 
+def _same_name(expected: str, got: str) -> bool:
+    """Whether two names of a test are one name, cut at different places.
+
+    A report prints a test's name with or without a subtitle, the specimen
+    or the laboratory, so the truth in the found name is right, and so is a
+    found name that starts the truth. Ten characters rule out a single word.
+    """
+    if min(len(expected), len(got)) < _NAME_LENGTH:
+        return False
+    return expected in got or expected.startswith(got)
+
+
 def _result(field: str, truth: Any, found: Any) -> str:
     expected, got = key(field, truth), key(field, found)
     if expected == got:
+        return "correct"
+    if field == "test_name" and expected and got and _same_name(expected, got):
         return "correct"
     if got is None:
         return "missed"
@@ -414,7 +433,17 @@ def compare(
             None,
             f"patient_phenotypes[{match[0]}].present",
         )
+    # A feature that the reason for testing names is the patient's own, and
+    # the schema sends it to patient_phenotypes, so it is no error.
+    indication = key("", record.get("clinical_indication")) or ""
+    in_indication = {
+        index
+        for index, extra in found_features
+        if (text := key("", extra.get("text"))) and text in indication
+    }
     for index, extra in found_features:
+        if index in in_indication:
+            continue
         cause = "distractor" if key("", extra.get("text")) in printed else None
         outcomes.append(
             Outcome(
@@ -456,5 +485,6 @@ def compare(
                 "normalize" if index in by_text.values() else None,
             )
             for index, hpo_id in found_ids
+            if index not in in_indication
         ]
     return outcomes

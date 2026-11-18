@@ -5,43 +5,52 @@ This folder holds the results of the evaluations in
 
 | File | What it holds |
 | --- | --- |
-| `pipeline.ipynb` | A notebook that follows one benchmark report through Gentrex's four commands, and shows the accuracy, time and tokens of a benchmark run, as a whole and for each command |
+| `walkthrough.ipynb` | A notebook that follows one benchmark report through Gentrex's four commands, and shows what each command reads and writes |
+| `analysis.ipynb` | A notebook that compares the benchmark runs and goes through one run in detail: accuracy, errors, time and tokens |
+| `benchruns.py` | What the two notebooks share: reading the runs, and the plots |
 | `hpo-matching.md` | [What the HPO matching of `gentrex normalize` got right](hpo-matching.md) on GSC+, and what that means for Gentrex |
 | `hpo_normalization.md`, `hpo_normalization.json` | The tables and the details of that run |
 | `mondo-matching.md` | [What the MONDO matching of `gentrex normalize` got right](mondo-matching.md) on ClinVar's condition names, and what that means for Gentrex |
 | `mondo_normalization.md`, `mondo_normalization.json` | The tables and the details of that run |
 
-## Read the pipeline notebook
+## Read the notebooks
 
-The notebook reads the runs in `results/gentrex-bench/` on your machine.
-Make one first with `evaluation/local/run_pipeline.sh` or the Minerva job
-([Evaluate Gentrex](../evaluation/README.md)), and then open the notebook
-from the Gentrex folder:
+The notebooks read the runs in `results/gentrex-bench/` on your machine.
+Make them first with `evaluation/local/run_pipeline.sh` or the Minerva job
+([Evaluate Gentrex](../evaluation/README.md)), and then open a notebook from
+the Gentrex folder:
 
 ```bash
-uv run --group notebook jupyter lab evaluation_results/pipeline.ipynb
+uv run --group notebook jupyter lab evaluation_results/analysis.ipynb
 ```
 
 `--group notebook` installs JupyterLab, pandas and matplotlib on the first
 run. In JupyterLab, choose Run, then Run All Cells.
 
-The notebook has these parts:
+Start with `walkthrough.ipynb` if you don't know the four commands yet. It
+takes one report from the PDF page to the scored record: the text that
+`gentrex transcribe` read, the pages that `gentrex select` kept, the record
+of `gentrex extract`, the standard values of `gentrex normalize`, and the
+values that the scorer counted as wrong. It is saved without outputs,
+because it reads the run folders of your own runs.
+
+`analysis.ipynb` has these parts:
 
 | Part | What it shows |
 | --- | --- |
-| The runs | Every scored run with its copy of the reports, its report accuracy and its GPU-hours |
-| Walk through the pipeline | One report from the PDF page to the scored record: the text that `gentrex transcribe` read, the pages that `gentrex select` kept, the record of `gentrex extract` and the standard values of `gentrex normalize` |
-| The whole pipeline | Report accuracy, variant F1 and the other main numbers of one run, with their 95% intervals |
-| Each command | The values that each command lost, got wrong or added, its time, requests and tokens, and what it did to the pages |
-| Each field | The accuracy of every field of the record |
-| Each kind of report | Report accuracy by challenge tag, template, test and result |
-| Compare runs | All runs side by side, the difference between two runs with its interval, and accuracy against GPU-hours |
-| The errors of the run | Every value that isn't right, with the truth and what Gentrex wrote |
+| Runs | Every scored run with its setup, which is its copy of the reports and whether it ran `gentrex select`. The software, GPUs, models and reference data of the runs, and what the reports of the split are made of. |
+| Accuracy | Report accuracy, variant F1 and the other main numbers of the newest run of each setup, with 95% intervals. The accuracy on templates that only the test split has, and dev next to test. |
+| Repeated runs | How far report accuracy moves between runs of the same setup |
+| Scanned and faxed copies | What each copy costs against the native PDFs, with the pages sent to OCR and the values lost there |
+| With and without `gentrex select` | Accuracy, lost values, tokens and time of a copy's run with `gentrex select` and its run without |
+| Fields, commands, time | The fields that differ most between setups, the errors charged to each command, and seconds, tokens and GPU-hours |
+| One run | Errors per report, missed and extra variants by cause, the wrong reports, patient identification, each kind of report and every field with intervals, `gentrex normalize` on values that were extracted right, the check of copied values, and every value that isn't right |
 
-It is saved without outputs, because its numbers come from your own runs. It
-computes no scores itself, so they are those of each run's `scores.md`. The
-difference between two runs is the exception, which the notebook computes
-with the scorer's `score.difference`.
+Every score comes from a run's `scores.json`, so it agrees with the run's
+`scores.md`. The notebook itself computes the difference between two runs,
+with the scorer's `score.difference`, the intervals in the tables of groups
+and fields, and the accuracy of `gentrex normalize` on values that were
+extracted right.
 
 Some tables quote values from the reports. After a run on real reports,
-clear the outputs before you save or share the notebook.
+clear the outputs before you save or share a notebook.

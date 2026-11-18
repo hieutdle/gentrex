@@ -8,16 +8,19 @@
 # on each copy of the reports and scores the records. It serves the model of
 # each command with serve.sh, one after another, so the job holds the two
 # GPUs of gentrex extract for its whole time. The scores go to
-# results/gentrex-bench/.
+# results/gentrex-bench/, one folder for each run.
 #
-# VERSION names the benchmark version (v1 by default), COPIES the copies of
-# the reports to read one after another (native), SPLIT the split (dev), and
-# OPTIONS more options of run.py, as in OPTIONS=--no-select. The job fails
-# if a command had failed files, after the scores are written.
+# By default the job makes six runs of the dev reports: one for each copy
+# (native, scan, fax, mixed and image), and one more of the native copy
+# without gentrex select. VERSION names the benchmark version (v1), COPIES
+# the copies to read, SPLIT the split (dev), NO_SELECT the copies to read
+# once more without gentrex select (native, and NO_SELECT= for none), and
+# OPTIONS more options of run.py for every run. The job fails if a command
+# had failed files, after the scores are written.
 #BSUB -J gentrex-pipeline
 #BSUB -q gpu
 #BSUB -n 4
-#BSUB -W 2:00
+#BSUB -W 6:00
 #BSUB -gpu num=2
 #BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
 #BSUB -oo run-pipeline.%J.log
@@ -26,11 +29,18 @@
 
 module load apptainer
 status=0
-for copy in ${COPIES:-native}; do
+run() {
   # --gpus names the GPUs that serve.sh gives each model.
   .venv/bin/python gentrex-bench/run.py \
-    --version "${VERSION:-v1}" --copy "$copy" --split "${SPLIT:-dev}" \
+    --version "${VERSION:-v1}" --split "${SPLIT:-dev}" \
     --gpus 1 1 2 --serve evaluation/minerva/serve.sh \
-    --settings evaluation/settings.yaml $OPTIONS || status=1
+    --settings evaluation/settings.yaml $OPTIONS "$@" || status=1
+}
+for copy in ${COPIES:-native scan fax mixed image}; do
+  run --copy "$copy"
 done
+case " $OPTIONS " in
+  *" --no-select "*) ;;
+  *) for copy in ${NO_SELECT-native}; do run --copy "$copy" --no-select; done ;;
+esac
 exit $status

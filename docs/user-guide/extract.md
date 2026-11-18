@@ -235,11 +235,13 @@ pages it sent. The copied values are the text fields of the schema without a
 list of allowed values, such as `mrn`, `hgvs_c` and `classification_raw`.
 Only letters and digits are compared, and upper and lower case count as the
 same. Line breaks, spacing and the marks that OCR puts around bold text and
-table cells therefore make no difference. A value that isn't found is named
-in `not_in_pages`, and the last lines of the output count these values. The
-report still counts as extracted, and its exit code doesn't change. A named
-value can be right, for example when the model wrote `Female` where the page
-prints `F`.
+table cells therefore make no difference. A value that wraps in a table cell
+or a column is found too. Its words then run over a few lines of the page,
+with the text of the neighbouring column between them. A value that isn't
+found is named in `not_in_pages`, and the last lines of the output count
+these values. The report still counts as extracted, and its exit code
+doesn't change. A named value can be right, for example when the model wrote
+`Female` where the page prints `F`.
 
 ## Settings
 

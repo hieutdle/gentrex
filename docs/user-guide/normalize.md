@@ -302,6 +302,7 @@ details.
 | `approved` | The symbol is the gene's approved symbol. |
 | `alias`, `previous` | The symbol is an alias or a previous symbol of exactly one gene, whose approved symbol is given. `alias_or_previous` means it is both. |
 | `ambiguous` | The symbol is an alias or previous symbol of several genes. Gentrex can't tell which one the report meant, so it gives none. |
+| `clinvar` | The symbol is an alias or previous symbol of several genes, and ClinVar has the variant's c. change for only one of them, which is given. MLL2 is an old symbol of KMT2D and an alias of KMT2B. This needs the ClinVar lookup. |
 | `unmapped` | The symbol isn't in the HGNC complete set. |
 | `missing` | The variant has no gene symbol. |
 
@@ -435,14 +436,14 @@ inconclusive.
 
 Gentrex reads dates printed like `2026-08-27`, `2026/08/27`, `08/27/2026`,
 `08-27-2026`, `27-AUG-2026`, `27-August-2026`, `27 August 2026`,
-`27 Aug 2026`, `August 27, 2026` and `Aug 27, 2026`. The comma may be
-missing, the day may have an ending as in `August 27th, 2026`, and September
-may be written `Sept` or `Sep.`. A date in any other format becomes `null`
-instead of a guess. A time of day after the date is ignored, so
-`27-Aug-2026 08:27` and `08/27/2026 10:15 AM EST` are read too.
+`27 Aug 2026`, `August 27, 2026`, `Aug 27, 2026` and `08.27.2026`. The comma
+may be missing, the day may have an ending as in `August 27th, 2026`, and
+September may be written `Sept` or `Sep.`. A date in any other format
+becomes `null` instead of a guess. A time of day after the date is ignored,
+so `27-Aug-2026 08:27` and `08/27/2026 10:15 AM EST` are read too.
 
-A date of numbers with slashes or dashes can have the month or the day
-first. `08/27/2026` and
+A date of numbers with slashes, dashes or periods can have the month or the
+day first. `08/27/2026` and
 `27/08/2026` are both read as August 27, because 27 can only be the day.
 `06/08/2026` fits both ways. Gentrex reads it month first, as June 8, the way
 US laboratories print dates. If your laboratories print the day first, as

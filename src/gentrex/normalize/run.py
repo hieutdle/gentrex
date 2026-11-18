@@ -33,12 +33,20 @@ def _variant(
         )
     )
     if clinvar is not None:
-        found = clinvar.normalize(
-            gene["gene_symbol"],
-            variant.get("transcript"),
-            variant.get("hgvs_c"),
-            variant.get("hgvs_p"),
-        )
+        change = [variant.get(name) for name in ("transcript", "hgvs_c", "hgvs_p")]
+        found = clinvar.normalize(gene["gene_symbol"], *change)
+        if gene["gene_status"] == "ambiguous":
+            # The variant settles the gene if ClinVar has it for one gene only.
+            hits = [
+                (candidate, hit)
+                for candidate in hgnc.candidates(variant.get("gene_symbol"))
+                if (hit := clinvar.normalize(candidate["gene_symbol"], *change))[
+                    "clinvar_status"
+                ]
+                == "found"
+            ]
+            if len(hits) == 1:
+                gene, found = hits[0]
     return {
         **gene,
         **mondo.normalize(variant.get("associated_phenotype")),
@@ -51,13 +59,18 @@ def _variant(
 def _gene_symbols(
     extractions: list[records.ReportExtraction], hgnc: genes_lib.HgncIndex
 ) -> set[str]:
-    """Returns the approved symbols of the genes of all variants."""
+    """Returns the approved symbols of the genes of all variants.
+
+    An ambiguous symbol gives the symbols of every gene it can stand for.
+    """
     symbols: set[str | None] = set()
     for extraction in extractions:
         variants = (extraction.data or {}).get("variants")
         for variant in variants if isinstance(variants, list) else []:
             if isinstance(variant, dict):
-                symbols.add(hgnc.normalize(variant.get("gene_symbol"))["gene_symbol"])
+                printed = variant.get("gene_symbol")
+                symbols.add(hgnc.normalize(printed)["gene_symbol"])
+                symbols |= {c["gene_symbol"] for c in hgnc.candidates(printed)}
     return {symbol for symbol in symbols if symbol}
 
 

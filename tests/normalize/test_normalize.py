@@ -222,7 +222,9 @@ def test_wording_and_classifications_that_disagree_are_flagged():
         ("09-18-2026", "2026-09-18"),
         ("2026/09/18", "2026-09-18"),
         ("08/18/2026 10:15 AM EST", "2026-08-18"),
-        ("27.08.2026", None),
+        ("27.08.2026", "2026-08-27"),
+        ("08.27.2026", "2026-08-27"),
+        ("20260827", None),
         (None, None),
     ],
 )
@@ -241,6 +243,8 @@ def test_day_first_decides_only_dates_that_fit_both_ways():
     assert rules.parse_date("03/04/2020", day_first=True) == "2020-04-03"
     assert rules.parse_date("03/25/2020", day_first=True) == "2020-03-25"
     assert rules.parse_date("03-04-2020", day_first=True) == "2020-04-03"
+    assert rules.parse_date("3.4.2020") == "2020-03-04"
+    assert rules.parse_date("3.4.2020", day_first=True) == "2020-04-03"
 
 
 @pytest.mark.parametrize(
@@ -543,6 +547,36 @@ def test_variants_get_their_clinvar_id_by_the_approved_gene_symbol(tmp_path):
         "9325",
         "valid",
     )
+
+
+@pytest.mark.parametrize(
+    ("change", "expected"),
+    [
+        ("c.5946del", ("BRCA2", "clinvar", "9325")),
+        ("c.1A>G", (None, "ambiguous", None)),
+    ],
+)
+def test_clinvar_settles_a_symbol_of_several_genes(tmp_path, change, expected):
+    """SYN-OLD names BRCA2 and MECP2, and only BRCA2 has c.5946del in ClinVar."""
+    extraction = records.ReportExtraction(
+        "a.pdf", [1], {"variants": [{"gene_symbol": "SYN-OLD", "hgvs_c": change}]}
+    )
+    input_path = tmp_path / "extractions.jsonl"
+    input_path.write_text(extraction.to_json() + "\n")
+    output_path = tmp_path / "normalized.jsonl"
+
+    run.run(
+        input_path,
+        output_path,
+        _hgnc_index(tmp_path),
+        _mondo_index(tmp_path),
+        None,
+        _clinvar_index(tmp_path),
+    )
+
+    variant = json.loads(output_path.read_text())["normalized"]["variants"][0]
+    found = (variant["gene_symbol"], variant["gene_status"])
+    assert (*found, variant["clinvar_variation_id"]) == expected
 
 
 def test_every_report_gets_a_record_and_failures_stay_with_their_report(tmp_path):

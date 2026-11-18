@@ -259,23 +259,27 @@ The notebook gives the difference between two runs with its interval.
 
 ## Compare runs in the notebook
 
-`evaluation_results/pipeline.ipynb` reads every `scores.json` under
+`evaluation_results/analysis.ipynb` reads every `scores.json` under
 `results/gentrex-bench/` and shows the runs side by side:
 
 ```bash
-uv run --group notebook jupyter lab evaluation_results/pipeline.ipynb
+uv run --group notebook jupyter lab evaluation_results/analysis.ipynb
 ```
 
 `--group notebook` installs JupyterLab, pandas and matplotlib on the first
-run. The notebook first follows one report of a run through the four
-commands. Then it has the main numbers of that run, the errors, time and
-tokens of each command, the accuracy of every field and of every kind of
-report, the difference between two runs with its interval, and a plot of
-accuracy against GPU-hours. It computes no scores itself, so its numbers are
-those of `scores.md`.
+run. The notebook compares the newest run of each setup, which is a copy of
+the reports with or without `gentrex select`. It gives the difference
+between two runs with its interval, the errors, time and tokens of each
+command, and a plot of accuracy against GPU-hours. Then it goes through one
+run: the reports that count as wrong, the accuracy of every field and of
+every kind of report, and every value that isn't right. It computes no
+scores itself, so its numbers are those of `scores.md`.
+
+`evaluation_results/walkthrough.ipynb` follows one report of a run through
+the four commands.
 
 Some tables quote values from the reports. After a run on real reports,
-clear the notebook's outputs before you save or share it.
+clear a notebook's outputs before you save or share it.
 
 ## Score a run you made yourself
 

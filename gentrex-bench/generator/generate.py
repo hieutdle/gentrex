@@ -6,7 +6,9 @@
 `sample` writes the cases. `build` has a model on the OpenAI-compatible
 server that GENTREX_BENCH_BASE_URL names write the free text of each report,
 fills the report's template, prints it and checks it, and makes the scanned
-copies. Both take their settings from settings.yaml, next to this file.
+copies. `recheck` samples the cases again after a fix to the sampler and
+renews the truth of the reports that are already printed. All take their
+settings from settings.yaml, next to this file.
 docs/development/generate-benchmark-reports.md explains them.
 """
 
@@ -58,16 +60,18 @@ def _write_json(path: pathlib.Path, value) -> None:
     part.replace(path)
 
 
-def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
-    out = args.out / args.version
-    if (out / "cases").exists():
-        _logger.error("%s already has cases; choose another --version", out)
-        return 1
+def _sampled(settings: dict[str, Any]) -> tuple[list[dict], dict[str, Any]] | None:
+    """Samples the cases from the reference files.
+
+    Returns:
+        The cases and what the manifest records about their sources, or None
+        if a reference file is missing.
+    """
     paths = {name: pathlib.Path(settings[name]) for name in _SOURCES}
     for name, path in paths.items():
         if not path.is_file():
             _logger.error("%s not found (sample.%s in settings.yaml)", path, name)
-            return 1
+            return None
     genes = {g for area in labs.AREAS for g in area.genes}
     genes |= set(labs.CARRIER_GENES) | set(labs.MITO_GENES) | set(labs.SECONDARY_GENES)
     _logger.info("reading HPO, MONDO and HGNC")
@@ -89,6 +93,25 @@ def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
         sources.load_syndromes(paths["mondo"], paths["hpoa"], terms, sample.SYNDROMES),
     )
     cases = sample.sample(refs, settings["seed"], settings["dev"], settings["test"])
+    return cases, {
+        "sources": {
+            name: {"file": path.name, "sha256": _sha256(path)}
+            for name, path in paths.items()
+        },
+        "usable_variants": sum(len(v) for v in variants.values()),
+        "usable_copy_number_changes": len(regions),
+    }
+
+
+def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
+    out = args.out / args.version
+    if (out / "cases").exists():
+        _logger.error("%s already has cases; choose another --version", out)
+        return 1
+    sampled = _sampled(settings)
+    if sampled is None:
+        return 1
+    cases, sources_used = sampled
     for case in cases:
         _write_json(
             out / "cases" / f"{case['case_id']}.json", {"canary": fill.CANARY, **case}
@@ -100,16 +123,50 @@ def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
             "version": args.version,
             "generator": sample._VERSION,
             "settings": settings,
-            "sources": {
-                name: {"file": path.name, "sha256": _sha256(path)}
-                for name, path in paths.items()
-            },
-            "usable_variants": sum(len(v) for v in variants.values()),
-            "usable_copy_number_changes": len(regions),
+            **sources_used,
         },
     )
     _logger.info("wrote %d cases to %s", len(cases), out / "cases")
     return 0
+
+
+def _recheck(args: argparse.Namespace, settings: dict[str, Any]) -> int:
+    """Samples the cases again and renews the truth of the printed reports.
+
+    After a fix to the sampler that changes no printed value, the reports
+    stay and only their truth changes. A report whose PDF doesn't print its
+    new case keeps its old case and truth, and is named in the log.
+    """
+    out = args.out / args.version
+    sampled = _sampled(settings)
+    if sampled is None:
+        return 1
+    renewed, failed = [], []
+    for case in sampled[0]:
+        case_id = case["case_id"]
+        truth_path = out / "truth" / f"{case_id}.json"
+        if truth_path.exists():
+            old = json.loads(truth_path.read_text(encoding="utf-8"))
+            native = out / "pdf" / "native" / f"{case_id}.pdf"
+            result = check.check(case, native, old["case"]["writer"])
+            if result.truth is None:
+                for error in result.errors:
+                    _logger.warning("%s: %s", case_id, error)
+                failed.append(case_id)
+                continue
+            for name in ("mixed_scanned_pages", "image_document_code"):
+                result.truth["case"][name] = old["case"][name]
+            truth = {"canary": fill.CANARY, **result.truth}
+            if truth != old:
+                _write_json(truth_path, truth)
+                renewed.append(case_id)
+        _write_json(out / "cases" / f"{case_id}.json", {"canary": fill.CANARY, **case})
+    _logger.info(
+        "renewed the truth of %d reports; reports that don't print their new case: %s",
+        len(renewed),
+        ", ".join(failed) or "none",
+    )
+    return 1 if failed else 0
 
 
 def _build_one(
@@ -275,6 +332,10 @@ def main() -> int:
     builder.add_argument("cases", nargs="*", help="Case IDs; all cases by default.")
     builder.add_argument("--chrome", help="Chrome or Chromium executable.")
     builder.set_defaults(func=_build, section="build")
+    rechecker = commands.add_parser(
+        "recheck", help="Sample the cases again and renew the truth files."
+    )
+    rechecker.set_defaults(func=_recheck, section="sample")
     args = parser.parse_args()
     settings = yaml.safe_load(_SETTINGS_PATH.read_text(encoding="utf-8"))
     return args.func(args, settings[args.section])

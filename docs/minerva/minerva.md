@@ -775,7 +775,7 @@ SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
 ```
 
 The `#BSUB` lines of `run_pipeline.lsf` ask for what
-[`extract.lsf`](#write-the-job-script-2) asks for, with two hours instead of
+[`extract.lsf`](#write-the-job-script-2) asks for, with six hours instead of
 30 minutes. The script then runs `gentrex-bench/run.py`, which does the work
 of the three job scripts. It picks a free port, starts
 `evaluation/minerva/serve.sh` for the model of `gentrex transcribe`, waits
@@ -791,16 +791,19 @@ of each model. `run_pipeline.lsf` sets two more things:
 - `--settings evaluation/settings.yaml` turns on the lookup of ClinVar IDs,
   so that the scorer scores them.
 
-By default the job reads the native PDFs of the dev set. `COPIES` names the
-copies to read, one after another, and `SPLIT` the split. Give a job with
-several copies more time:
+By default the job makes six runs of the dev set, one after another. Five
+read the native, scan, fax, mixed and image copies, and the sixth reads the
+native copy again without `gentrex select`. `COPIES` names the copies to
+read, `NO_SELECT` the copies to read once more without `gentrex select`,
+and `SPLIT` the split. The test set has twice as many reports, so give its
+job more time:
 
 ```bash
-SERVING=/path/to/serving COPIES="native scan fax mixed image" SPLIT=test \
+SERVING=/path/to/serving SPLIT=test \
   bsub -P acc_xxx -W 10:00 < evaluation/minerva/run_pipeline.lsf
 ```
 
-`OPTIONS` passes more options to `run.py`, as in `OPTIONS=--no-select`
+`OPTIONS` passes more options to every run of `run.py`
 ([Run another setup](../development/run-benchmark.md#run-another-setup)).
 Run one such job at a time in a `gentrex` folder, because `run.py` finds the
 run that a command just made through the command's `latest` link.

@@ -33,19 +33,26 @@ additionalProperties: false
 properties:
   mrn:
     description: >-
-      Patient's medical record number, as printed (e.g. SYN-MRN-0007). A
-      national patient number, such as the UK's NHS number, counts as the
-      MRN when the report gives no hospital number.
+      Patient's medical record number, as printed (e.g. SYN-MRN-0007). When
+      no number is labelled MRN, the patient's main identifier is the MRN,
+      such as one labelled Patient ID or ID#, or a national patient number
+      such as the UK's NHS number. A number of an account, client, visit,
+      order or specimen is not the patient's.
     type: [string, "null"]
   submitter_patient_id:
     description: >-
-      Patient identifier from the ordering clinic or submitter, other than the
-      MRN, as printed (e.g. SYN-SUB-0006).
+      A second patient identifier, which the ordering clinic or submitter
+      gave and the report prints next to the MRN, as printed (e.g.
+      SYN-SUB-0006 after "Alternate Patient ID"). Null if the report prints
+      only one patient identifier, which is the MRN. A number of an account,
+      client, visit, order or specimen is not the patient's.
     type: [string, "null"]
   lab_accession_number:
     description: >-
-      The laboratory's accession or order number for this test, as printed
-      (e.g. SYN-ACC-0011).
+      The laboratory's own number for this specimen or order, as printed
+      (e.g. SYN-ACC-0011). Laboratories label it differently, as an
+      accession, specimen, order or laboratory ID or number. If the report
+      prints several, take the accession or specimen number.
     type: [string, "null"]
   date_of_birth:
     description: >-
@@ -55,7 +62,9 @@ properties:
     description: Patient's sex, as printed (e.g. Female, Male, M).
     type: [string, "null"]
   specimen_type:
-    description: Specimen tested (e.g. Blood in EDTA, Buccal swab, Saliva).
+    description: >-
+      Specimen tested, as printed with its tube or kit (e.g. Blood in EDTA,
+      Buccal swab, Saliva (Oragene)).
     type: [string, "null"]
   collection_date:
     description: >-
@@ -94,7 +103,9 @@ properties:
       Date the laboratory started the analysis, as printed (e.g. 2026-08-27).
     type: [string, "null"]
   report_date:
-    description: Date the report was finalized, as printed (e.g. 18-SEP-2026).
+    description: >-
+      Date the report was finalized, signed or reported, as printed (e.g.
+      18-SEP-2026). Not the date a copy was printed.
     type: [string, "null"]
   overall_result_raw:
     description: >-
@@ -143,9 +154,11 @@ properties:
     type: [string, "null"]
   genome_build:
     description: >-
-      Reference genome of the report's genomic positions and array results
-      (e.g. GRCh37 or hg19 is GRCh37, GRCh38 or hg38 is GRCh38). Null if the
-      report names none.
+      Reference genome that the report names for its positions, array
+      results or alignment (e.g. GRCh37 or hg19 is GRCh37, GRCh38 or hg38 is
+      GRCh38). It counts wherever the pages name it, also in a table column
+      or in the methods, as in "aligned to the GRCh38 reference sequence".
+      Null if the report names none.
     type: [string, "null"]
     enum:
       - GRCh37
@@ -161,7 +174,10 @@ properties:
       One object per variant reported in the patient, listed once even if
       several pages mention it: a sequence variant, a copy-number change, a
       repeat expansion or a uniparental disomy. Empty if the report lists
-      none. A karyotype from a chromosome analysis goes in karyotype instead.
+      none. The finding of a chromosome analysis goes in karyotype only, also
+      an abnormal one such as trisomy 21 or a translocation. A normal result
+      is no variant, such as repeat sizes in the normal range or two copies
+      of SMN1, and neither is an abnormal methylation pattern on its own.
     type: array
     items:
       type: object
@@ -195,12 +211,16 @@ properties:
             The DNA change, copied verbatim, when it is not given as a
             separate c. change (e.g. "NC_012920.1:m.3243A>G", "Deletion of
             exons 45-50", "arr[GRCh37] 17p11.2(16761827_20304681)x3", "30 and
-            56 CGG repeats", "7p22.3q36.3 maternal uniparental disomy").
+            56 CGG repeats", "7p22.3q36.3 maternal uniparental disomy"). Null
+            when the report gives only the copy number of a gene, which goes
+            in copy_number.
           type: [string, "null"]
         chromosomal_position:
           description: >-
             Genomic position or range of the variant, as printed
-            (e.g. chr17:43057062, chr7:1-159345973).
+            (e.g. chr17:43057062, chr7:1-159345973). Null when the position
+            is only part of an array result written as arr[...], which stays
+            whole in dna_change_raw.
           type: [string, "null"]
         copy_number:
           description: >-
@@ -211,8 +231,11 @@ properties:
           type: [integer, "null"]
         classification_raw:
           description: >-
-            Classification wording, copied verbatim (e.g. "Pathogenic
-            (Class 5)", "VUS", "Premutation allele").
+            Classification that the report gives this variant, copied
+            verbatim with every word (e.g. "Pathogenic (Class 5)", "Variant,
+            Likely Pathogenic", "VUS", "Premutation allele"). Null if the
+            variant has none. The report's overall result, such as POSITIVE,
+            AFFECTED or CARRIER, is not a classification.
           type: [string, "null"]
         classification:
           description: Closest allowed value for classification_raw.
@@ -227,8 +250,10 @@ properties:
             - null
         zygosity_raw:
           description: >-
-            Zygosity or heteroplasmy wording, copied verbatim
-            (e.g. "Heteroplasmic (28%)").
+            Zygosity or heteroplasmy wording, copied verbatim (e.g. "HET",
+            "Heterozygous", "Heteroplasmic (28%)"). Null if the report does
+            not state it. Do not derive it from carrier status, the
+            patient's sex or a copy number.
           type: [string, "null"]
         zygosity:
           description: Closest allowed value for zygosity_raw.
@@ -266,8 +291,8 @@ properties:
         mode_of_inheritance_raw:
           description: >-
             How the condition is inherited, as printed (e.g. "Autosomal
-            recessive", "Mitochondrial inheritance"). This is the condition's
-            pattern, not where the patient's variant came from.
+            recessive", "AR", "Mitochondrial inheritance"). This is the
+            condition's pattern, not where the patient's variant came from.
           type: [string, "null"]
         mode_of_inheritance:
           description: >-
@@ -291,6 +316,9 @@ properties:
           type: [boolean, "null"]
         variant_type_raw:
           description: >-
-            Kind of variant, as printed (e.g. Missense, Frameshift deletion,
-            Copy-number deletion, GAIN, Uniparental disomy).
+            Kind of variant, copied verbatim from the variant's own entry,
+            such as a Type or Consequence column (e.g. Missense, Frameshift
+            deletion, stop_gained, Copy-number deletion, GAIN, Uniparental
+            disomy). Null if only the interpretation text describes the kind
+            of change.
           type: [string, "null"]

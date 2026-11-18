@@ -60,6 +60,11 @@ select:
     has_phenotype: >-
       Does this page describe the patient's own symptoms, clinical features or
       reason for testing?
+    # Some reports list these dates only in a table at the end, on a page
+    # without the result.
+    has_dates: >-
+      Does this page list when the specimen was collected or received, or
+      when the result was reported?
   # A page is kept when, for at least one question, the probability of "yes"
   # is at least this. Lower keeps more pages.
   keep_threshold: 0.5
@@ -83,7 +88,8 @@ extract:
     as "--- PAGE 2 ---"; pages in between may be missing. Return one JSON
     object that follows the schema below and covers all the pages. Fill a
     field only if the report states it; otherwise use null. Never guess. Copy
-    every field ending in _raw verbatim from the report. A field with allowed
+    every field ending in _raw verbatim from the report, with every word and
+    with abbreviations as printed (HET stays HET). A field with allowed
     values follows the field holding the report's wording; choose the value
     closest to that wording.
   # Longest answer allowed for one report, in tokens. It stops a model stuck
@@ -101,7 +107,7 @@ extract:
 # specimen, result, gene symbols and clinical features of each record from
 # `gentrex extract` into standard values.
 normalize:
-  # How to read a date with slashes that fits both ways, such as 03/04/2020.
+  # How to read a date of numbers that fits both ways, such as 03/04/2020.
   # false reads the month first, as US laboratories print it (March 4). true
   # reads the day first, as British laboratories do (April 3). A date that
   # fits only one way, such as 25/03/2020, is read that way under both.

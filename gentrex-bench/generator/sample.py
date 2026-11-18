@@ -1148,7 +1148,8 @@ class _Sampler:
             test_type = "single_gene"
         elif plan.kind == "carrier":
             test_name = lab.carrier_name
-            test_type = "panel"
+            one_gene = lab.carrier_genes is not None and len(lab.carrier_genes) == 1
+            test_type = "single_gene" if one_gene else "panel"
         else:
             test_name = "Mitochondrial Genome Sequencing"
             test_type = "other"

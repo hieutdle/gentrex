@@ -322,7 +322,7 @@ cases have three tags.
 | `missing_optional_fields` | One or two fields are left out with their labels, such as the date received |
 | `legacy_gene_symbol` | The gene appears under a previous HGNC symbol |
 | `nonstandard_hgvs` | The protein change is in one-letter code, as p.R412W |
-| `unusual_date_format` | Dates in a format that `gentrex normalize` doesn't read, as 6.12.2019 |
+| `unusual_date_format` | Dates in a format that few laboratories print, as 6.12.2019 for June 12 |
 | `ambiguous_specimen` | A specimen without a clear category, as "Saliva/Buccal" |
 
 Some templates add distractors of their own, as real reports do. The

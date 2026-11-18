@@ -5,11 +5,39 @@ from collections.abc import Iterator
 from collections.abc import Sequence
 from typing import Any
 
+# How many lines after a part of a wrapped value its next part may come.
+_REACH = 3
+
 
 def _letters(text: str) -> str:
     """Returns the letters and digits of a text, without case."""
     folded = unicodedata.normalize("NFKC", text).casefold()
     return "".join(character for character in folded if character.isalnum())
+
+
+def _wrapped(value: str, text: str) -> bool:
+    """Whether the words of a value run over nearby lines of a page, in order.
+
+    A PDF's text is read line by line across the page. A table cell or a
+    column that wraps therefore continues a few lines further down, after
+    the text of its neighbours on the same line.
+    """
+    words = [word for word in map(_letters, value.split()) if word]
+    lines = [_letters(line) for line in text.splitlines()]
+    for start in range(len(lines)):
+        done, last = 0, start
+        for at in range(start, min(len(lines), start + _REACH * len(words) + 1)):
+            if at - last > _REACH:
+                break
+            for end in range(len(words), done, -1):
+                if "".join(words[done:end]) in lines[at]:
+                    done, last = end, at
+                    break
+            if done in (0, len(words)):
+                break
+        if words and done == len(words):
+            return True
+    return False
 
 
 def copied_values(
@@ -40,7 +68,8 @@ def not_in_pages(
 
     Only letters and digits are compared, without case, so that line breaks,
     spacing and the marks that OCR puts around bold text and table cells
-    don't count.
+    don't count. A value that wraps in a table cell or a column counts as
+    found when its words run over nearby lines of one page.
 
     Args:
         data: The record that the model returned.
@@ -52,6 +81,7 @@ def not_in_pages(
         path
         for path, value in copied_values(data, schema)
         if _letters(value) not in pages
+        and not any(_wrapped(value, text) for text in texts)
     ]
 
 
