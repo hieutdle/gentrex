@@ -780,8 +780,12 @@ cd /path/to/gentrex
 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
+`evaluation/minerva/submit_pipeline.sh` submits the same runs as short jobs
+instead, which wait less in the queue and can run at the same time
+([Evaluate Gentrex on Minerva](evaluate.md#step-5-run-gentrex-on-the-benchmark-reports)).
+
 The `#BSUB` lines of `run_pipeline.lsf` ask for what
-[`extract.lsf`](#write-the-job-script-2) asks for, with six hours instead of
+[`extract.lsf`](#write-the-job-script-2) asks for, with eight hours instead of
 30 minutes. The script then runs `gentrex-bench/run.py`, which does the work
 of the three job scripts. It picks a free port, starts
 `evaluation/minerva/serve.sh` for the model of `gentrex transcribe`, waits
@@ -797,16 +801,15 @@ of each model. `run_pipeline.lsf` sets two more things:
 - `--settings evaluation/settings.yaml` turns on the lookup of ClinVar IDs,
   so that the scorer scores them.
 
-By default the job makes six runs of the dev set, one after another. Five
-read the native, scan, fax, mixed and image copies, and the sixth reads the
-native copy again without `gentrex select`. `COPIES` names the copies to
-read, `NO_SELECT` the copies to read once more without `gentrex select`,
-and `SPLIT` the split. The test set has twice as many reports, so give its
-job more time:
-
-```bash
-SPLIT=test bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf
-```
+By default the job makes four runs of the 300 benchmark reports, one after
+another. Three read the native, scan and fax copies, and the fourth reads
+the native copy again without `gentrex select`. The run of the native copy
+also chooses the pages in two other ways, to compare `gentrex select` with
+them
+([Compare ways to choose pages](../development/run-benchmark.md#compare-ways-to-choose-pages)).
+`COPIES` names the copies to read, `NO_SELECT` the copies to read once more
+without `gentrex select`, and `SELECT_METHODS` the copies with that
+comparison.
 
 `OPTIONS` passes more options to every run of `run.py`
 ([Run another setup](../development/run-benchmark.md#run-another-setup)).

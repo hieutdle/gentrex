@@ -16,6 +16,7 @@ import dataclasses
 import datetime
 import json
 import logging
+import math
 import pathlib
 import re
 import statistics
@@ -38,6 +39,7 @@ FORMAT = 3
 # Standard values with a fixed list of categories, besides the fields of the
 # schema that have one.
 _CATEGORIES = ("normalized.overall_result", "normalized.specimen_type")
+_PATHOGENIC = frozenset({"pathogenic", "likely_pathogenic"})
 _WORD = re.compile(r"[a-z0-9]+")
 
 
@@ -103,9 +105,50 @@ def _value_counts(outcomes: list[compare.Outcome]) -> dict[str, int]:
     }
 
 
+def _strict_value_counts(outcomes: list[compare.Outcome]) -> dict[str, int]:
+    """Returns exact-match value counts where lenient-only matches count as wrong."""
+    counts = _value_counts(outcomes)
+    lenient_only = sum(
+        o.result == "correct" and not o.strict and _is_stated(o) for o in outcomes
+    )
+    return {
+        "right": counts["right"] - lenient_only,
+        "missed": counts["missed"] + lenient_only,
+        "extra": counts["extra"] + lenient_only,
+    }
+
+
+def _report_field_counts(
+    outcomes: list[compare.Outcome],
+) -> dict[str, tuple[int, int, int]]:
+    """Returns per-field (right, lost, added) counts for extracted fields."""
+    counts: dict[str, list[int]] = {}
+    for o in outcomes:
+        if not _is_extracted(o) or o.field in compare.ENTITIES:
+            continue
+        row = counts.setdefault(o.field, [0, 0, 0])
+        if o.result == "correct" and _is_stated(o):
+            row[0] += 1
+        elif o.result == "missed":
+            row[1] += 1
+        elif o.result == "extra":
+            row[2] += 1
+        elif o.result == "wrong":
+            row[1] += 1
+            row[2] += 1
+    return {
+        field: (right, lost, added) for field, (right, lost, added) in counts.items()
+    }
+
+
 def _summary(outcomes: list[compare.Outcome]) -> dict[str, Any]:
     """Returns what the main numbers need from one report."""
-    variants = collections.Counter(o.result for o in outcomes if o.field == "variants")
+    variant_outcomes = [o for o in outcomes if o.field == "variants"]
+    variants = collections.Counter(o.result for o in variant_outcomes)
+    clin_bad = sum(
+        o.result == "correct" and o.clinical_ok is False for o in variant_outcomes
+    )
+    extracted = [o for o in outcomes if _is_extracted(o)]
     return {
         "correct": all(
             o.result == "correct" for o in outcomes if o.field in compare.CLINICAL
@@ -121,7 +164,13 @@ def _summary(outcomes: list[compare.Outcome]) -> dict[str, Any]:
             "missed": variants["missed"],
             "extra": variants["extra"],
         },
-        "values": _value_counts([o for o in outcomes if _is_extracted(o)]),
+        "clinical_variants": {
+            "matched": variants["correct"] - clin_bad,
+            "missed": variants["missed"] + clin_bad,
+            "extra": variants["extra"] + clin_bad,
+        },
+        "values": _value_counts(extracted),
+        "strict_values": _strict_value_counts(extracted),
         "errors": sum(o.result != "correct" for o in outcomes),
         # The checks of Gentrex that flagged a value of the report.
         "flags": sorted(
@@ -139,7 +188,9 @@ def _rows(summaries: list[dict[str, Any]]) -> np.ndarray:
                 s["complete"],
                 s["patient_match"],
                 *s["variants"].values(),
+                *s["clinical_variants"].values(),
                 *s["values"].values(),
+                *s["strict_values"].values(),
             ]
             for s in summaries
         ],
@@ -149,9 +200,23 @@ def _rows(summaries: list[dict[str, Any]]) -> np.ndarray:
 
 def _numbers(sums: np.ndarray, reports: int) -> dict[str, np.ndarray]:
     """Returns the main numbers from the summed rows of one or more samples."""
-    correct, complete, patient, matched, missed, extra, right, lost, added = (
-        np.moveaxis(sums, -1, 0)
-    )
+    (
+        correct,
+        complete,
+        patient,
+        matched,
+        missed,
+        extra,
+        clin_matched,
+        clin_missed,
+        clin_extra,
+        right,
+        lost,
+        added,
+        strict_right,
+        strict_lost,
+        strict_added,
+    ) = np.moveaxis(sums, -1, 0)
     with np.errstate(invalid="ignore", divide="ignore"):
         return {
             "report_accuracy": correct / reports,
@@ -160,9 +225,17 @@ def _numbers(sums: np.ndarray, reports: int) -> dict[str, np.ndarray]:
             "value_precision": right / (right + added),
             "value_recall": right / (right + lost),
             "value_f1": 2 * right / (2 * right + lost + added),
+            "strict_value_f1": (
+                2 * strict_right / (2 * strict_right + strict_lost + strict_added)
+            ),
             "variant_precision": matched / (matched + extra),
             "variant_recall": matched / (matched + missed),
             "variant_f1": 2 * matched / (2 * matched + missed + extra),
+            "clinical_variant_precision": clin_matched / (clin_matched + clin_extra),
+            "clinical_variant_recall": clin_matched / (clin_matched + clin_missed),
+            "clinical_variant_f1": (
+                2 * clin_matched / (2 * clin_matched + clin_missed + clin_extra)
+            ),
         }
 
 
@@ -179,13 +252,68 @@ def _interval(value: Any, samples: np.ndarray) -> dict[str, float | None]:
     }
 
 
-def _main_numbers(summaries: list[dict[str, Any]]) -> dict[str, Any]:
+def _macro_field_f1(
+    field_counts: list[dict[str, tuple[int, int, int]]], picks: np.ndarray
+) -> dict[str, float | None]:
+    """Returns macro-averaged F1 over extracted fields with its 95% interval."""
+    fields = sorted({f for counts in field_counts for f in counts})
+    if not fields:
+        return {"value": None, "low": None, "high": None}
+    arr = np.array(
+        [[counts.get(field, (0, 0, 0)) for field in fields] for counts in field_counts],
+        dtype=float,
+    )
+
+    def macro(sums: np.ndarray) -> np.ndarray:
+        right, lost, added = np.moveaxis(sums, -1, 0)
+        denom = 2 * right + lost + added
+        with np.errstate(invalid="ignore", divide="ignore"):
+            f1 = np.where(denom > 0, 2 * right / denom, np.nan)
+            return np.nanmean(f1, axis=-1)
+
+    return _interval(macro(arr.sum(axis=0)), macro(arr[picks].sum(axis=1)))
+
+
+def _main_numbers(
+    summaries: list[dict[str, Any]],
+    field_counts: list[dict[str, tuple[int, int, int]]] | None = None,
+) -> dict[str, Any]:
     """Returns the main numbers, with intervals from resampling whole reports."""
     rows = _rows(summaries)
     picks = np.random.default_rng(_SEED).integers(0, len(rows), (_RESAMPLES, len(rows)))
     values = _numbers(rows.sum(axis=0), len(rows))
     samples = _numbers(rows[picks].sum(axis=1), len(rows))
-    return {name: _interval(values[name], samples[name]) for name in values}
+    found = {name: _interval(values[name], samples[name]) for name in values}
+    if field_counts is not None:
+        found["macro_field_f1"] = _macro_field_f1(field_counts, picks)
+    return found
+
+
+def _mcnemar_exact(b: int, c: int) -> float:
+    """Returns the exact two-sided McNemar p-value from discordant pairs."""
+    n = b + c
+    if n == 0:
+        return 1.0
+    k = min(b, c)
+    tail = sum(math.comb(n, i) for i in range(k + 1)) / (2**n)
+    return round(min(1.0, 2.0 * tail), 4)
+
+
+def fisher_exact(a: int, b: int, c: int, d: int) -> float:
+    """Returns the exact two-sided Fisher's exact p-value for a 2x2 table."""
+    row1, row2 = a + b, c + d
+    col1, total = a + c, a + b + c + d
+    if not row1 or not row2 or not col1 or col1 == total:
+        return 1.0
+    denom = math.comb(total, col1)
+
+    def prob(x: int) -> float:
+        return math.comb(row1, x) * math.comb(row2, col1 - x) / denom
+
+    observed = prob(a)
+    low, high = max(0, col1 - row2), min(row1, col1)
+    p = sum(prob(x) for x in range(low, high + 1) if prob(x) <= observed + 1e-12)
+    return round(min(1.0, p), 4)
 
 
 def difference(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
@@ -196,11 +324,13 @@ def difference(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
         second: The scores.json of another run.
 
     Returns:
-        The number of shared reports, and the second run's report accuracy
-        minus the first's with its 95% interval, from resampling the reports
-        in pairs.
+        The number of shared reports, the second run's report accuracy minus
+        the first's with its 95% paired bootstrap interval, and the exact
+        two-sided McNemar p-value.
     """
     shared = sorted(set(first["by_report"]) & set(second["by_report"]))
+    if not shared:
+        return {"reports": 0, "value": None, "low": None, "high": None, "p_value": None}
     gains = np.array(
         [
             second["by_report"][name]["correct"] - first["by_report"][name]["correct"]
@@ -211,9 +341,12 @@ def difference(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
     picks = np.random.default_rng(_SEED).integers(
         0, len(gains), (_RESAMPLES, len(gains))
     )
+    b = int((gains == 1).sum())
+    c = int((gains == -1).sum())
     return {
         "reports": len(shared),
         **_interval(gains.mean(), gains[picks].mean(axis=1)),
+        "p_value": _mcnemar_exact(b, c),
     }
 
 
@@ -441,6 +574,7 @@ def _pages(
     chosen: list[str],
     transcribed: list[dict[str, Any]],
     kept: list[dict[str, Any]] | None,
+    value_pages: list[set["Page"]] | None = None,
 ) -> dict[str, Any]:
     """Returns what gentrex transcribe and gentrex select did to the pages.
 
@@ -474,7 +608,32 @@ def _pages(
         true_words += sum(expected.values())
         written += sum(found.values())
         shared += sum((expected & found).values())
-    needed = _needed(_value_pages(truths, chosen))
+    by_report: dict[str, list[str]] = collections.defaultdict(list)
+    for page in pages:
+        by_report[pathlib.Path(page["file"]).stem].append(page["text"])
+    critical_fields = {
+        "mrn",
+        "date_of_birth",
+        "karyotype",
+        "overall_result_raw",
+        "gene_symbol",
+        "hgvs_c",
+        "dna_change_raw",
+    }
+    values_stated = values_preserved = 0
+    critical_stated = critical_preserved = 0
+    for name in chosen:
+        lines = [compare.check.page_lines(t) for t in by_report.get(name, [])]
+        for path, value in compare.check._printed(truths[name]["record"]):
+            preserved = any(compare.check.locate(value, lines))
+            values_stated += 1
+            values_preserved += preserved
+            if path.rsplit("/", 1)[-1] in critical_fields:
+                critical_stated += 1
+                critical_preserved += preserved
+    needed = _needed(
+        _value_pages(truths, chosen) if value_pages is None else value_pages
+    )
     every = _every_page(truths, chosen)
     selected = (
         None
@@ -492,6 +651,12 @@ def _pages(
         ),
         "ocr_word_recall": _ratio(shared, true_words),
         "ocr_word_precision": _ratio(shared, written),
+        "values_stated": values_stated,
+        "values_preserved": values_preserved,
+        "values_preserved_rate": _ratio(values_preserved, values_stated),
+        "critical_values_stated": critical_stated,
+        "critical_values_preserved": critical_preserved,
+        "critical_values_preserved_rate": _ratio(critical_preserved, critical_stated),
         "needed": len(needed),
         "needed_kept": None if selected is None else len(needed & selected),
         "other": len(every - needed),
@@ -540,11 +705,71 @@ def _every_page(truths: dict[str, dict[str, Any]], chosen: list[str]) -> set[Pag
 _THRESHOLDS = (0.02, 0.05, 0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9, 0.95, 0.98)
 
 
+def _select_scores(
+    answers: dict[Page, dict[str, Any]], needed: set[Page]
+) -> dict[str, float | None]:
+    """Returns AUROC, AUPRC, Brier score, and 10-bin ECE of max(p_yes)."""
+    by_score: dict[float, list[bool]] = collections.defaultdict(list)
+    pairs: list[tuple[float, int]] = []
+    for page, decision in answers.items():
+        probs = [p for p in decision["p_yes"].values() if p is not None]
+        if probs:
+            prob = max(probs)
+            label = page in needed
+            by_score[prob].append(label)
+            pairs.append((prob, int(label)))
+    if not pairs:
+        return {"auroc": None, "auprc": None, "brier": None, "ece": None}
+    brier = round(sum((p - y) ** 2 for p, y in pairs) / len(pairs), 4)
+    bins: list[list[tuple[float, int]]] = [[] for _ in range(10)]
+    for prob, label in pairs:
+        bins[min(int(prob * 10), 9)].append((prob, label))
+    ece = round(
+        sum(
+            len(bucket)
+            / len(pairs)
+            * abs(
+                sum(y for _, y in bucket) / len(bucket)
+                - sum(p for p, _ in bucket) / len(bucket)
+            )
+            for bucket in bins
+            if bucket
+        ),
+        4,
+    )
+    pos = sum(y for _, y in pairs)
+    neg = len(pairs) - pos
+    if not pos or not neg:
+        return {"auroc": None, "auprc": None, "brier": brier, "ece": ece}
+    wins = seen_neg = 0.0
+    for score_value in sorted(by_score):
+        flags = by_score[score_value]
+        n_pos = sum(flags)
+        n_neg = len(flags) - n_pos
+        wins += n_pos * (seen_neg + 0.5 * n_neg)
+        seen_neg += n_neg
+    ap = tp = total = 0.0
+    for score_value in sorted(by_score, reverse=True):
+        flags = by_score[score_value]
+        n_pos = sum(flags)
+        tp += n_pos
+        total += len(flags)
+        if n_pos:
+            ap += (n_pos / pos) * (tp / total)
+    return {
+        "auroc": round(wins / (pos * neg), 4),
+        "auprc": round(ap, 4),
+        "brier": brier,
+        "ece": ece,
+    }
+
+
 def _select(
     truths: dict[str, dict[str, Any]],
     chosen: list[str],
     decisions: list[dict[str, Any]],
     threshold: float,
+    value_pages: list[set[Page]] | None = None,
 ) -> dict[str, Any]:
     """Returns how well gentrex select chose the pages, and at other thresholds.
 
@@ -559,7 +784,8 @@ def _select(
         decisions: The lines of decisions.jsonl of gentrex select.
         threshold: The run's select.keep_threshold.
     """
-    value_pages = _value_pages(truths, chosen)
+    if value_pages is None:
+        value_pages = _value_pages(truths, chosen)
     needed = _needed(value_pages)
     names = set(chosen)
     answers = {
@@ -609,6 +835,7 @@ def _select(
     return {
         "threshold": threshold,
         "pages": len(pages),
+        **_select_scores(answers, needed),
         "needed_kept": len(needed & now),
         "needed_dropped": len(needed & pages - now),
         "other_kept": len(other & now),
@@ -640,6 +867,13 @@ def _data(truths: dict[str, dict[str, Any]], chosen: list[str]) -> dict[str, Any
         (truths[name].get("case", {}).get("writer") or {}).get("attempt")
         for name in chosen
     ]
+
+    def _iqr(values: list[int]) -> list[float] | None:
+        if not values:
+            return None
+        q25, q75 = np.percentile(values, [25, 75])
+        return [round(float(q25), 1), round(float(q75), 1)]
+
     return {
         "reports": len(chosen),
         # Reports whose first text failed the generator's check.
@@ -650,12 +884,21 @@ def _data(truths: dict[str, dict[str, Any]], chosen: list[str]) -> dict[str, Any
         ),
         "pages": sum(pages) if pages else None,
         "pages_median": statistics.median(pages) if pages else None,
+        "pages_iqr": _iqr(pages),
         "pages_most": max(pages) if pages else None,
         "words_median": statistics.median(words) if words else None,
+        "words_iqr": _iqr(words),
         "variants": sum(len(record["variants"]) for record in records),
+        "negative_reports": sum(not record["variants"] for record in records),
+        "multi_variant_reports": sum(
+            len(record["variants"]) >= 2 for record in records
+        ),
         "genes": len({i.get("gene_symbol") for i in ids if i.get("gene_symbol")}),
         "conditions": len({i.get("disease_id") for i in ids if i.get("disease_id")}),
         "features": sum(len(record["patient_phenotypes"]) for record in records),
+        "distractors": sum(
+            len(truths[name].get("distractors") or []) for name in chosen
+        ),
     }
 
 
@@ -754,25 +997,144 @@ def _review(summaries: dict[str, dict[str, Any]]) -> dict[str, Any]:
             for report, summary in summaries.items()
             if (summary["flags"] if name == "any" else name in summary["flags"])
         }
+        unflagged = len(summaries) - len(flagged)
+        unflagged_wrong = len(wrong) - len(flagged & wrong)
         found[name] = {
             "flagged": len(flagged),
             "flagged_and_wrong": len(flagged & wrong),
             "precision": _ratio(len(flagged & wrong), len(flagged)),
             "recall": _ratio(len(flagged & wrong), len(wrong)),
+            "unflagged_accuracy": _ratio(unflagged - unflagged_wrong, unflagged),
         }
     return {"reports": len(summaries), "wrong": len(wrong), "checks": found}
 
 
+def _category_macro_f1(matrix: dict[str, dict[str, int]]) -> float | None:
+    """Returns unweighted macro-F1 across non-empty classes of a confusion matrix."""
+    classes = sorted(
+        (set(matrix) | {pred for row in matrix.values() for pred in row}) - {"none"}
+    )
+    if not classes:
+        return None
+    f1s = []
+    for cls in classes:
+        tp = matrix.get(cls, {}).get(cls, 0)
+        fn = sum(count for pred, count in matrix.get(cls, {}).items() if pred != cls)
+        fp = sum(row.get(cls, 0) for truth, row in matrix.items() if truth != cls)
+        denom = 2 * tp + fp + fn
+        f1s.append(2 * tp / denom if denom else 0.0)
+    return round(sum(f1s) / len(f1s), 4)
+
+
+def _actionable_acmg_f1(matrix: dict[str, dict[str, int]]) -> float | None:
+    """Returns binary F1 separating P/LP from other variant classifications."""
+    tp = fp = fn = 0
+    for truth, row in matrix.items():
+        truth_pos = truth in _PATHOGENIC
+        for pred, count in row.items():
+            pred_pos = pred in _PATHOGENIC
+            if truth_pos and pred_pos:
+                tp += count
+            elif not truth_pos and pred_pos:
+                fp += count
+            elif truth_pos and not pred_pos:
+                fn += count
+    if not (tp + fp + fn):
+        return None
+    denom = 2 * tp + fp + fn
+    return round(2 * tp / denom, 4) if denom else 0.0
+
+
+def _safety(
+    truths: dict[str, dict[str, Any]],
+    chosen: list[str],
+    summaries: dict[str, dict[str, Any]],
+    outcomes: list[compare.Outcome],
+    confusions: dict[str, dict[str, dict[str, int]]],
+) -> dict[str, Any]:
+    """Returns clinical safety, grounding, and category macro-F1 metrics."""
+    negatives = [name for name in chosen if not truths[name]["record"]["variants"]]
+    neg_right = sum(summaries[name]["correct"] for name in negatives)
+    fp_variants = sum(summaries[name]["variants"]["extra"] > 0 for name in negatives)
+    pathogenic = [o for o in outcomes if o.field == "variants" and o.pathogenic is True]
+    pathogenic_found = sum(o.result == "correct" for o in pathogenic)
+    pathogenic_clinical = sum(
+        o.result == "correct" and o.clinical_ok is True for o in pathogenic
+    )
+    written = sum(
+        s["values"]["right"] + s["values"]["extra"] for s in summaries.values()
+    )
+    hallucinations = sum(
+        _is_extracted(o)
+        and o.result in ("wrong", "extra")
+        and o.cause in ("not_in_pages", "hallucination")
+        for o in outcomes
+    )
+    distractor_entities = sum(
+        o.field in compare.ENTITIES and o.result == "extra" and o.cause == "distractor"
+        for o in outcomes
+    )
+    return {
+        "pathogenic_variants": len(pathogenic),
+        "pathogenic_variant_recall": _ratio(pathogenic_found, len(pathogenic)),
+        "pathogenic_clinical_recall": _ratio(pathogenic_clinical, len(pathogenic)),
+        "actionable_acmg_f1": _actionable_acmg_f1(
+            confusions.get("variants.classification", {})
+        ),
+        "negative_reports": len(negatives),
+        "negative_specificity": _ratio(neg_right, len(negatives)),
+        "false_positive_variant_rate": _ratio(fp_variants, len(negatives)),
+        "written_values": written,
+        "hallucinations": hallucinations,
+        "hallucination_rate": _ratio(hallucinations, written),
+        "distractor_entities": distractor_entities,
+        "classification_macro_f1": _category_macro_f1(
+            confusions.get("variants.classification", {})
+        ),
+        "result_macro_f1": _category_macro_f1(
+            confusions.get("normalized.overall_result", {})
+        ),
+    }
+
+
+def _clinical_errors(outcomes: list[compare.Outcome]) -> dict[str, int]:
+    """Returns counts of clinical errors by clinical severity category."""
+    counts = {
+        "missed_pathogenic_variant": 0,
+        "missed_other_variant": 0,
+        "extra_variant": 0,
+        "actionable_acmg_flip": 0,
+        "other_acmg_error": 0,
+        "wrong_zygosity_or_cn": 0,
+        "wrong_result_or_karyotype": 0,
+    }
+    for o in outcomes:
+        if o.field not in compare.CLINICAL or o.result == "correct":
+            continue
+        if o.field == "variants":
+            if o.result == "extra":
+                counts["extra_variant"] += 1
+            elif o.pathogenic:
+                counts["missed_pathogenic_variant"] += 1
+            else:
+                counts["missed_other_variant"] += 1
+        elif o.field == "variants.classification":
+            if (o.truth in _PATHOGENIC) != (o.found in _PATHOGENIC):
+                counts["actionable_acmg_flip"] += 1
+            else:
+                counts["other_acmg_error"] += 1
+        elif o.field in ("variants.zygosity", "variants.copy_number"):
+            counts["wrong_zygosity_or_cn"] += 1
+        else:
+            counts["wrong_result_or_karyotype"] += 1
+    return counts
+
+
 def _groups(
-    cases: dict[str, dict[str, Any]],
     truths: dict[str, dict[str, Any]],
     summaries: dict[str, dict[str, Any]],
 ) -> dict[str, dict[str, dict[str, Any]]]:
-    """Returns the report accuracy of the reports of each lab, tag and so on.
-
-    A lab is held out if the truth folder has no dev case of it.
-    """
-    seen = {case.get("lab") for case in cases.values() if case.get("split") == "dev"}
+    """Returns the report accuracy of the reports of each lab, tag and so on."""
     members: dict[tuple[str, str], list[str]] = collections.defaultdict(list)
     for name in summaries:
         case = truths[name].get("case", {})
@@ -780,16 +1142,13 @@ def _groups(
         length = len(truths[name].get("pages") or [])
         labels = [
             ("lab", case.get("lab")),
+            ("laboratory", case.get("laboratory")),
             ("kind", case.get("kind")),
             ("scenario", case.get("scenario")),
             ("variants", str(count) if count < 2 else "2 or more"),
             ("pages", (str(length) if length < 4 else "4 or more") if length else None),
-            *(("tag", tag) for tag in case.get("tags", [])),
+            *(("challenge", name) for name in case.get("challenges", [])),
         ]
-        if seen and case.get("lab"):
-            labels.append(
-                ("held_out", "seen in dev" if case["lab"] in seen else "held out")
-            )
         for group, label in labels:
             if label is not None:
                 members[group, label].append(name)
@@ -847,14 +1206,41 @@ def _performance(
     }
 
 
+def _truths(truth_dir: pathlib.Path) -> tuple[dict[str, dict[str, Any]], list[str]]:
+    """Returns the truth files of a folder by report, and their sorted names.
+
+    Raises:
+        ValueError: `truth_dir` has no truth files.
+    """
+    truths = {
+        path.stem: json.loads(path.read_text(encoding="utf-8"))
+        for path in sorted(truth_dir.glob("*.json"))
+    }
+    chosen = list(truths)
+    if not chosen:
+        raise ValueError(f"{truth_dir} has no truth files")
+    return truths, chosen
+
+
+def page_choice(
+    truth_dir: pathlib.Path, decisions: pathlib.Path, threshold: float
+) -> dict[str, Any]:
+    """Returns how well a decisions.jsonl chose the pages.
+
+    The numbers are those of `select` in the scores, for a decisions.jsonl
+    that another way of choosing pages wrote (select_methods.py).
+    """
+    truths, chosen = _truths(truth_dir)
+    return _select(truths, chosen, _read_jsonl(decisions), threshold)
+
+
 def score(
     truth_dir: pathlib.Path,
     run_dir: pathlib.Path,
-    split: str,
     gpus: list[int] | None = None,
     label: str | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Scores a run of gentrex normalize against the truth files of a split.
+    """Scores a run of gentrex normalize against a folder of truth files.
 
     A truth file's report is the PDF with the same name. A report that the
     run doesn't have counts as all missed.
@@ -862,7 +1248,6 @@ def score(
     Args:
         truth_dir: Folder of truth files.
         run_dir: Run folder of gentrex normalize.
-        split: The split to score, as the truth files name it, or "all".
         gpus: The GPUs that the model servers of gentrex transcribe, select
             and extract ran on, for the GPU-hours.
         label: A name of the run's setup, such as the model it tried.
@@ -876,18 +1261,8 @@ def score(
     runs = _runs(run_dir)
     if "normalize" not in runs or "transcribe" not in runs:
         raise ValueError(f"{run_dir} is not a run folder of gentrex normalize")
-    truths = {
-        path.stem: json.loads(path.read_text(encoding="utf-8"))
-        for path in sorted(truth_dir.glob("*.json"))
-    }
+    truths, chosen = _truths(truth_dir)
     cases = {name: truth.get("case", {}) for name, truth in truths.items()}
-    chosen = [
-        name
-        for name, case in cases.items()
-        if split == "all" or case.get("split") == split
-    ]
-    if not chosen:
-        raise ValueError(f"{truth_dir} has no truth files of the split {split}")
 
     transcribe_dir = pathlib.Path(runs["transcribe"]["path"])
     select_dir = pathlib.Path(runs.get("select", runs["transcribe"])["path"])
@@ -905,6 +1280,7 @@ def score(
 
     outcomes: list[compare.Outcome] = []
     summaries = {}
+    field_counts = []
     errors = []
     for name in chosen:
         own = compare.compare(
@@ -917,14 +1293,19 @@ def score(
             clinvar,
         )
         outcomes += own
+        field_counts.append(_report_field_counts(own))
         case = cases[name]
         summaries[name] = _summary(own) | {
-            "case": {key: case.get(key) for key in ("lab", "kind", "scenario", "tags")}
+            "case": {
+                key: case.get(key) for key in ("lab", "kind", "scenario", "challenges")
+            }
         }
         for outcome in own:
             if outcome.result != "correct":
                 error = {"report": name, **dataclasses.asdict(outcome)}
                 del error["strict"]
+                del error["clinical_ok"]
+                del error["pathogenic"]
                 errors.append(error)
 
     performance = _performance(runs, len(transcribed), gpus)
@@ -946,6 +1327,8 @@ def score(
         else None
     )
     manifest = truth_dir.parent / "manifest.json"
+    confusions = _confusions(outcomes, _categories(schema))
+    value_pages = _value_pages(truths, chosen)
     scores = {
         "format": FORMAT,
         "truth": str(truth_dir.resolve()),
@@ -954,7 +1337,6 @@ def score(
             if manifest.is_file()
             else None
         ),
-        "split": split,
         "label": label,
         "pdfs": runs["transcribe"]["input"],
         "reports": len(chosen),
@@ -962,11 +1344,13 @@ def score(
             not (reports.get(name) or {}).get("data") for name in chosen
         ),
         "data": _data(truths, chosen),
-        "main": _main_numbers(list(summaries.values())),
+        "main": _main_numbers(list(summaries.values()), field_counts),
+        "safety": _safety(truths, chosen, summaries, outcomes, confusions),
+        "clinical_errors": _clinical_errors(outcomes),
         "entities": _entities(outcomes),
         "variant_kinds": _variant_kinds(outcomes),
         "fields": _fields(outcomes),
-        "confusions": _confusions(outcomes, _categories(schema)),
+        "confusions": confusions,
         "funnel": _funnel(outcomes),
         "charges": _charges(outcomes),
         "pages": _pages(
@@ -974,6 +1358,7 @@ def score(
             chosen,
             _read_jsonl(transcribe_dir / "pages.jsonl"),
             _read_jsonl(select_dir / "pages.jsonl") if "select" in runs else None,
+            value_pages,
         ),
         "select": (
             _select(
@@ -981,6 +1366,7 @@ def score(
                 chosen,
                 _read_jsonl(select_dir / "decisions.jsonl"),
                 runs["select"]["settings"]["keep_threshold"],
+                value_pages,
             )
             if "select" in runs and (select_dir / "decisions.jsonl").is_file()
             else None
@@ -989,7 +1375,7 @@ def score(
         "hpo": _hpo(outcomes),
         "checks": _checks(outcomes),
         "review": _review(summaries),
-        "groups": _groups(cases, truths, summaries),
+        "groups": _groups(truths, summaries),
         "performance": performance,
         "runs": runs,
         "by_report": summaries,
@@ -1019,7 +1405,7 @@ def list_runs(folder: pathlib.Path = _RESULTS_DIR) -> list[str]:
         main = scores["main"]
         value_f1 = main.get("value_f1", {}).get("value")
         lines.append(
-            f"{path.parent.name}  {scores['split']:<4}  {setup(scores):<24}"
+            f"{path.parent.name}  {setup(scores):<24}"
             f"  {scores['reports']:>4} reports"
             f"  report accuracy {percent(main['report_accuracy']['value']):>6}"
             f"  value F1 {percent(value_f1):>6}"
@@ -1040,10 +1426,13 @@ _MAIN_LABELS = {
     "report_accuracy": "Report accuracy",
     "record_accuracy": "Reports with every value right",
     "patient_match": "MRN and date of birth both right",
-    "value_f1": "Value F1",
+    "value_f1": "Value F1 (micro)",
+    "macro_field_f1": "Field F1 (macro)",
+    "strict_value_f1": "Exact-match value F1",
     "value_precision": "Value precision",
     "value_recall": "Value recall",
-    "variant_f1": "Variant F1",
+    "variant_f1": "Variant detection F1",
+    "clinical_variant_f1": "Clinical variant F1",
     "variant_precision": "Variant precision",
     "variant_recall": "Variant recall",
 }
@@ -1077,6 +1466,32 @@ def _pages_text(scores: dict[str, Any]) -> str:
         f" {funnel['extra']} values that no report states."
     )
     return " ".join(text)
+
+
+def _select_methods_text(scores: dict[str, Any]) -> list[str]:
+    """Returns the table of the ways to choose pages, if the run compared them."""
+    compared = scores.get("select_methods")
+    if not compared:
+        return []
+    rows = []
+    for name, m in compared["methods"].items():
+        needed = m["needed_kept"] + m["needed_dropped"]
+        rows.append(
+            [
+                f"`{name}`",
+                percent(_ratio(m["needed_kept"], needed)),
+                percent(_ratio(m["needed_kept"] + m["other_kept"], m["pages"])),
+                m["seconds"],
+                m["requests"],
+                m["prompt_tokens"],
+                m["completion_tokens"],
+            ]
+        )
+    header = ["Way to choose pages", "Needed pages kept", "Pages kept", "Seconds"]
+    return [
+        f"The ways to choose pages, each on `{compared['model']}`:",
+        _table([*header, "Requests", "Tokens in", "Tokens out"], rows),
+    ]
 
 
 def markdown(scores: dict[str, Any]) -> str:
@@ -1114,7 +1529,7 @@ def markdown(scores: dict[str, Any]) -> str:
     ]
     parts = [
         "# Scores",
-        f"{scores['reports']} reports of the split `{scores['split']}`, read from"
+        f"{scores['reports']} reports, read from"
         f" `{scores['pdfs']}`. {scores['without_record']} of them have no record.",
         "## Main numbers",
         _table(
@@ -1127,6 +1542,55 @@ def markdown(scores: dict[str, Any]) -> str:
                     f" {percent(scores['main'][name]['high'])}",
                 ]
                 for name, label in _MAIN_LABELS.items()
+            ],
+        ),
+        "## Clinical safety and grounding",
+        _table(
+            ["Measure", "Value"],
+            [
+                [
+                    "Pathogenic / likely pathogenic variant recall",
+                    percent(scores["safety"].get("pathogenic_variant_recall")),
+                ],
+                [
+                    "Pathogenic / likely pathogenic clinical recall",
+                    percent(scores["safety"].get("pathogenic_clinical_recall")),
+                ],
+                [
+                    "Actionable ACMG F1 (P/LP vs. other)",
+                    percent(scores["safety"].get("actionable_acmg_f1")),
+                ],
+                [
+                    "Negative-report specificity",
+                    percent(scores["safety"]["negative_specificity"]),
+                ],
+                [
+                    "False-positive variant rate on negative reports",
+                    percent(scores["safety"]["false_positive_variant_rate"]),
+                ],
+                [
+                    "Ungrounded hallucination rate",
+                    percent(scores["safety"]["hallucination_rate"]),
+                ],
+                [
+                    "Distractor entities copied",
+                    scores["safety"]["distractor_entities"],
+                ],
+                [
+                    "ACMG classification macro-F1",
+                    percent(scores["safety"]["classification_macro_f1"]),
+                ],
+                [
+                    "Overall result macro-F1",
+                    percent(scores["safety"]["result_macro_f1"]),
+                ],
+            ],
+        ),
+        _table(
+            ["Clinical error type", "Count"],
+            [
+                [name.replace("_", " "), count]
+                for name, count in (scores.get("clinical_errors") or {}).items()
             ],
         ),
         "## Variants and clinical features",
@@ -1167,6 +1631,7 @@ def markdown(scores: dict[str, Any]) -> str:
         *checked,
         "## Pages",
         _pages_text(scores),
+        *_select_methods_text(scores),
         "## Fields",
         _table(
             ["Field", "Values", "Accuracy", "F1", "Exact", "Missed", "Extra", "Wrong"],
@@ -1237,11 +1702,6 @@ def write(
 def add_arguments(parser: argparse.ArgumentParser) -> None:
     """Adds the options that the scorer shares with gentrex-bench/run.py."""
     parser.add_argument(
-        "--split",
-        default="dev",
-        help="Split to score: dev, test or all. The default is dev.",
-    )
-    parser.add_argument(
         "--gpus",
         type=int,
         nargs=3,
@@ -1283,7 +1743,7 @@ def main() -> int:
         print("\n".join(list_runs()))
         return 0
     try:
-        scores, errors = score(args.truth, args.run, args.split, args.gpus, args.label)
+        scores, errors = score(args.truth, args.run, args.gpus, args.label)
     except ValueError as exc:
         _logger.error("%s", exc)
         return 1

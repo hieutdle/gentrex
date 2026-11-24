@@ -24,16 +24,16 @@ whether gentrex-bench does it yet.
 | TPC-H | Every published result comes with a [Full Disclosure Report](https://www.tpc.org/results/fdr/tpch/hpe~tpch~30000~hpe_proliant_compute_dl580_gen12~fdr~2026-06-11~v02.pdf) of the hardware, the settings and the price. | `manifest.json` records the settings and a checksum of each reference file. Each truth file records the model that wrote the report and the Chrome version. `scores.json` keeps the `run.yaml` of every command with the scores. | yes |
 | TPC-H | Its run rules forbid code that only exists to win the benchmark. | Nothing in Gentrex may react to what only synthetic reports have, such as their footer. | rule only |
 | [Artificial Analysis](https://artificialanalysis.ai/methodology/intelligence-benchmarking), for LLMs | It runs every model itself with the same test setup, repeats the tests whose scores vary, and gives 95% confidence intervals. | Every model goes through the same Gentrex commands on the same frozen test set, three times, with bootstrap confidence intervals. | the intervals |
-| Artificial Analysis | It shows each model's accuracy next to its speed and price. | A table of report accuracy next to GPU-hours per 1,000 reports, in `evaluation_results/analysis.ipynb`. | yes |
+| Artificial Analysis | It shows each model's accuracy next to its speed and price. | A table of report accuracy next to GPU-hours per 1,000 reports, in `evaluation_results/benchruns.py`. | yes |
 | [GIAB and GA4GH](https://pmc.ncbi.nlm.nih.gov/articles/PMC6699627), for variant calling | Every tool's variants are matched and counted the same way. A variant found with the wrong genotype counts apart from one not found. | The scorer matches variants by gene and DNA change first, and then scores zygosity, classification and the rest. | yes |
-| GIAB and GA4GH | Results are split by variant type and region. | Every case records its lab, test, result and challenge tags, so results can be split by each. Each tag is in 11 to 17 of the 200 test cases, and each template in 8 to 12. | yes |
+| GIAB and GA4GH | Results are split by variant type and region. | Every case records its lab, test, result and challenges, so results can be split by each. Each challenge is in 49 to 52 of the 300 cases, and each template in 12 to 18. | yes |
 | GIAB and GA4GH | Only regions where the truth is certain are scored. | Where a real report is ambiguous, the annotators give both readings and either one counts. | no |
 | [CAMI](https://pmc.ncbi.nlm.nih.gov/articles/PMC6368784), for metagenomics | One simulation gives the truth for every step of the analysis. | One truth file holds the page texts for `gentrex transcribe`, the record for `gentrex extract` and the IDs for `gentrex normalize`. | yes |
 | [n2c2](https://pmc.ncbi.nlm.nih.gov/articles/PMC7489085), for clinical NLP | Two people annotate each document, and a third settles disagreements. Matches are scored strict and lenient. | The same protocol for real reports, and both ways of matching. | the matching |
-| [Weber et al. 2019](https://pmc.ncbi.nlm.nih.gov/articles/PMC6584985), guidelines | Simulated data has a known truth, but it must look like real data. | The truth comes from real ClinVar, HPO and MONDO records. Reports have distractors, held-out labs and scanned copies. Public sample reports and real reports will show how far synthetic results carry over. | partly |
+| [Weber et al. 2019](https://pmc.ncbi.nlm.nih.gov/articles/PMC6584985), guidelines | Simulated data has a known truth, but it must look like real data. | The truth comes from real ClinVar, HPO and MONDO records. Reports have distractors and scanned copies. Public sample reports and real reports will show how far synthetic results carry over. | partly |
 
 Two ideas don't carry over. TPC-H scales its data up because databases slow
-down as data grows, but Gentrex reads each report on its own, so 200 reports
+down as data grows, but Gentrex reads each report on its own, so 300 reports
 show its speed as well as 10,000 would. Artificial Analysis also combines its
 tests into one index. Gentrex would need weights between its measures for
 that, and there is no good reason for any choice of weights, so report
@@ -99,38 +99,27 @@ for Prader-Willi and Angelman syndromes.
 
 | Part | What it is |
 | --- | --- |
-| Dev set | 100 cases, for tuning Gentrex's prompts and settings |
-| Test set | 200 cases, frozen. At 90% accuracy, 200 reports give a 95% confidence interval of about ±4 points, and at 70% about ±6. |
-| Templates | Three of the 21 templates appear only in the test set: the image-only genome cards, the carrier screen grid and the lab-system printout. They show how Gentrex does on layouts it wasn't tuned on. |
-| Versions | Each report comes as a native PDF, a scan, a fax, a mixed PDF and an image PDF, all with one truth. Comparing them shows what scanning costs. |
+| Cases | 300 cases across all 21 templates. At 90% accuracy, 300 reports give a 95% confidence interval of about ±3.4 points, and at 70% about ±5.2. |
+| Versions | Each report comes as a native PDF, a scan and a fax, all with one truth. Comparing them shows what scanning costs. |
 | Version name | A folder name such as `v1`. Results compare only within one version. |
 
-Gentrex trains no model, but every change made after reading its wrong
-records fits it to those reports. That holds for the questions and
-`select.keep_threshold` of `gentrex select`, for `extract.instruction` and
-the descriptions in the schema of `gentrex extract`, and for the rules and
-the HPO models of `gentrex normalize`. Accuracy on reports that were used
-this way comes out too high. The test set is therefore scored only with
-settings that were decided on the dev set.
-
-Every report has all five versions. The alternative would give each version
-to a share of the reports, such as scans to a fifth of them. With all five,
+Every report has all three versions. The alternative would give each version
+to a share of the reports, such as scans to a fifth of them. With all three,
 the runs on native PDFs and on scans read the same reports, so a drop in
 accuracy comes from the scanning alone and not from harder cases. No share
 has to be chosen either. How many reports arrive scanned or faxed differs
 between hospitals, and a reader can weigh the accuracy of each version by
 their own mix.
 
-The templates get about the same number of cases. Each of the 18 templates
-of the dev set gets 5 to 7 cases, and each of the 21 templates of the test
-set gets 8 to 12. The numbers can't be equal, because the
+The templates get about the same number of cases. Each of the 21 templates
+gets 12 to 18 cases. The numbers can't be equal, because the
 shares of the tests are fixed first, and a template only gets cases of the
 tests it reports.
 [How the benchmark generator works](benchmark-generator.md#templates) lists
 the count of each template.
 
 Every JSON and HTML file of a version holds a canary string, and the native
-and image PDFs have it in their title. It's a fixed sentence with a random
+PDFs have it in their title. It's a fixed sentence with a random
 ID, as BIG-bench uses, that lets model makers keep the set out of their
 training data.
 
@@ -140,7 +129,7 @@ Each report gets one JSON file, in the formats Gentrex itself writes.
 
 | Key | Holds |
 | --- | --- |
-| `case` | The split, lab, test, result, challenge tags and writing model |
+| `case` | The template and its laboratory, the test, result, challenges, tags and writing model |
 | `record` | What `gentrex extract` should write, with the page of each variant |
 | `normalized` | What `gentrex normalize` should add |
 | `pages` | The text of each page of the native PDF |
@@ -228,9 +217,9 @@ Each lost value is charged to the first command that lost it:
 | wrong or missing in the record | `gentrex extract` |
 | right in the record, with a wrong date, category or ID | `gentrex normalize` |
 
-An extra value is charged to the command that wrote it. Results are split by
-seen and held-out lab, by challenge tag, by number of variants and by
-result. Each run reads one PDF version, so the versions are compared across
+An extra value is charged to the command that wrote it. Results are grouped
+by laboratory, by template, by kind of test, by result, by challenge, by
+number of variants and by page count. Each run reads one PDF version, so the versions are compared across
 runs.
 
 `gentrex extract` names the copied values that it can't find in the pages'
@@ -254,13 +243,11 @@ records the GPUs and the vLLM version.
 
 ## Run rules
 
-1. Tune on the dev set only. Score the test set only for the numbers you
-   report.
-2. Report every run, not only the best one.
-3. Use the same settings for native and scanned reports.
-4. Nothing in Gentrex may react to what only synthetic reports have, such as
+1. Report every run, not only the best one.
+2. Use the same settings for native and scanned reports.
+3. Nothing in Gentrex may react to what only synthetic reports have, such as
    their footer.
-5. Keep with every result the Gentrex version and commit from `run.yaml`, the
+4. Keep with every result the Gentrex version and commit from `run.yaml`, the
    settings, the models, the vLLM version, the GPUs and the benchmark
    version.
 
@@ -329,9 +316,8 @@ reports do, and prints the ClinVar ID of each variant. Labcorp's diagonal "SAMPL
 because its letters mix into the text of the values and the check could no
 longer find them.
 
-Because the templates follow these reports, their layouts are no longer new
-to a Gentrex that was tuned on the synthetic dev set. Scores on the public
-reports then measure how Gentrex handles real files of familiar layouts.
+Because the templates follow these reports, scores on the public reports
+measure how Gentrex handles real files of familiar layouts.
 
 The sample reports have limits. Three labs make up 47 of the 61, and sample
 reports are tidier than real ones. The labs haven't allowed anyone to share
@@ -356,7 +342,7 @@ tables leave it, because the error lists quote patient data.
 Synthetic accuracy describes only the mix of cases that was generated. What
 the synthetic set can show is whether it ranks setups the same way as real
 reports and finds the same weak fields. Where it doesn't, the generator is
-missing something, and that gap becomes a new challenge tag.
+missing something, and that gap becomes a new tag.
 
 ## Next steps
 

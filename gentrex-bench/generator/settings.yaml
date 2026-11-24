@@ -5,10 +5,9 @@
 # `generate.py sample`: Sample the cases.
 sample:
   # The same seed and reference files always give the same cases.
-  seed: gentrex-synthetic-1
-  # Cases for tuning Gentrex, and frozen cases for scoring it.
-  dev: 100
-  test: 200
+  seed: gentrex-synthetic-2
+  # How many cases to sample.
+  cases: 300
   # The reference files the cases are sampled from
   # (docs/development/generate-benchmark-reports.md, step 1).
   clinvar: data/clinvar/variant_summary_2026-11.txt.gz

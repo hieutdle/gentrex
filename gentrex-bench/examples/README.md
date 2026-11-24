@@ -43,16 +43,14 @@ The labs are fictional. Each one's templates follow the public sample reports
 of a real lab, which
 [Templates](../../docs/development/benchmark-generator.md#templates) lists.
 
-## The five copies
+## The three copies
 
 | File | What it looks like |
 | --- | --- |
 | `carrier-banner.pdf` | The PDF as Chrome printed it, with a text layer |
-| `carrier-banner-scan.pdf` | Page images with a slight skew, blur, noise and JPEG compression, as from an office scanner |
-| `carrier-banner-fax.pdf` | Page images at three quarters of the vertical resolution, with a larger skew, in black and white, with a few speckles and thin streaks |
-| `carrier-banner-mixed.pdf` | The native PDF with about a third of its pages scanned |
-| `carrier-banner-image.pdf` | Clean page images whose only text is a short document code |
+| `carrier-banner-scan.pdf` | Page images with a slight skew, a little blur and noise, and JPEG compression, as from a good office scanner |
+| `carrier-banner-fax.pdf` | Page images at seven eighths of the vertical resolution, with a larger skew, in black and white, with a few speckles and at most one thin streak |
 
-All five share the truth file `carrier-banner.json`.
+All three share the truth file `carrier-banner.json`.
 [How the benchmark generator works](../../docs/development/benchmark-generator.md)
-explains the truth files, the challenge tags and the copies.
+explains the truth files, the challenges and the copies.

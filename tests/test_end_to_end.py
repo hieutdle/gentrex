@@ -154,9 +154,7 @@ def test_records_that_match_the_truth_score_as_right(tmp_path, monkeypatch):
         assert args.func(args) == 0
     finally:
         server.shutdown()
-    scores, errors = score.score(
-        _EXAMPLES, pathlib.Path("results/normalize/latest"), "all"
-    )
+    scores, errors = score.score(_EXAMPLES, pathlib.Path("results/normalize/latest"))
 
     unexpected = [e for e in errors if not _is_challenge(e, truths[e["report"]])]
     assert unexpected == [], json.dumps(unexpected, indent=1)

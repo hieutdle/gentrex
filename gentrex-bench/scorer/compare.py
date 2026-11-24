@@ -86,6 +86,10 @@ class Outcome:
         rank: For the HPO term of a clinical feature whose text was found,
             the place of the true term among the candidates, from 1, or None
             if it isn't one of them.
+        clinical_ok: For a matched variant, whether its clinical attributes
+            (copy number, classification, zygosity) are all correct.
+        pathogenic: For an expected variant, whether its true ACMG
+            classification is pathogenic or likely pathogenic.
     """
 
     field: str
@@ -100,6 +104,8 @@ class Outcome:
     kind: str | None = None
     subgroup: str | None = None
     rank: int | None = None
+    clinical_ok: bool | None = None
+    pathogenic: bool | None = None
 
 
 def key(field: str, value: Any) -> Any:
@@ -405,6 +411,10 @@ def compare(
             None,
         )
         kind = check.variant_kind(expected)
+        is_pathogenic = expected.get("classification") in (
+            "pathogenic",
+            "likely_pathogenic",
+        )
         if match is None:
             lost = _change(expected)[1] or expected.get("gene_symbol")
             outcomes.append(
@@ -416,6 +426,7 @@ def compare(
                     None,
                     charge(lost),
                     kind=kind,
+                    pathogenic=is_pathogenic,
                 )
             )
             continue
@@ -427,17 +438,17 @@ def compare(
         ):
             # Written as the approved symbol, which is as right as the printed one.
             expected = expected | {"gene_symbol": found["gene_symbol"]}
-        outcomes.append(
-            Outcome(
-                "variants",
-                "correct",
-                True,
-                _label(expected),
-                _label(found),
-                checks=hgvs_check(index),
-                kind=kind,
-            )
+        variant_outcome = Outcome(
+            "variants",
+            "correct",
+            True,
+            _label(expected),
+            _label(found),
+            checks=hgvs_check(index),
+            kind=kind,
+            pathogenic=is_pathogenic,
         )
+        outcomes.append(variant_outcome)
         variant_results = {
             field: add(
                 f"variants.{field}",
@@ -449,6 +460,11 @@ def compare(
             )
             for field, value in expected.items()
         }
+        variant_outcome.clinical_ok = all(
+            variant_results[field] == "correct"
+            for field in ("copy_number", "classification", "zygosity")
+            if field in variant_results
+        )
         ids = (normalized.get("variants") or [])[index : index + 1]
         printed_symbol = key("gene_symbol", printed_gene)
         old = printed_symbol != key("gene_symbol", expected_ids.get("gene_symbol"))

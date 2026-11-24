@@ -29,7 +29,6 @@ import write  # noqa: E402
 
 from gentrex import config  # noqa: E402
 from gentrex.normalize import rules  # noqa: E402
-from gentrex.transcribe import native  # noqa: E402
 
 _MODES = {
     "DMD": "x_linked_recessive",
@@ -124,7 +123,7 @@ def test_same_seed_gives_same_cases():
     script = (
         "import json, sys; sys.path[:0] = ['tests', 'gentrex-bench/generator']; "
         "import sample, test_bench_generator as t; print(json.dumps(sample.sample("
-        "t.references(), {seed!r}, 10, 10)))"
+        "t.references(), {seed!r}, 20)))"
     )
     runs = [
         subprocess.run(
@@ -145,17 +144,10 @@ def test_records_follow_the_extraction_schema(refs):
     """A truth record has the fields gentrex extract writes, so it can be scored."""
     schema = config.load_schema()["properties"]
     variant_fields = set(schema["variants"]["items"]["properties"])
-    for case in sample.sample(refs, "seed", 20, 20):
+    for case in sample.sample(refs, "seed", 40):
         assert set(case["record"]) == set(schema)
         for variant in case["record"]["variants"]:
             assert set(variant) == variant_fields
-
-
-def test_held_out_labs_appear_only_in_test(refs):
-    held_out = {lab.key for lab in labs.LABS if lab.held_out}
-    cases = sample.sample(refs, "seed", 40, 40)
-    assert not {c["lab"] for c in cases if c["split"] == "dev"} & held_out
-    assert {c["lab"] for c in cases if c["split"] == "test"} & held_out
 
 
 def test_templates_word_every_result_of_their_kinds():
@@ -185,19 +177,19 @@ def test_templates_word_every_result_of_their_kinds():
                 assert wording and "{" not in wording, (lab.key, kind, scenario)
 
 
-def test_every_template_gets_enough_test_cases(refs):
+def test_every_template_gets_enough_cases(refs):
     """Results split by template need enough reports of each template."""
-    cases = sample.sample(refs, "seed", 100, 200)
-    counts = collections.Counter(c["lab"] for c in cases if c["split"] == "test")
+    cases = sample.sample(refs, "seed", 300)
+    counts = collections.Counter(c["lab"] for c in cases)
     assert {lab.key for lab in labs.LABS} == set(counts)
     assert min(counts.values()) >= 8, counts
 
 
-def test_templates_share_the_test_cases_under_any_seed(refs):
+def test_templates_share_the_cases_under_any_seed(refs):
     """A template takes only cases of its kinds, so evening out the counts can
     need a chain of moves through other templates."""
     for seed in range(10):
-        plans = sample._Sampler(refs, str(seed)).plans("test", 200)
+        plans = sample._Sampler(refs, str(seed)).plans(200)
         counts = collections.Counter(lab.key for _, lab in plans)
         assert min(counts.values()) >= 8, (seed, counts)
 
@@ -209,7 +201,7 @@ def test_positive_case_has_a_pathogenic_variant():
         if not gene.startswith("MT-") and gene not in labs.CARRIER_GENES:
             vus = [v for v in variants if v.classification == "uncertain_significance"]
             refs.variants[gene] = vus if len(gene) % 2 else variants
-    for case in sample.sample(refs, "seed", 100, 100):
+    for case in sample.sample(refs, "seed", 200):
         if case["scenario"] == "positive" and case["kind"] == "single_gene":
             classes = {v["classification"] for v in case["record"]["variants"]}
             assert classes & {"pathogenic", "likely_pathogenic"}, case["case_id"]
@@ -218,16 +210,24 @@ def test_positive_case_has_a_pathogenic_variant():
 def test_cases_fit_their_template(refs):
     """A case uses a template that reports its test, with the template's fields."""
     templates = {lab.key: lab for lab in labs.LABS}
-    for case in sample.sample(refs, "seed", 60, 60):
+    for case in sample.sample(refs, "seed", 120):
         lab = templates[case["lab"]]
         assert case["kind"] in lab.kinds
         assert "{" not in case["record"]["overall_result_raw"]
         assert all(case["record"][field] is None for field in lab.missing)
 
 
+def test_challenges_share_the_cases(refs):
+    """Results split by challenge need about as many reports of each."""
+    cases = sample.sample(refs, "seed", 300)
+    counts = collections.Counter(name for c in cases for name in c["challenges"])
+    assert set(counts) == set(sample.CHALLENGES)
+    assert max(counts.values()) - min(counts.values()) <= 5, counts
+
+
 def test_tags_change_the_report(refs):
     """A tag on a report without its challenge would blur the results split by tag."""
-    for case in sample.sample(refs, "seed", 60, 60):
+    for case in sample.sample(refs, "seed", 120):
         variants = case["record"]["variants"]
         current = [v["gene_symbol"] for v in case["normalized"]["variants"]]
         if "legacy_gene_symbol" in case["tags"]:
@@ -253,7 +253,7 @@ def test_templates_print_every_value_and_distractor(refs):
     change its layout, and the HTML must hold every value and distractor
     of the case.
     """
-    for case in sample.sample(refs, "seed", 60, 120):
+    for case in sample.sample(refs, "seed", 180):
         page = fill.fill(case, fill.stand_in_prose(case))
         # Comments aren't printed, unlike the page margins' text in the style.
         page = re.sub(r"/\*.*?\*/|<!--.*?-->", " ", page, flags=re.DOTALL)
@@ -270,9 +270,7 @@ def test_templates_print_every_value_and_distractor(refs):
 
 def test_changes_that_the_case_does_not_print_are_found(refs):
     """A variant that the model prints wrongly would be a false variant in the truth."""
-    case = next(
-        c for c in sample.sample(refs, "seed", 40, 0) if c["record"]["variants"]
-    )
+    case = next(c for c in sample.sample(refs, "seed", 40) if c["record"]["variants"])
     variant = case["record"]["variants"][0]
     change = variant["hgvs_c"] or variant["dna_change_raw"]
     pages = [f"The {change} variant.", "Compare c.9999del in another gene."]
@@ -299,9 +297,7 @@ def test_wrong_protein_changes_and_cut_changes_are_found():
 
 def test_karyotypes_that_the_case_does_not_print_are_found(refs):
     """A karyotype that the model writes may contradict the truth's."""
-    case = next(
-        c for c in sample.sample(refs, "seed", 40, 0) if c["kind"] == "karyotype"
-    )
+    case = next(c for c in sample.sample(refs, "seed", 40) if c["kind"] == "karyotype")
     karyotype = case["record"]["karyotype"]
     other = "46,XX" if karyotype != "46,XX" else "46,XY"
     pages = [f"RESULTS: {karyotype}", f"Unlike {other}, this karyotype"]
@@ -449,10 +445,10 @@ def test_variant_types_follow_the_position():
 
 
 def test_no_variant_is_drawn_twice(refs):
-    """A variant in both dev and test would be tuned on and then scored."""
+    """A variant in two reports would be scored twice."""
     ids = [
         variant["clinvar_variation_id"]
-        for case in sample.sample(refs, "seed", 100, 100)
+        for case in sample.sample(refs, "seed", 200)
         for variant in case["normalized"]["variants"]
         if variant["clinvar_variation_id"]
     ]
@@ -467,14 +463,15 @@ def test_only_mitochondrial_dna_is_heteroplasmic(refs):
     assert sample._zygosity(variant, "Female", True) == "heterozygous"
 
 
-def test_targeted_test_is_named_after_the_printed_gene():
+def test_targeted_test_is_named_after_the_printed_gene(monkeypatch):
     """A current symbol in the test's name would give the report two symbols
     for one gene, and the truth only one of them."""
     refs = references()
     refs.previous_symbols = {gene: [f"OLD{n}"] for n, gene in enumerate(refs.variants)}
+    monkeypatch.setattr(sample._Sampler, "_tags", lambda *args: {"legacy_gene_symbol"})
     cases = [
         case
-        for case in sample.sample(refs, "seed", 100, 100)
+        for case in sample.sample(refs, "seed", 60)
         if case["kind"] == "targeted" and "legacy_gene_symbol" in case["tags"]
     ]
     assert cases
@@ -487,7 +484,7 @@ def test_findings_are_primary_or_secondary_only_where_the_report_says_so(refs):
     """gentrex extract leaves is_secondary_finding null unless the report flags
     the finding, so the truth must too."""
     labelled = {lab.key for lab in labs.LABS if lab.labels_primary}
-    for case in sample.sample(refs, "seed", 60, 60):
+    for case in sample.sample(refs, "seed", 120):
         for variant in case["record"]["variants"]:
             flag = variant["is_secondary_finding"]
             if case["scenario"] == "secondary_finding":
@@ -496,10 +493,15 @@ def test_findings_are_primary_or_secondary_only_where_the_report_says_so(refs):
                 assert flag is (False if case["lab"] in labelled else None)
 
 
-def test_one_page_report_has_no_scanned_page_in_its_mixed_copy():
-    """A mixed copy never has every page scanned, or it would be a scan."""
-    assert scan.mixed_pages("SYN-0001", 1) == []
-    assert len(scan.mixed_pages("SYN-0001", 3)) == 1
+def test_a_report_gets_only_its_appendix_pages(refs):
+    """Appendix pages bring a report to the length of a real one, so the
+    sampler has to vary them and the template has to print the named ones."""
+    cases = sample.sample(refs, "seed", 40)
+    assert len({tuple(case["appendix"]) for case in cases}) > 5
+    case = cases[0] | {"appendix": ["billing"]}
+    page = fill.fill(case, fill.stand_in_prose(case))
+    assert "Billing and Insurance Information" in page
+    assert "Support and Resources" not in page
 
 
 def test_error_in_one_report_does_not_end_the_build(tmp_path, monkeypatch):
@@ -525,7 +527,7 @@ def test_every_variant_of_the_cases_has_a_kind(refs):
     """The kinds split the scores, so a variant of a new kind must get one."""
     kinds = {
         check.variant_kind(variant)
-        for case in sample.sample(refs, "seed", 60, 120)
+        for case in sample.sample(refs, "seed", 180)
         for variant in case["record"]["variants"]
     }
     assert kinds <= set(check.VARIANT_KINDS)
@@ -560,10 +562,9 @@ def test_recheck_renews_the_truth_of_reports_that_print_their_new_case(
         return {"case_id": name, "record": {"test_type": test_type}}
 
     def truth(name, test_type):
-        scans = {"mixed_scanned_pages": [2], "image_document_code": "RPT-1"}
         return {
             "canary": fill.CANARY,
-            "case": {"case_id": name, "writer": {"attempt": 1}} | scans,
+            "case": {"case_id": name, "writer": {"attempt": 1}},
             "record": {"test_type": test_type},
         }
 
@@ -600,24 +601,15 @@ def test_recheck_renews_the_truth_of_reports_that_print_their_new_case(
 def test_a_carrier_test_of_one_gene_is_a_single_gene_test(refs):
     """A cystic fibrosis carrier test sequences CFTR alone, so it is no panel."""
     one_gene = {lab.key for lab in labs.LABS if len(lab.carrier_genes or ()) == 1}
-    carrier = [c for c in sample.sample(refs, "seed", 60, 60) if c["kind"] == "carrier"]
+    carrier = [c for c in sample.sample(refs, "seed", 120) if c["kind"] == "carrier"]
     kinds = {(c["lab"] in one_gene, c["record"]["test_type"]) for c in carrier}
     assert kinds == {(True, "single_gene"), (False, "panel")}
-
-
-def test_image_copy_goes_to_ocr():
-    """The image copy's only text, a document code, is longer than
-    transcribe.native_min_chars, so only its full-page image sends it to OCR."""
-    code = scan.document_code("SYN-0001")
-    min_chars = config.load_settings()["transcribe"]["native_min_chars"]
-    assert len("".join(code.split())) >= min_chars
-    assert native.classify_source(code, min_chars, 1.0, 0) == "scanned"
 
 
 def test_zygosity_fits_inheritance_and_sex(refs):
     """X-linked recessive findings are hemizygous in males, X-linked dominant
     ones heterozygous in females, and carrier findings heterozygous."""
-    for case in sample.sample(refs, "seed", 60, 60):
+    for case in sample.sample(refs, "seed", 120):
         sex = case["card"]["patient"]["sex"]
         for variant in case["record"]["variants"]:
             mode = variant["mode_of_inheritance"]
@@ -707,3 +699,35 @@ def test_list_field_of_another_type_is_a_problem():
     assert write.problems(case, write.paragraphs(prose)) == [
         "recommendations must be lists of paragraphs"
     ]
+
+
+def test_case_summary_counts_dataset_composition():
+    """manifest.json records dataset composition for benchmark reporting."""
+    cases = [
+        {
+            "lab": "exome-box",
+            "kind": "exome",
+            "scenario": "positive",
+            "tags": ["split_table"],
+            "record": {"variants": [{}, {}], "patient_phenotypes": [{}]},
+            "distractors": [{"kind": "literature_variant"}],
+        },
+        {
+            "lab": "panel-blue",
+            "kind": "panel",
+            "scenario": "negative",
+            "tags": [],
+            "record": {"variants": [], "patient_phenotypes": []},
+            "distractors": [],
+        },
+    ]
+
+    summary = generate._case_summary(cases)
+
+    assert summary["cases"] == 2
+    assert summary["labs"] == 2
+    assert summary["negative_reports"] == 1
+    assert summary["multi_variant_reports"] == 1
+    assert summary["variants"] == 2
+    assert summary["distractors"] == 1
+    assert summary["distractors_by_kind"] == {"literature_variant": 1}

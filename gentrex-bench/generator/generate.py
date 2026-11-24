@@ -13,6 +13,7 @@ docs/development/generate-benchmark-reports.md explains them.
 """
 
 import argparse
+import collections
 import datetime
 import hashlib
 import json
@@ -125,7 +126,7 @@ def _sampled(settings: dict[str, Any]) -> tuple[list[dict], dict[str, Any]] | No
         regions,
         sources.load_syndromes(paths["mondo"], paths["hpoa"], terms, sample.SYNDROMES),
     )
-    cases = sample.sample(refs, settings["seed"], settings["dev"], settings["test"])
+    cases = sample.sample(refs, settings["seed"], settings["cases"])
     return cases, {
         "sources": {
             name: {"file": path.name, "sha256": _sha256(path)}
@@ -133,6 +134,33 @@ def _sampled(settings: dict[str, Any]) -> tuple[list[dict], dict[str, Any]] | No
         },
         "usable_variants": sum(len(v) for v in variants.values()),
         "usable_copy_number_changes": len(regions),
+    }
+
+
+def _case_summary(cases: list[dict[str, Any]]) -> dict[str, Any]:
+    """Returns benchmark composition counts recorded in manifest.json."""
+    by_kind = collections.Counter(c["kind"] for c in cases)
+    by_scenario = collections.Counter(c["scenario"] for c in cases)
+    by_tag = collections.Counter(tag for c in cases for tag in c.get("tags", []))
+    by_challenge = collections.Counter(
+        name for c in cases for name in c.get("challenges", [])
+    )
+    distractors = collections.Counter(
+        d["kind"] for c in cases for d in c.get("distractors", [])
+    )
+    return {
+        "cases": len(cases),
+        "labs": len({c["lab"] for c in cases}),
+        "by_kind": dict(sorted(by_kind.items())),
+        "by_scenario": dict(sorted(by_scenario.items())),
+        "by_challenge": dict(sorted(by_challenge.items())),
+        "by_tag": dict(sorted(by_tag.items())),
+        "variants": sum(len(c["record"]["variants"]) for c in cases),
+        "negative_reports": sum(not c["record"]["variants"] for c in cases),
+        "multi_variant_reports": sum(len(c["record"]["variants"]) >= 2 for c in cases),
+        "phenotypes": sum(len(c["record"]["patient_phenotypes"]) for c in cases),
+        "distractors": sum(distractors.values()),
+        "distractors_by_kind": dict(sorted(distractors.items())),
     }
 
 
@@ -160,6 +188,7 @@ def _sample(args: argparse.Namespace, settings: dict[str, Any]) -> int:
                 **_source(),
             },
             "settings": settings,
+            "summary": _case_summary(cases),
             **sources_used,
         },
     )
@@ -191,8 +220,6 @@ def _recheck(args: argparse.Namespace, settings: dict[str, Any]) -> int:
                     _logger.warning("%s: %s", case_id, error)
                 failed.append(case_id)
                 continue
-            for name in ("mixed_scanned_pages", "image_document_code"):
-                result.truth["case"][name] = old["case"][name]
             truth = {"canary": fill.CANARY, **result.truth}
             if truth != old:
                 _write_json(truth_path, truth)
@@ -290,17 +317,6 @@ def _attempt(
         return False
     for level in scan.LEVELS:
         scan.copy(native, out / "pdf" / level / f"{case_id}.pdf", level, case_id)
-    mixed = scan.mixed_pages(case_id, len(result.truth["pages"]))
-    scan.copy(native, out / "pdf" / "mixed" / f"{case_id}.pdf", "scan", case_id, mixed)
-    scan.image_copy(
-        native,
-        out / "pdf" / "image" / f"{case_id}.pdf",
-        case_id,
-        chrome,
-        fill.CANARY,
-    )
-    result.truth["case"]["mixed_scanned_pages"] = mixed
-    result.truth["case"]["image_document_code"] = scan.document_code(case_id)
     _write_json(
         out / "truth" / f"{case_id}.json", {"canary": fill.CANARY, **result.truth}
     )

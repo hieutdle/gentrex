@@ -4,23 +4,28 @@
 #
 #   SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
 #
+# submit_pipeline.sh submits the same runs as six short jobs instead, which
+# wait less in the queue.
+#
 # gentrex-bench/run.py runs gentrex transcribe, select, extract and normalize
 # on each copy of the reports and scores the records. It serves the model of
 # each command with serve.sh, one after another, so the job holds the two
 # GPUs of gentrex extract for its whole time. The scores go to
 # results/gentrex-bench/, one folder for each run.
 #
-# By default the job makes six runs of the dev reports: one for each copy
-# (native, scan, fax, mixed and image), and one more of the native copy
+# By default the job makes six runs of the benchmark reports: native (3 runs
+# for repeatability, the first with --select-methods), scan, fax, and native
 # without gentrex select. VERSION names the benchmark version (v1), COPIES
-# the copies to read, SPLIT the split (dev), NO_SELECT the copies to read
-# once more without gentrex select (native, and NO_SELECT= for none), and
-# OPTIONS more options of run.py for every run. The job fails if a command
-# had failed files, after the scores are written.
+# the copies to read, NO_SELECT the copies to read once more without gentrex
+# select (native, and NO_SELECT= for none), SELECT_METHODS the copies whose
+# pages are also chosen in two other ways (native, and SELECT_METHODS= for
+# none), REPEATS total runs of REPEAT_COPY (3 on native, set REPEATS=1 for
+# none), and OPTIONS extra options of run.py for every run. The job fails if
+# a command had failed files, after the scores are written.
 #BSUB -J gentrex-pipeline
 #BSUB -q gpu
 #BSUB -n 4
-#BSUB -W 6:00
+#BSUB -W 8:00
 #BSUB -gpu num=2
 #BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
 #BSUB -oo run-pipeline.%J.log
@@ -32,12 +37,22 @@ status=0
 run() {
   # --gpus names the GPUs that serve.sh gives each model.
   .venv/bin/python gentrex-bench/run.py \
-    --version "${VERSION:-v1}" --split "${SPLIT:-dev}" \
+    --version "${VERSION:-v1}" \
     --gpus 1 1 2 --serve evaluation/minerva/serve.sh \
     --settings evaluation/settings.yaml $OPTIONS "$@" || status=1
 }
-for copy in ${COPIES:-native scan fax mixed image}; do
-  run --copy "$copy"
+for copy in ${COPIES:-native scan fax}; do
+  case " ${SELECT_METHODS-native} " in
+    *" $copy "*) run --copy "$copy" --select-methods ;;
+    *) run --copy "$copy" ;;
+  esac
+  if [ "$copy" = "${REPEAT_COPY:-native}" ]; then
+    n="${REPEATS:-3}"
+    while [ "$n" -gt 1 ]; do
+      run --copy "$copy"
+      n=$((n - 1))
+    done
+  fi
 done
 case " $OPTIONS " in
   *" --no-select "*) ;;

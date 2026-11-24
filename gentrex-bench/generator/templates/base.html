@@ -1,7 +1,7 @@
 {# The page frame of every template: the canary string, which Chrome also
    writes into the PDF's title, the synthetic footer, the cover pages of the
-   late_page_evidence tag and the feature page of the
-   provided_phenotype_page tag. A template fills the blocks style, footer
+   late_page_evidence tag, the feature page of the
+   provided_phenotype_page tag and the appendix pages. A template fills the blocks style, footer
    (its own footer lines, each ending with a newline) and report. #}
 <!DOCTYPE html>
 <html lang="en">
@@ -38,5 +38,6 @@
   </ul>
 </section>
 {% endif %}
+{% include "_appendix.html" %}
 </body>
 </html>

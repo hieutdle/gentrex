@@ -25,15 +25,15 @@ _PAGES = [
 ]
 
 
-def _truth(name: str = "SYN-0001", split: str = "dev") -> dict[str, Any]:
+def _truth(name: str = "SYN-0001") -> dict[str, Any]:
     return {
         "case": {
             "case_id": name,
-            "split": split,
             "lab": "exome-box",
+            "laboratory": "Aqua Genetics",
             "kind": "exome",
             "scenario": "positive",
-            "tags": ["repeated_variant"],
+            "challenges": ["late_page"],
         },
         "record": {
             "mrn": "SYN-MRN-0001",
@@ -133,7 +133,7 @@ def test_the_truth_scores_all_right(tmp_path):
     truth = _truth()
     truth_dir, run_dir = _write_run(tmp_path, [truth], [_report(truth)])
 
-    scores, errors = score.score(truth_dir, run_dir, "dev")
+    scores, errors = score.score(truth_dir, run_dir)
 
     assert errors == []
     assert scores["main"]["report_accuracy"]["value"] == 1
@@ -309,7 +309,7 @@ def test_the_check_of_copied_values_is_scored_against_the_truth(tmp_path):
     report["not_in_pages"] = ["variants[1].gene_symbol", "variants[1].hgvs_c"]
     truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     # The made-up variant is named, and the wrong MRN is not.
     check = scores["checks"]["not_in_pages"]
@@ -346,7 +346,7 @@ def test_only_clinical_errors_make_a_report_wrong(tmp_path, field, value, right)
     report["data"]["variants"][0][field] = value
     truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     assert scores["main"]["report_accuracy"]["value"] == right
 
@@ -361,7 +361,7 @@ def test_value_numbers_count_only_stated_and_written_values(tmp_path):
     report["data"]["specimen_type"] = "Blood"
     truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     main = {name: number["value"] for name, number in scores["main"].items()}
     assert (main["report_accuracy"], main["record_accuracy"]) == (1, 0)
@@ -400,6 +400,16 @@ def test_ocr_words_are_compared_with_the_true_page_whatever_their_order():
     assert found["ocr_word_precision"] == 0.6
     assert (found["needed"], found["needed_kept"]) == (1, 1)
     assert (found["other"], found["other_dropped"]) == (1, 1)
+    assert (
+        found["values_stated"],
+        found["values_preserved"],
+        found["values_preserved_rate"],
+    ) == (1, 0, 0.0)
+    assert (
+        found["critical_values_stated"],
+        found["critical_values_preserved"],
+        found["critical_values_preserved_rate"],
+    ) == (1, 0, 0.0)
 
 
 @pytest.mark.parametrize(
@@ -434,7 +444,7 @@ def test_categories_are_counted_by_what_they_were_written_as(tmp_path):
     report["data"]["variants"][0]["classification"] = "likely_pathogenic"
     truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     confusions = scores["confusions"]
     assert confusions["variants.classification"] == {
@@ -455,7 +465,7 @@ def test_checks_are_scored_by_value_and_by_report(tmp_path):
     wrong["normalized"]["variants"][0]["hgvs_c_status"] = "invalid"
     truth_dir, run_dir = _write_run(tmp_path, truths, [right, wrong])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     conflict = scores["checks"]["result_conflict"]
     assert (conflict["values"], conflict["flagged"], conflict["not_right"]) == (2, 1, 1)
@@ -470,7 +480,10 @@ def test_checks_are_scored_by_value_and_by_report(tmp_path):
         "flagged_and_wrong": 1,
         "precision": 0.5,
         "recall": 1.0,
+        "unflagged_accuracy": None,
     }
+    assert review["checks"]["hgvs_invalid"]["unflagged_accuracy"] == 1.0
+    assert review["checks"]["result_conflict"]["unflagged_accuracy"] == 0.0
 
 
 def test_variants_are_scored_by_their_kind(tmp_path):
@@ -485,7 +498,7 @@ def test_variants_are_scored_by_their_kind(tmp_path):
     del report["data"]["variants"][1]
     truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     kinds = scores["variant_kinds"]
     assert (kinds["sequence"]["found"], kinds["sequence"]["classification"]) == (1, 1)
@@ -524,7 +537,7 @@ def test_hpo_terms_are_scored_at_the_first_place_and_among_the_candidates(
     report["normalized"]["patient_phenotypes"] = term
     truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     hpo = scores["hpo"]["all"]
     names = ("top_1", "first_candidate", "top_5", "no_term")
@@ -541,7 +554,7 @@ def test_genes_are_scored_by_whether_the_report_prints_the_approved_symbol(tmp_p
     report["normalized"]["variants"][0]["hgnc_id"] = None
     truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     older = scores["normalize"]["normalized.variants.hgnc_id (older symbol)"]
     assert (older["values"], older["right"], older["given_right_source"]) == (1, 0, 0)
@@ -570,7 +583,7 @@ def test_page_selection_is_scored_at_the_run_and_at_other_thresholds(tmp_path):
     run["settings"]["keep_threshold"] = 0.5
     (select_dir / "run.yaml").write_text(yaml.safe_dump(run))
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     select = scores["select"]
     assert (select["needed_kept"], select["needed_dropped"]) == (1, 1)
@@ -593,7 +606,7 @@ def test_extract_is_also_scored_on_the_values_that_reached_it(tmp_path):
         json.dumps({"file": "SYN-0001.pdf", "page": 1, "text": kept[0]}) + "\n"
     )
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
+    scores, _ = score.score(truth_dir, run_dir)
 
     funnel = scores["funnel"]
     assert funnel["lost"]["select"] >= 1
@@ -606,7 +619,7 @@ def test_runs_are_listed_by_their_setup(tmp_path):
     """The label tells two runs on the same copy apart, as two models."""
     truth = _truth()
     truth_dir, run_dir = _write_run(tmp_path, [truth], [_report(truth)])
-    scores, errors = score.score(truth_dir, run_dir, "dev", label="Qwen")
+    scores, errors = score.score(truth_dir, run_dir, label="Qwen")
     out = tmp_path / "scored" / "20261118-120000"
     out.mkdir(parents=True)
     score.write(out, scores, errors)
@@ -614,7 +627,7 @@ def test_runs_are_listed_by_their_setup(tmp_path):
     (line,) = score.list_runs(tmp_path / "scored")
 
     assert score.setup(scores) == "native, Qwen"
-    assert line.startswith("20261118-120000  dev ")
+    assert line.startswith("20261118-120000  native, Qwen")
     assert "report accuracy 100.0%" in line
 
 
@@ -623,7 +636,7 @@ def test_a_report_without_a_record_counts_as_missed(tmp_path):
     truths = [_truth("SYN-0001"), _truth("SYN-0002")]
     truth_dir, run_dir = _write_run(tmp_path, truths, [_report(truths[0])])
 
-    scores, errors = score.score(truth_dir, run_dir, "dev")
+    scores, errors = score.score(truth_dir, run_dir)
 
     assert scores["reports"] == 2
     assert scores["without_record"] == 1
@@ -632,16 +645,15 @@ def test_a_report_without_a_record_counts_as_missed(tmp_path):
     assert {error["report"] for error in errors} == {"SYN-0002"}
 
 
-def test_only_the_named_split_is_scored(tmp_path):
-    """Test reports must not leak into the numbers used for tuning."""
-    truths = [_truth("SYN-0001", "dev"), _truth("SYN-0101", "test")]
-    reports = [_report(truths[0]), {"file": "SYN-0101.pdf", "data": None}]
-    truth_dir, run_dir = _write_run(tmp_path, truths, reports)
+def test_empty_truth_folder_raises(tmp_path):
+    """Scoring an empty truth folder must fail instead of returning empty scores."""
+    truth = _truth("SYN-0001")
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [_report(truth)])
+    for path in truth_dir.glob("*.json"):
+        path.unlink()
 
-    scores, _ = score.score(truth_dir, run_dir, "dev")
-
-    assert list(scores["by_report"]) == ["SYN-0001"]
-    assert scores["main"]["report_accuracy"]["value"] == 1
+    with pytest.raises(ValueError, match="has no truth files"):
+        score.score(truth_dir, run_dir)
 
 
 def test_gpu_hours_come_from_the_time_of_each_command(tmp_path):
@@ -649,7 +661,7 @@ def test_gpu_hours_come_from_the_time_of_each_command(tmp_path):
     truth = _truth()
     truth_dir, run_dir = _write_run(tmp_path, [truth], [_report(truth)], seconds=36.0)
 
-    scores, _ = score.score(truth_dir, run_dir, "dev", gpus=[1, 1, 2])
+    scores, _ = score.score(truth_dir, run_dir, gpus=[1, 1, 2])
 
     # (36 s x 1 + 36 s x 1 + 36 s x 2) / 3600 for one PDF, times 1,000.
     assert scores["performance"]["gpu_hours_per_1000_files"] == 40.0
@@ -671,3 +683,151 @@ def test_two_runs_are_compared_on_the_reports_they_share():
 
     assert (gain["reports"], gain["value"]) == (2, 0.5)
     assert gain["low"] <= gain["value"] <= gain["high"]
+    assert gain["p_value"] == 1.0
+
+
+def test_difference_mcnemar_p_value_drops_on_consistent_wins():
+    """Ten paired wins with zero losses is significant under exact McNemar."""
+    first = {"by_report": {f"r{i}": {"correct": False} for i in range(10)}}
+    second = {"by_report": {f"r{i}": {"correct": True} for i in range(10)}}
+
+    gain = score.difference(first, second)
+
+    assert gain["value"] == 1.0
+    assert gain["p_value"] == round(2 / (2**10), 4)
+
+
+def test_clinical_variant_strict_value_and_macro_field_f1(tmp_path):
+    """Paper metrics separate locus detection, exact strings, and equal field weight."""
+    truth = _truth()
+    report = _report(truth)
+    # Wrong classification breaks clinical variant F1 while locus detection stays 1.
+    report["data"]["variants"][0]["classification"] = "likely_pathogenic"
+    # Lenient-only spelling keeps value_f1 high while lowering strict_value_f1.
+    report["data"]["specimen_type"] = "saliva."
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [report])
+
+    scores, _ = score.score(truth_dir, run_dir)
+
+    main = {name: number["value"] for name, number in scores["main"].items()}
+    assert main["variant_f1"] == 1.0
+    assert main["clinical_variant_f1"] == 0.0
+    assert main["strict_value_f1"] < main["value_f1"]
+    field_f1s = [
+        row["f1"]
+        for name, row in scores["fields"].items()
+        if not name.startswith("normalized.") and row["f1"] is not None
+    ]
+    assert main["macro_field_f1"] == round(sum(field_f1s) / len(field_f1s), 4)
+
+
+def test_page_selection_auroc_separates_needed_from_other_pages(tmp_path):
+    """AUROC measures page ranking quality independent of the chosen threshold."""
+    truth = _truth()
+    truth["pages"] = [
+        {"page": 1, "text": _PAGES[0]},
+        {"page": 2, "text": _PAGES[1]},
+        {"page": 3, "text": "Methods and laboratory limitations"},
+    ]
+    truth_dir, run_dir = _write_run(tmp_path, [truth], [_report(truth)])
+    select_dir = run_dir.parents[1] / "select" / run_dir.name
+    answers = [(1, 0.9, True), (2, 0.7, True), (3, 0.2, False)]
+    (select_dir / "decisions.jsonl").write_text(
+        "".join(
+            json.dumps(
+                {"file": "SYN-0001.pdf", "page": page, "p_yes": {"q": p}, "keep": keep}
+            )
+            + "\n"
+            for page, p, keep in answers
+        )
+    )
+    run = yaml.safe_load((select_dir / "run.yaml").read_text())
+    run["settings"]["keep_threshold"] = 0.5
+    (select_dir / "run.yaml").write_text(yaml.safe_dump(run))
+
+    scores, _ = score.score(truth_dir, run_dir)
+
+    assert scores["select"]["auroc"] == 1.0
+    assert scores["select"]["auprc"] == 1.0
+    assert scores["select"]["brier"] < 0.05
+    assert scores["select"]["ece"] < 0.25
+
+
+def test_clinical_safety_grounding_and_category_macro_f1(tmp_path):
+    """Safety metrics track negative specificity, hallucinations, and macro-F1."""
+    pos = _truth("SYN-0001")
+    neg = _truth("SYN-0002")
+    neg["case"]["scenario"] = "negative"
+    neg["record"]["variants"] = []
+    neg["normalized"]["variants"] = []
+    neg["normalized"]["overall_result"] = "negative"
+
+    r_pos = _report(pos)
+    r_neg = _report(neg)
+    # Hallucinate a variant on the negative report and copy a distractor.
+    r_neg["data"]["variants"] = [{"gene_symbol": "TTN", "hgvs_c": "c.7G>A"}]
+    r_pos["data"]["variants"].append({"gene_symbol": "DMD", "hgvs_c": "c.100C>T"})
+    truth_dir, run_dir = _write_run(tmp_path, [pos, neg], [r_pos, r_neg])
+
+    scores, _ = score.score(truth_dir, run_dir)
+
+    safety = scores["safety"]
+    assert safety["negative_reports"] == 1
+    assert safety["negative_specificity"] == 0.0
+    assert safety["false_positive_variant_rate"] == 1.0
+    assert safety["hallucinations"] == 1
+    assert safety["hallucination_rate"] > 0
+    assert safety["distractor_entities"] == 1
+    assert safety["classification_macro_f1"] == 1.0
+    assert safety["result_macro_f1"] == 1.0
+    assert scores["data"]["negative_reports"] == 1
+    assert scores["data"]["distractors"] == 2
+
+
+def test_fisher_exact_detects_strong_association():
+    """Exact two-sided Fisher p-value is small on separated 2x2 counts."""
+    assert score.fisher_exact(0, 10, 10, 0) < 0.001
+    assert score.fisher_exact(5, 5, 5, 5) == 1.0
+
+
+def test_pathogenic_recall_actionable_acmg_and_clinical_error_breakdown(tmp_path):
+    """Separates P/LP misses and actionable flips from same-tier grade errors."""
+    t1, t2, t3 = _truth("SYN-0001"), _truth("SYN-0002"), _truth("SYN-0003")
+    # Add a second VUS variant on t3 to distinguish missed P/LP vs. missed other.
+    vus = t3["record"]["variants"][0] | {
+        "gene_symbol": "BRCA1",
+        "hgvs_c": "c.100G>A",
+        "classification": "uncertain_significance",
+    }
+    t3["record"]["variants"].append(vus)
+    t3["normalized"]["variants"].append({"hgnc_id": "HGNC:1100"})
+
+    r1, r2, r3 = _report(t1), _report(t2), _report(t3)
+    # r1: adjacent P -> LP grade shift (still actionable, not a clinical flip).
+    r1["data"]["variants"][0]["classification"] = "likely_pathogenic"
+    # r2: actionable P -> VUS flip + wrong zygosity.
+    r2["data"]["variants"][0]["classification"] = "uncertain_significance"
+    r2["data"]["variants"][0]["zygosity"] = "homozygous"
+    # r3: miss both variants, add one extra variant, and get overall result wrong.
+    r3["data"]["variants"] = [{"gene_symbol": "TTN", "hgvs_c": "c.7G>A"}]
+    r3["normalized"]["overall_result"] = "negative"
+
+    truth_dir, run_dir = _write_run(tmp_path, [t1, t2, t3], [r1, r2, r3])
+    scores, errors = score.score(truth_dir, run_dir)
+
+    safety = scores["safety"]
+    assert safety["pathogenic_variants"] == 3
+    assert safety["pathogenic_variant_recall"] == round(2 / 3, 4)
+    assert safety["pathogenic_clinical_recall"] == 0.0
+    # Matched classifications: r1 is P->LP (TP), r2 is P->VUS (FN) => F1 = 2/3.
+    assert safety["actionable_acmg_f1"] == round(2 / 3, 4)
+    assert scores["clinical_errors"] == {
+        "missed_pathogenic_variant": 1,
+        "missed_other_variant": 1,
+        "extra_variant": 1,
+        "actionable_acmg_flip": 1,
+        "other_acmg_error": 1,
+        "wrong_zygosity_or_cn": 1,
+        "wrong_result_or_karyotype": 1,
+    }
+    assert all("pathogenic" not in err for err in errors)

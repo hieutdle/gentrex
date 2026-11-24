@@ -3,12 +3,14 @@
     uv run --extra hpo --env-file .env python gentrex-bench/run.py --version v1
 
 Runs gentrex transcribe, select, extract and normalize on one copy of the
-reports of one split, and scores the result with scorer/score.py. The scores
+reports, and scores the result with scorer/score.py. The scores
 go to a new folder under results/gentrex-bench/. With --serve, the script
 starts the model server of each command and stops it afterwards, so that one
 machine can serve the three models in turn. --settings and --no-select run
-another setup, to compare it with the default one. --from-run goes on after a
-command that already finished, so that a run that stopped doesn't repeat it.
+another setup, to compare it with the default one. --select-methods chooses
+the pages in two other ways as well, to compare gentrex select with them
+(select_methods.py). --from-run goes on after a command that already
+finished, so that a run that stopped doesn't repeat it.
 docs/development/run-benchmark.md explains it.
 """
 
@@ -25,9 +27,12 @@ import time
 import urllib.request
 from typing import Any
 
+import yaml
+
 sys.path.insert(0, str(pathlib.Path(__file__).parent / "scorer"))
 
 import score  # noqa: E402
+import select_methods  # noqa: E402
 
 from gentrex import config  # noqa: E402
 from gentrex import runs  # noqa: E402
@@ -39,15 +44,12 @@ _DATA_DIR = pathlib.Path("data/gentrex-bench")
 type _Step = tuple[str, str | None, str | None]
 
 
-def link_pdfs(
-    version_dir: pathlib.Path, copy: str, split: str, folder: pathlib.Path
-) -> int:
-    """Links one copy of the PDFs of a split into a new folder.
+def link_pdfs(version_dir: pathlib.Path, copy: str, folder: pathlib.Path) -> int:
+    """Links one copy of the benchmark PDFs into a new folder.
 
     Args:
         version_dir: Folder of the benchmark version.
         copy: Folder under pdf/, such as native or scan.
-        split: The split, as the truth files name it, or "all".
         folder: The folder to create.
 
     Returns:
@@ -56,11 +58,9 @@ def link_pdfs(
     folder.mkdir()
     linked = 0
     for path in sorted((version_dir / "truth").glob("*.json")):
-        case = json.loads(path.read_text(encoding="utf-8")).get("case", {})
-        if split in ("all", case.get("split")):
-            pdf = version_dir / "pdf" / copy / f"{path.stem}.pdf"
-            (folder / pdf.name).symlink_to(pdf.resolve())
-            linked += 1
+        pdf = version_dir / "pdf" / copy / f"{path.stem}.pdf"
+        (folder / pdf.name).symlink_to(pdf.resolve())
+        linked += 1
     return linked
 
 
@@ -88,6 +88,28 @@ def _gpu_names() -> list[str]:
     return listed.stdout.split("\n")[:-1] if listed.returncode == 0 else []
 
 
+def finished_run(command: str, input_path: pathlib.Path) -> pathlib.Path | None:
+    """Returns the newest finished run of a command that read input_path.
+
+    Each benchmark run reads a folder of its own, so the input names the run
+    even while other jobs run the same command in the same Gentrex folder.
+    The command's `latest` link can't, because those jobs move it.
+    """
+    wanted = input_path.resolve()
+    found = []
+    for path in runs.latest(command).parent.glob("*/run.yaml"):
+        record = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        read = pathlib.Path(record.get("input", ""))
+        if (
+            (read == wanted or wanted in read.parents)
+            and "seconds" in record
+            and "crashed" not in record
+        ):
+            found.append(path.parent.resolve())
+    # A run folder's name is its start time.
+    return max(found, default=None)
+
+
 def _gentrex(
     command: str, arguments: list[str], env: dict[str, str]
 ) -> tuple[pathlib.Path | None, int]:
@@ -97,12 +119,10 @@ def _gentrex(
         The command's run folder, or None if it didn't finish, and its exit
         status.
     """
-    latest = runs.latest(command)
-    before = latest.resolve() if latest.exists() else None
     gentrex = pathlib.Path(sys.executable).with_name("gentrex")
     status = subprocess.run([str(gentrex), command, *arguments], env=env).returncode
-    after = latest.resolve() if latest.exists() else None
-    if after is None or after == before:
+    after = finished_run(command, pathlib.Path(arguments[1]))
+    if after is None:
         _logger.error("gentrex %s did not finish (exit code %d)", command, status)
         return None, status
     if status:
@@ -148,9 +168,57 @@ def add_failures(scores: dict[str, Any], statuses: dict[str, int]) -> int:
     return failures
 
 
+def _failed_pages(decisions: pathlib.Path) -> int:
+    with decisions.open(encoding="utf-8") as fh:
+        return sum(bool(json.loads(line).get("error")) for line in fh)
+
+
+def add_select_methods(
+    scores: dict[str, Any],
+    methods: dict[str, dict[str, Any]],
+    truth_dir: pathlib.Path,
+) -> None:
+    """Adds gentrex select and the other ways to choose pages to the scores.
+
+    Each way gets the time, requests and tokens that it took, the pages that
+    it kept as `select` in the scores counts them, and the pages that it kept
+    because a request failed. `questions` is the run of gentrex select
+    itself.
+
+    Args:
+        scores: The scores of a run with gentrex select.
+        methods: What select_methods.compare returned.
+        truth_dir: Folder of truth files.
+    """
+    select = scores["runs"]["select"]
+    cost = ("seconds", "requests", "prompt_tokens", "completion_tokens")
+    pages = ("pages", "needed_kept", "needed_dropped", "other_kept", "other_dropped")
+    pages += ("values", "values_reachable", "auroc", "auprc", "brier")
+    own = {
+        "decisions": pathlib.Path(select["path"]) / "decisions.jsonl",
+        **scores["performance"]["commands"]["select"],
+    }
+    found = {}
+    for name, method in {"questions": own, **methods}.items():
+        chosen = score.page_choice(
+            truth_dir, method["decisions"], select["settings"]["keep_threshold"]
+        )
+        found[name] = (
+            {key: method[key] for key in cost}
+            | {key: chosen[key] for key in pages}
+            | {"failed": _failed_pages(method["decisions"])}
+        )
+    scores["select_methods"] = {
+        "model": select["settings"]["model"],
+        "methods": found,
+    }
+
+
 def main() -> int:
     """Runs and scores the benchmark named on the command line."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s")
+    # select_methods.py sends its requests from this process.
+    logging.getLogger("httpx").setLevel(logging.WARNING)
     parser = argparse.ArgumentParser(description="Run Gentrex on benchmark reports.")
     parser.add_argument(
         "--version", default="v1", help="Benchmark version, a folder under data/."
@@ -158,7 +226,7 @@ def main() -> int:
     parser.add_argument(
         "--copy",
         default="native",
-        help="Copy of the reports to read: native, scan, fax, mixed or image.",
+        help="Copy of the reports to read: native, scan or fax.",
     )
     score.add_arguments(parser)
     parser.add_argument(
@@ -182,6 +250,12 @@ def main() -> int:
         "--no-select",
         action="store_true",
         help="Skip gentrex select, so that gentrex extract reads every page.",
+    )
+    parser.add_argument(
+        "--select-methods",
+        action="store_true",
+        help="After gentrex select, choose the pages in two other ways on the"
+        " same model server, and score all three.",
     )
     parser.add_argument(
         "--from-run",
@@ -219,15 +293,14 @@ def main() -> int:
         run_dir = args.from_run
     else:
         run_dir = out / args.copy
-        if not link_pdfs(version_dir, args.copy, args.split, run_dir):
-            _logger.error(
-                "%s has no truth files of the split %s", version_dir, args.split
-            )
+        if not link_pdfs(version_dir, args.copy, run_dir):
+            _logger.error("%s has no truth files", version_dir)
             shutil.rmtree(out)
             return 1
     versions: dict[str, Any] = {}
     statuses: dict[str, int] = {}
     starts: dict[str, float] = {}
+    methods: dict[str, dict[str, Any]] = {}
     for command, variable, model in steps:
         arguments = ["--input-dir" if command == "transcribe" else "--input"]
         arguments.append(str(run_dir))
@@ -246,6 +319,13 @@ def main() -> int:
                 if variable:
                     versions[command] = _server_version(env.get(variable))
                 found, statuses[command] = _gentrex(command, arguments, env)
+                if command == "select" and args.select_methods and found:
+                    methods = select_methods.compare(
+                        run_dir / "pages.jsonl",
+                        out / "select-methods",
+                        settings,
+                        env["GENTREX_LLM_BASE_URL"],
+                    )
         except RuntimeError as exc:
             _logger.error("%s", exc)
             return 1
@@ -253,14 +333,16 @@ def main() -> int:
             return 1
         run_dir = found
 
-    scores, errors = score.score(
-        version_dir / "truth", run_dir, args.split, args.gpus, args.label
-    )
+    scores, errors = score.score(version_dir / "truth", run_dir, args.gpus, args.label)
     scores["performance"]["server_versions"] = versions
     scores["performance"]["gpu_names"] = _gpu_names() if args.serve else []
     # The time a server took to load its model, which `seconds` leaves out.
     for name, command in scores["performance"]["commands"].items():
         command["server_start_seconds"] = starts.get(name)
+    if methods:
+        add_select_methods(scores, methods, version_dir / "truth")
+    elif args.select_methods:
+        _logger.warning("--select-methods needs a run of gentrex select; skipped")
     failures = add_failures(scores, statuses)
     score.write(out, scores, errors)
     _logger.info(

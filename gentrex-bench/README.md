@@ -16,11 +16,11 @@ It has these parts:
 | `run.py` | The script that runs Gentrex on the reports and scores the result |
 | `scorer/` | The scorer, which compares Gentrex's records with the truth files |
 | `public/` | A list of sample reports that genetics labs publish, and a script that downloads them |
-| `examples/` | One example report for each template, with its truth file, and the five copies of one report |
+| `examples/` | One example report for each template, with its truth file, and the three copies of one report |
 
 The scripts in [`evaluation/`](../evaluation/README.md) run the generator
 and `run.py` with one command each, on your own machine or on Minerva, and
-[`evaluation_results/analysis.ipynb`](../evaluation_results/analysis.ipynb)
+[`presentation.ipynb`](../presentation.ipynb)
 shows the scores of all runs as tables and plots.
 
 ## What the synthetic reports test
@@ -31,13 +31,12 @@ shows the scores of all runs as tables and plots.
   made up.
 - **21 layouts from seven labs.** The templates follow the public sample
   reports of Ambry, ARUP, Blueprint, Invitae, Labcorp, PreventionGenetics and
-  the NHS. Three appear only in the test set.
+  the NHS.
 - **Most germline tests.** Panels, exomes, genomes, single genes, carrier
   screens, the mitochondrial genome, one known variant, microarrays,
   karyotypes, repeat expansions, SMN1 copy numbers and a methylation test.
-- **Five copies of each report.** The native PDF, an office scan, a fax, a
-  PDF with some pages scanned, and one made of page images.
-- **Known traps.** Most cases get one or two of 18 challenge tags, such as
+- **Three copies of each report.** The native PDF, an office scan and a fax.
+- **Known traps.** Most cases get one or two of eight challenges, such as
   a relative's feature in the family history or dates in an unusual format,
   so results can be split by what makes a report hard.
 - **Checked reports.** Every PDF is checked against its truth before it is
@@ -62,7 +61,7 @@ explains the plan and what it takes from other benchmarks.
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --copy native --split dev --gpus 1 1 2 \
+  --version v1 --copy native --gpus 1 1 2 \
   --serve evaluation/local/serve.sh
 ```
 

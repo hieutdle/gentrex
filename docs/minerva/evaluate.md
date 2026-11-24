@@ -154,72 +154,82 @@ If cases failed, submit the job once more. It builds only those.
 | `truth/` | One truth file per report |
 | `pdf/native/` | The reports as Chrome printed them |
 | `pdf/scan/`, `pdf/fax/` | The same reports as an office scan and as a fax |
-| `pdf/mixed/` | The reports with some pages scanned |
-| `pdf/image/` | The reports as page images with one line of text |
 | `cases/`, `responses/`, `html/` | The cases, the model's answers and the filled templates |
 | `manifest.json` | The settings and the checksums of the reference files |
 
 Generate the reports once and keep them. The model writes other text in
 every run, and scores compare only on the same reports.
 
-## Step 5: Run Gentrex on the dev reports
+## Step 5: Run Gentrex on the benchmark reports
 
 ```bash
-bsub < evaluation/minerva/run_pipeline.lsf
+evaluation/minerva/submit_pipeline.sh
 ```
 
-The job asks for two H100 GPUs and six hours. This one job makes every run
-of the 100 dev reports that the results compare, one after another:
+The script submits seven jobs, one for each run of the 300 benchmark reports
+that the results compare:
 
-| Run | Reads | Shows |
-| --- | --- | --- |
-| 1 | The native PDFs | The pipeline on PDFs with a text layer, where nothing goes to OCR |
-| 2 to 5 | The scan, fax, mixed and image copies | What OCR loses on scanned and faxed pages |
-| 6 | The native PDFs again, without `gentrex select` | What selecting pages is worth |
+| Job | Reads | Time asked for | Shows |
+| --- | --- | --- | --- |
+| 1 | The native PDFs, also choosing pages in two other ways | 3 hours | The pipeline on PDFs with a text layer, and what other ways of choosing pages do |
+| 2 and 3 | The native PDFs again | 2 hours each | How much the results vary between identical runs |
+| 4 and 5 | The scan and fax copies | 2 hours each | What OCR loses on scanned and faxed pages |
+| 6 | The native PDFs without `gentrex select` | 2 hours | What selecting pages is worth |
+| 7 | The native PDFs, with Gemma 4 26B-A4B as the extraction model | 2 hours | What the larger extraction model is worth |
 
-A run is the four commands and the scoring. The three models are served one
-after another, so the job holds both GPUs for its whole time.
+Jobs 1 to 6 ask for two H100 GPUs each. Job 7 asks for one, because its
+extraction model fits on one GPU. Its settings are in
+`evaluation/settings-extract-26b.yaml`, and its run is labelled
+`extract-26B-A4B`. LSF starts short jobs sooner than long ones, and the jobs
+can run at the same time, so all of them usually end long before one job
+with every run would. A run is the four commands and the
+scoring. The three models are served one after another, so a job holds both
+GPUs for its whole time. Options after the script's name go to every `bsub`,
+such as `-P acc_xxx`.
 
-Follow it with `bjobs` and `tail -f run-pipeline.*.log`. Each run ends with
-a line that gives its report accuracy and the folder with its scores:
+Follow the jobs with `bjobs` and `tail -f run-pipeline.*.log`, with one log
+for each job. Each run ends with a line that gives its report accuracy and
+the folder with its scores:
 
 ```
-2026-11-10 11:02:11,306 report accuracy 91.0% on 100 reports; wrote results/gentrex-bench/20261110-103752
+2026-11-10 11:02:11,306 report accuracy 91.0% on 300 reports; wrote results/gentrex-bench/20261110-103752
 ```
 
-The log ends with every scored run, one line each:
+Each log ends with every scored run so far, one line each:
 
 ```
-20261110-103752  dev   native                     100 reports  report accuracy  91.0%  value F1  97.1%
+20261110-103752  native                    300 reports  report accuracy  91.0%  value F1  97.1%
 ```
 
 `.venv/bin/python gentrex-bench/scorer/score.py --list` prints the same
 list at any time.
 
-Use the dev reports to decide on prompts and settings. Run one such job at a
-time in a Gentrex folder, because the job finds each command's run through
-the command's `latest` link, which a second job would move.
+A job that ends in `TERM_RUNLIMIT` ran out of time. Submit that run again
+with more time, as in the next section.
 
-To make fewer runs, name the copies in `COPIES`, and in `NO_SELECT` the
-copies to read once more without `gentrex select`. This makes only the first
-run:
+### Run everything in one job
 
-```bash
-COPIES=native NO_SELECT= bsub < evaluation/minerva/run_pipeline.lsf
-```
-
-## Step 6: Run Gentrex on the test reports
-
-Score the 200 test reports only with the settings that you decided on, and
-only for the numbers that you report. `SPLIT` names the split, and the job
-makes the same six runs:
+`run_pipeline.lsf` makes the first six runs one after another in one job of
+eight hours. It waits longer in the queue, but needs only one `bsub`:
 
 ```bash
-SPLIT=test bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf
+bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
-To show how much runs differ, submit the same job three times, each after
-the one before it has ended.
+The same job makes a single run when it gets fewer copies. Name the copies in `COPIES`, and in `NO_SELECT` the
+copies to read once more without `gentrex select`. The run of each copy in
+`SELECT_METHODS` also chooses the pages in two other ways, to compare
+`gentrex select` with them
+([Compare ways to choose pages](../development/run-benchmark.md#compare-ways-to-choose-pages)).
+This makes only the first run, without that comparison:
+
+```bash
+COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 bsub < evaluation/minerva/run_pipeline.lsf
+```
+
+By default the job runs `native` three times (`REPEATS=3`) to measure
+run-to-run repeatability. To give a job more or less time, pass `-W` to
+`bsub`, as in `bsub -W 3:00 < evaluation/minerva/run_pipeline.lsf`.
 
 ## Check the result
 
@@ -238,18 +248,15 @@ Read the tables on Minerva:
 less results/gentrex-bench/20261110-103752/scores.md
 ```
 
-Two notebooks show the runs as tables and plots. Open them in the Gentrex
-folder on Minerva, or copy `results/` and `data/gentrex-bench/v1/` into a
-clone of Gentrex on your own computer first:
+The notebook `presentation.ipynb` holds the text, tables and figures of the
+paper, written from the scores. Open it in the Gentrex
+folder on Minerva, or copy
+`results/` and `data/gentrex-bench/v1/` into a clone of Gentrex on your own
+computer first:
 
 ```bash
-uv run --group notebook jupyter lab evaluation_results/analysis.ipynb
+uv run --group notebook jupyter lab presentation.ipynb
 ```
-
-| Notebook | Shows |
-| --- | --- |
-| `analysis.ipynb` | The tables and figures of the results: the accuracy of each copy, what scanning and faxing cost, where values are lost, the pipeline with and without `gentrex select`, every field and kind of report, and time and cost. It also writes them as files to `evaluation_results/paper/`. |
-| `walkthrough.ipynb` | One report through the four commands, with what each command read and wrote |
 
 All of this is synthetic. Results of real reports must stay on Minerva.
 
@@ -267,7 +274,7 @@ label. The notebook then shows them as a setup of their own next to the
 default one:
 
 ```bash
-OPTIONS="--label new-prompt" COPIES=native NO_SELECT= bsub < evaluation/minerva/run_pipeline.lsf
+OPTIONS="--label new-prompt" COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 To change a setting of Gentrex, add it to `evaluation/settings.yaml`, which
@@ -298,7 +305,7 @@ to compare it with later ones under the same rules. Name the run folder of
 `runs`:
 
 ```bash
-.venv/bin/python gentrex-bench/scorer/score.py --split dev --gpus 1 1 2 \
+.venv/bin/python gentrex-bench/scorer/score.py --gpus 1 1 2 \
   --run results/normalize/20261117-203542
 ```
 
@@ -311,9 +318,10 @@ the truth of each case from ClinVar, HPO, MONDO and HGNC.
 `generate_reports.lsf` runs `generate.py build`, which has the model write
 the free text around that truth.
 
-`run_pipeline.lsf` runs `gentrex-bench/run.py` once for each copy, and once
-more with `--no-select` for each copy in `NO_SELECT`. `run.py`
-links the PDFs of the split into its results folder, runs the four commands
+`run_pipeline.lsf` runs `gentrex-bench/run.py` once for each copy, with
+`--select-methods` for each copy in `SELECT_METHODS`, and once more with
+`--no-select` for each copy in `NO_SELECT`. `run.py`
+links the benchmark PDFs into its results folder, runs the four commands
 on them and scores the records of the last one. Before each command it
 calls `evaluation/minerva/serve.sh` with the model's name and a free port,
 waits until vLLM answers, and stops vLLM after the command.
@@ -326,9 +334,10 @@ Both jobs take their settings from environment variables:
 | `LSB_DEFAULTPROJECT` | none | `bsub` | The allocation that a job is charged to |
 | `VERSION` | `v1` | all three scripts | The benchmark version, a folder under `data/gentrex-bench/` |
 | `CASES` | all without a truth file | `generate_reports.lsf` | The cases to build |
-| `COPIES` | all five | `run_pipeline.lsf` | The copies to read, of `native`, `scan`, `fax`, `mixed` and `image` |
+| `COPIES` | all three | `run_pipeline.lsf` | The copies to read, of `native`, `scan` and `fax` |
 | `NO_SELECT` | `native` | `run_pipeline.lsf` | The copies to read once more without `gentrex select`. `NO_SELECT=` reads none. |
-| `SPLIT` | `dev` | `run_pipeline.lsf` | The split to read, `dev`, `test` or `all` |
+| `SELECT_METHODS` | `native` | `run_pipeline.lsf` | The copies whose pages are also chosen in two other ways. `SELECT_METHODS=` compares none. |
+| `REPEATS` | `3` | `run_pipeline.lsf` | Total runs of `REPEAT_COPY` (`native` by default) to measure repeatability. Set `REPEATS=1` to skip repeats. |
 | `OPTIONS` | none | `run_pipeline.lsf` | More options of `run.py`, for every run |
 
 Options of `bsub` on the command line replace the `#BSUB` lines of a job

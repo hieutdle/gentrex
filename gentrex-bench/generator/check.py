@@ -282,12 +282,13 @@ def check(case: dict[str, Any], pdf_path, writer: dict[str, Any]) -> Result:
                 key: case[key]
                 for key in (
                     "case_id",
-                    "split",
                     "generator",
                     "lab",
+                    "laboratory",
                     "kind",
                     "scenario",
                     "tags",
+                    "challenges",
                 )
             }
             | {

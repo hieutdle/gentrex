@@ -188,16 +188,14 @@ wrong, and on which kinds of report.
   features come from ClinVar, MONDO, HPO and HGNC. Only the patients and the
   labs are made up.
 - **21 layouts.** The templates follow the public sample reports of seven
-  labs, from panels to karyotypes. Three appear only in the test set, to show
-  how Gentrex does on layouts it wasn't tuned on.
-- **Five copies of each report.** The native PDF, an office scan, a fax, a
-  PDF with some pages scanned, and one made of page images.
-- **Known traps.** 18 challenge tags mark what makes a report hard, such as
+  labs, from panels to karyotypes.
+- **Three copies of each report.** The native PDF, an office scan and a fax.
+- **Known traps.** Eight challenges mark what makes a report hard, such as
   IDs that look like the lab number or a variant table split across pages.
 - **Public reports too.** A catalog links 77 public sample reports, 61 of
   them within Gentrex's scope, with a script that downloads them.
 
-A version has 300 cases, 100 for tuning and 200 for testing. The scripts in
+A version has 300 cases. The scripts in
 [`evaluation/`](evaluation/README.md) make the reports, run Gentrex on them
 and score the records, on your own machine or on Minerva. A notebook then
 follows one report through the four commands and shows the accuracy, time

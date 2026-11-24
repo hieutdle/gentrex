@@ -5,7 +5,7 @@ run `gentrex transcribe`, `gentrex select`, `gentrex extract` and
 `gentrex normalize` on them, and score the records against the reports'
 truth files. One set of scripts runs on your own machine, and one on Mount
 Sinai's Minerva cluster. The notebook
-[`evaluation_results/analysis.ipynb`](../evaluation_results/analysis.ipynb)
+[`presentation.ipynb`](../presentation.ipynb)
 then shows the results.
 
 The benchmark reports are synthetic and hold no patient data, so the
@@ -19,9 +19,11 @@ evaluation can run on any computer that can serve Gentrex's models.
 | `minerva/prepare.sh` | Downloads what the two Minerva jobs need |
 | `minerva/generate_reports.lsf` | The Minerva job that makes the benchmark reports |
 | `minerva/run_pipeline.lsf` | The Minerva job that runs Gentrex on the reports and scores it |
+| `minerva/submit_pipeline.sh` | Submits the runs of `run_pipeline.lsf` as short jobs, and one run with a smaller extraction model |
 | `minerva/serve.sh` | Starts vLLM with one model in a Minerva job. The two jobs call it. |
 | `download_reference_files.sh` | Downloads ClinVar, HPO, MONDO and HGNC. The other scripts call it. |
 | `settings.yaml` | The settings of the evaluation that differ from Gentrex's defaults |
+| `settings-extract-26b.yaml` | The same settings with Gemma 4 26B-A4B as the extraction model, for the comparison run |
 | `hpo_normalization.py` | Measures the HPO matching of `gentrex normalize` on its own, which [Evaluate HPO matching](hpo-matching.md) describes |
 | `mondo_normalization.py` | Measures the MONDO matching of `gentrex normalize` on its own, which [Evaluate MONDO matching](mondo-matching.md) describes |
 
@@ -98,10 +100,10 @@ evaluation/local/run_pipeline.sh
 ```
 
 The first run builds the HPO index of `gentrex normalize`, which takes about
-6 minutes. Then the script makes six runs of the 100 dev reports, one after
-another. Each report comes in five copies, and each copy gets a run: the
-native PDFs, and the scanned, faxed, mixed and image copies, which go
-through OCR. The sixth run reads the native PDFs again without
+6 minutes. Then the script makes four runs of the 300 benchmark reports, one after
+another. Each report comes in three copies, and each copy gets a run: the
+native PDFs, and the scanned and faxed copies, which go
+through OCR. The fourth run reads the native PDFs again without
 `gentrex select`, to measure what selecting pages is worth.
 
 A run is the four commands and the scoring. Before each command the script
@@ -110,19 +112,18 @@ start of each model downloads its weights. Each run ends with a line that
 gives its main result and the folder with its scores:
 
 ```text
-2026-11-10 11:02:11,306 report accuracy 91.0% on 100 reports; wrote results/gentrex-bench/20261110-103752
+2026-11-10 11:02:11,306 report accuracy 91.0% on 300 reports; wrote results/gentrex-bench/20261110-103752
 ```
 
 `COPIES` names the copies to read, and `NO_SELECT` the copies to read once
-more without `gentrex select`. This makes only the run of the native PDFs:
+more without `gentrex select`. The run of each copy in `SELECT_METHODS` also
+chooses the pages in two other ways, to compare `gentrex select` with them
+([Compare ways to choose pages](../docs/development/run-benchmark.md#compare-ways-to-choose-pages)).
+This makes only the run of the native PDFs, without that comparison:
 
 ```bash
-COPIES=native NO_SELECT= evaluation/local/run_pipeline.sh
+COPIES=native NO_SELECT= SELECT_METHODS= evaluation/local/run_pipeline.sh
 ```
-
-`SPLIT=test` reads the 200 test reports. Tune Gentrex on the dev reports,
-and run the test reports only for the numbers you report
-([Choose the reports](../docs/development/run-benchmark.md#step-1-choose-the-reports)).
 
 Options after the script's name go to every run of `gentrex-bench/run.py`,
 as `--no-hpo` does here:
@@ -201,21 +202,25 @@ can be submitted again and goes on where it stopped.
 ### Step 3: Run the pipeline
 
 ```bash
-bsub < evaluation/minerva/run_pipeline.lsf
+evaluation/minerva/submit_pipeline.sh
 ```
 
-The job makes the same six runs of the dev reports as the script on your
-own machine, and asks for six hours. It serves the three models one after
-another, so it holds two GPUs for its whole time. Follow it with `bjobs` and
+The script submits seven jobs of two hours each, and three hours for the
+first. Six make the runs of the 300 reports on `native` three times, the
+first also with `--select-methods`, then `scan`, `fax`, and `native` with
+`--no-select`. The seventh reads `native` with Gemma 4 26B-A4B as the
+extraction model, on one GPU. Short jobs wait less in the queue, and they
+can run at the same time. Each job serves the three models one after another, so it holds
+two GPUs for its whole time. Follow them with `bjobs` and
 `tail -f run-pipeline.*.log`. Each run ends with a line that gives its
 report accuracy and the folder with its scores.
 
-`COPIES`, `NO_SELECT` and `SPLIT` work as they do there. The test set has
-twice as many reports, so give its job more time:
+`bsub < evaluation/minerva/run_pipeline.lsf` makes the first six runs in one
+job of eight hours.
 
-```bash
-SPLIT=test bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf
-```
+`COPIES`, `NO_SELECT`, `SELECT_METHODS`, and `REPEATS` work as they do on your own
+machine (`REPEATS` defaults to `3` on Minerva and `1` locally). To give a job more time, pass `-W` to `bsub`, as in
+`bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf`.
 
 `OPTIONS` passes options to every run of `gentrex-bench/run.py`, as in
 `OPTIONS=--no-hpo`.
@@ -233,16 +238,12 @@ Each run of the pipeline writes a folder such as
 [Run the benchmark](../docs/development/run-benchmark.md#check-the-result)
 explains them.
 
-The notebook `analysis.ipynb` reads all runs and shows them as tables and
-plots. It compares the copies, and the pipeline with and without
-`gentrex select`, and then goes through one run in detail:
+The notebook `presentation.ipynb` holds the text, tables and figures of the
+paper, written from the scores:
 
 ```bash
-uv run --group notebook jupyter lab evaluation_results/analysis.ipynb
+uv run --group notebook jupyter lab presentation.ipynb
 ```
-
-`walkthrough.ipynb`, in the same folder, follows one report through the four
-commands.
 
 `--group notebook` installs JupyterLab, pandas and matplotlib on the first
 run.
@@ -264,7 +265,9 @@ goes through the same steps by hand, and
 explains what happens inside.
 
 `run_pipeline.sh` and `run_pipeline.lsf` run `gentrex-bench/run.py` once for
-each copy, and once more with `--no-select` for each copy in `NO_SELECT`. `run.py` links the PDFs of the split into its results folder,
+each copy, with `--select-methods` for each copy in `SELECT_METHODS`, and
+once more with `--no-select` for each copy in `NO_SELECT`. `run.py` links
+the benchmark PDFs into its results folder,
 runs the four commands on them and scores the last one's records. It calls
 `serve.sh` with a model's name and a free port, waits until the server
 answers and stops it after the command.
@@ -282,9 +285,10 @@ The scripts read these environment variables:
 | Variable | Default | Read by | What it sets |
 | --- | --- | --- | --- |
 | `VERSION` | `v1` | the scripts of the steps | The benchmark version, a folder under `data/gentrex-bench/` |
-| `COPIES` | all five | the pipeline scripts | The copies to read, of `native`, `scan`, `fax`, `mixed` and `image` |
+| `COPIES` | all three | the pipeline scripts | The copies to read, of `native`, `scan` and `fax` |
 | `NO_SELECT` | `native` | the pipeline scripts | The copies to read once more without `gentrex select`. `NO_SELECT=` reads none. |
-| `SPLIT` | `dev` | the pipeline scripts | The split to read, `dev`, `test` or `all` |
+| `SELECT_METHODS` | `native` | the pipeline scripts | The copies whose pages are also chosen in two other ways. `SELECT_METHODS=` compares none. |
+| `REPEATS` | `1` local, `3` Minerva | the pipeline scripts | Total runs of `REPEAT_COPY` (`native` by default) to measure run-to-run repeatability. |
 | `SERVING` | none | the Minerva scripts | The serving folder |
 | `CASES` | all without a truth file | `generate_reports.lsf` | The cases to build. On your own machine, name them after the script. |
 | `OPTIONS` | none | `run_pipeline.lsf` | More options of `run.py`, for every run. On your own machine, name them after the script. |

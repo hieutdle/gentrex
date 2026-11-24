@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="760" height="556" viewBox="0 0 760 556" role="img" aria-labelledby="title desc">
   <title id="title">The truth is fixed before the LLM writes</title>
-  <desc id="desc">The five steps of the benchmark generator. Code and a seed sample the case, with one of the report templates, and write the truth file. An LLM writes the report's free text, code fills the template's HTML with the truth and that text, and Chrome renders it as a PDF. check.py compares the PDF text with the truth file, and a case that fails is written again. The PDFs that pass are scanned at two levels with Pillow and copied as clean images, so each report comes as a native, scan, fax, mixed or image PDF, all with one truth file.</desc>
+  <desc id="desc">The five steps of the benchmark generator. Code and a seed sample the case, with one of the report templates, and write the truth file. An LLM writes the report's free text, code fills the template's HTML with the truth and that text, and Chrome renders it as a PDF. check.py compares the PDF text with the truth file, and a case that fails is written again. The PDFs that pass are scanned at two levels with Pillow, so each report comes as a native, scan or fax PDF, all with one truth file.</desc>
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0 0L10 5L0 10z" fill="#8c8c8c"/>
@@ -55,15 +55,15 @@
     <text x="72" y="412">and every distractor in the text</text>
 
     <text x="72" y="484" font-size="13" font-weight="700">5. Scan</text>
-    <text x="72" y="500">Scan and fax levels from a seed, plus</text>
-    <text x="72" y="516">mixed PDFs and clean image copies</text>
+    <text x="72" y="500">Scan and fax copies, with damage</text>
+    <text x="72" y="516">drawn from a seed</text>
 
     <text x="436" y="84" font-size="13" font-weight="700">Truth file, one JSON per report</text>
     <text x="436" y="100">What each command should write</text>
     <text x="436" y="116">Read by check.py and later the scorer</text>
 
     <text x="436" y="484" font-size="13" font-weight="700">PDFs in the benchmark</text>
-    <text x="436" y="500">Native, scan, fax, mixed and image</text>
+    <text x="436" y="500">Native, scan and fax</text>
     <text x="436" y="516">All versions share one truth file</text>
   </g>
 </svg>

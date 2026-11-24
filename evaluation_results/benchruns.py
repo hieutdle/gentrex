@@ -1,4 +1,4 @@
-"""The tables and figures of the two notebooks in this folder.
+"""The tables and figures of presentation.ipynb, in the Gentrex folder.
 
 A scored run is a folder under results/gentrex-bench/ with the scores.json
 and errors.jsonl that gentrex-bench/run.py wrote. Every function here takes
@@ -10,11 +10,16 @@ as PDF and PNG, for a paper.
 # The notebook group provides matplotlib and pandas.
 # pyright: reportMissingImports=false
 
+import csv
+import datetime
 import html
 import json
+import logging
 import math
 import pathlib
+import statistics
 import sys
+import time
 from typing import Any
 
 import matplotlib.pyplot as plt
@@ -26,7 +31,7 @@ RESULTS = ROOT / "results"
 # The folder that tables and figures are written to, or None to write none.
 EXPORT: pathlib.Path | None = None
 COMMANDS = ("transcribe", "select", "extract", "normalize")
-COPIES = ("native", "scan", "fax", "mixed", "image")
+COPIES = ("native", "scan", "fax")
 
 sys.path.insert(0, str(ROOT / "gentrex-bench" / "scorer"))
 
@@ -39,9 +44,11 @@ MAIN = {
     "report_accuracy": "Report accuracy",
     "record_accuracy": "Every value right",
     "patient_match": "MRN and date of birth right",
-    "value_f1": "Value F1",
-    "variant_f1": "Variant F1",
+    "value_f1": "Value F1 (micro)",
+    "macro_field_f1": "Field F1 (macro)",
+    "clinical_variant_f1": "Clinical variant F1",
 }
+MAIN_TABLE = MAIN
 FIELD_GROUPS = {
     "Patient and specimen": (
         "mrn",
@@ -159,17 +166,25 @@ VALUE_LABELS = {
     "vus_only": "VUS only",
     "upd": "Uniparental disomy",
     "secondary_finding": "Secondary finding",
+    "split_table": "Variant table split across pages",
+    "late_page": "Findings on a late page",
+    "similar_ids": "IDs that look alike",
+    "distractor_variants": "Genes and variants that aren't findings",
+    "family_history": "A relative's features",
+    "negated_features": "Absent or uncertain features",
+    "unusual_notation": "Older symbols, one-letter HGVS, rare dates",
+    "missing_values": "Values left out or not provided",
 }
 # Groups whose values have an order of their own.
-_ORDERED = ("variants", "pages", "held_out")
+_ORDERED = ("variants", "pages")
 GROUP_LABELS = {
     "kind": "Kind of test",
     "scenario": "Result",
     "variants": "Variants in the report",
     "pages": "Pages of the report",
-    "held_out": "Templates",
     "lab": "Template",
-    "tag": "Challenge",
+    "laboratory": "Laboratory",
+    "challenge": "Challenge",
 }
 
 _INK, _SECONDARY, _MUTED = "#0b0b0b", "#52514e", "#898781"
@@ -264,6 +279,66 @@ def load_runs() -> dict[str, dict[str, Any]]:
     return {name: run for name, run in found.items() if name not in old}
 
 
+def start(
+    runs: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, dict[str, Any]], dict[str, Any]]:
+    """Returns the newest run of each setup, and the main one.
+
+    The main run is the one on the native PDFs. The figures are written to
+    figures/ from here on.
+
+    Raises:
+        SystemExit: No run is scored yet.
+    """
+    global EXPORT
+    if runs is None:
+        runs = load_runs()
+    chosen = {setup: runs[name] for setup, name in newest(runs).items()}
+    if not chosen:
+        raise SystemExit("No scored run under results/gentrex-bench yet.")
+    EXPORT = ROOT / "figures"
+    return chosen, chosen.get("native") or next(iter(chosen.values()))
+
+
+def _folder_of(
+    run: dict[str, Any], runs: dict[str, dict[str, Any]] | None = None
+) -> str:
+    """Returns the results/gentrex-bench/ folder name of a scored run."""
+    if runs is not None:
+        return next(name for name, item in runs.items() if item["runs"] == run["runs"])
+    return next(
+        path.parent.name
+        for path in sorted((RESULTS / "gentrex-bench").glob("*/scores.json"))
+        if json.loads(path.read_text(encoding="utf-8"))["runs"] == run["runs"]
+    )
+
+
+def run_errors(
+    run: dict[str, Any], runs: dict[str, dict[str, Any]] | None = None
+) -> pd.DataFrame:
+    """Returns every value error of a scored run."""
+    return errors(_folder_of(run, runs))
+
+
+def example(
+    run: dict[str, Any],
+    report: str | None = None,
+    runs: dict[str, dict[str, Any]] | None = None,
+) -> tuple[dict[str, Any], pd.DataFrame]:
+    """Returns the files and the errors of one report that shows every command."""
+    folder = _folder_of(run, runs)
+    name = example_report(run) if report is None else report
+    return report_files(run, name), errors(folder, name)
+
+
+def show_or_note(table: pd.DataFrame, note: str) -> pd.DataFrame | None:
+    """Returns a table when non-empty, otherwise prints a short note."""
+    if not table.empty:
+        return table
+    print(note)
+    return None
+
+
 def copy_of(run: dict[str, Any]) -> str:
     """Returns the copy of the reports that a run read, such as native or scan."""
     return pathlib.Path(run["pdfs"]).name
@@ -281,11 +356,11 @@ def setup_of(run: dict[str, Any]) -> str:
 def _same_as(run: dict[str, Any]) -> str:
     """Returns what runs of one configuration share.
 
-    That is the split, the setup, the settings of each command and the code
-    that ran them. Runs that share it differ only by chance.
+    That is the truth folder, the setup, the settings of each command and the
+    code that ran them. Runs that share it differ only by chance.
     """
     same = {
-        "split": run["split"],
+        "truth": run["truth"],
         "setup": setup_of(run),
         "settings": {command: r.get("settings") for command, r in run["runs"].items()},
         "code": {command: r.get("gentrex") for command, r in run["runs"].items()},
@@ -293,13 +368,13 @@ def _same_as(run: dict[str, Any]) -> str:
     return json.dumps(same, sort_keys=True, default=str)
 
 
-def newest(runs: dict[str, dict[str, Any]], split: str) -> dict[str, str]:
-    """Returns the folder of the newest run of each setup on a split.
+def newest(runs: dict[str, dict[str, Any]]) -> dict[str, str]:
+    """Returns the folder of the newest run of each setup.
 
-    The setups come in the order native, scan, fax, mixed, image, and each
-    copy's run without gentrex select after its run with it.
+    The setups come in the order native, scan, fax, and each copy's run
+    without gentrex select after its run with it.
     """
-    found = {setup_of(run): name for name, run in runs.items() if run["split"] == split}
+    found = {setup_of(run): name for name, run in runs.items()}
 
     def order(setup: str) -> tuple[int, str]:
         copy = setup.partition(",")[0]
@@ -308,13 +383,13 @@ def newest(runs: dict[str, dict[str, Any]], split: str) -> dict[str, str]:
     return {setup: found[setup] for setup in sorted(found, key=order)}
 
 
-def repeats(runs: dict[str, dict[str, Any]], split: str) -> dict[str, list[str]]:
-    """Returns the runs of each setup on a split that repeat its newest run.
+def repeats(runs: dict[str, dict[str, Any]]) -> dict[str, list[str]]:
+    """Returns the runs of each setup that repeat its newest run.
 
     They have the same settings and code as the newest run, oldest first.
     """
     found = {}
-    for setup, latest in newest(runs, split).items():
+    for setup, latest in newest(runs).items():
         same = _same_as(runs[latest])
         found[setup] = [name for name, run in runs.items() if _same_as(run) == same]
     return found
@@ -432,18 +507,26 @@ def wilson(correct: float, total: float) -> dict[str, float | None]:
     return {"value": share, "low": max(0.0, low), "high": min(1.0, high)}
 
 
+def _p_value(p: float | None) -> str:
+    if p is None:
+        return ""
+    return "p<0.001" if p < 0.001 else f"p={p:.3f}"
+
+
 def difference(first: dict[str, Any], second: dict[str, Any]) -> str:
     """Formats the second run's report accuracy minus the first's, in points.
 
     The two runs are compared on the reports that both scored, with a 95%
-    interval. An interval that includes 0 means the runs can't be told apart.
+    paired bootstrap interval and exact two-sided McNemar p-value.
     """
     gain = score.difference(first, second)
     if not gain["reports"]:
         return ""
+    p = _p_value(gain.get("p_value"))
+    suffix = f", {p}" if p else ""
     return (
         f"{gain['value'] * 100:+.1f} ({gain['low'] * 100:+.1f} to"
-        f" {gain['high'] * 100:+.1f})"
+        f" {gain['high'] * 100:+.1f}{suffix})"
     )
 
 
@@ -479,7 +562,6 @@ def runs_table(runs: dict[str, dict[str, Any]]) -> pd.DataFrame:
         {
             name: {
                 "Setup": setup_of(run),
-                "Split": run["split"],
                 "Reports": run["reports"],
                 "Report accuracy, % (95% CI)": interval(run["main"]["report_accuracy"]),
             }
@@ -520,30 +602,48 @@ def setup_table(run: dict[str, Any]) -> pd.DataFrame:
 
 
 def data_table(run: dict[str, Any]) -> pd.DataFrame:
-    """Returns what the reports of a run's split are made of."""
+    """Returns what the benchmark reports of a run are made of."""
     data, groups = run["data"], run["groups"]
-    held_out = groups.get("held_out", {}).get("held out", {}).get("reports", 0)
+    pages_iqr = data.get("pages_iqr")
+    words_iqr = data.get("words_iqr")
+    pages_summary = ""
+    if data["pages"]:
+        if pages_iqr:
+            pages_summary = (
+                f"{data['pages_median']:g} (IQR {pages_iqr[0]:g}–{pages_iqr[1]:g};"
+                f" max {data['pages_most']})"
+            )
+        else:
+            pages_summary = f"{data['pages_median']:g} ({data['pages_most']})"
+    words_summary = None
+    if data.get("words_median") is not None:
+        if words_iqr:
+            words_summary = (
+                f"{round(data['words_median'])}"
+                f" (IQR {round(words_iqr[0])}–{round(words_iqr[1])})"
+            )
+        else:
+            words_summary = round(data["words_median"])
     rows = {
         "Reports": data["reports"],
+        "Negative reports": data.get("negative_reports"),
+        "Multi-variant reports": data.get("multi_variant_reports"),
         "Pages": data["pages"],
-        "Pages per report, median (most)": (
-            f"{data['pages_median']:g} ({data['pages_most']})" if data["pages"] else ""
-        ),
-        "Words per report, median": (
-            None if data.get("words_median") is None else round(data["words_median"])
-        ),
+        "Pages per report, median": pages_summary,
+        "Words per report, median": words_summary,
         "Variants": data["variants"],
         "Genes": data.get("genes"),
         "Conditions": data.get("conditions"),
         "Clinical features": data["features"],
+        "Planted distractors": data.get("distractors"),
         "Stated values": run["funnel"]["stated"],
         "Templates": len(groups.get("lab", {})),
-        "Reports of held-out templates": held_out,
-        "Challenges": len(groups.get("tag", {})),
-        "Reports that the writing model wrote more than once": data.get("rewritten"),
+        "Challenges": len(groups.get("challenge", {})),
+        "Rewritten during generation": data.get("rewritten"),
     }
     rows = {name: value for name, value in rows.items() if value is not None}
-    table = pd.Series(rows, name=f"{run['split']} split", dtype=object).to_frame()
+    version = (run.get("benchmark") or {}).get("version") or "Benchmark"
+    table = pd.Series(rows, name=version, dtype=object).to_frame()
     return _save_table(table, "table-data")
 
 
@@ -552,49 +652,65 @@ def main_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
     table = pd.DataFrame(
         {
             setup: {"Reports": run["reports"]}
-            | {title: interval(run["main"][name]) for name, title in MAIN.items()}
+            | {
+                title: interval(run["main"][name])
+                for name, title in MAIN_TABLE.items()
+                if name in run["main"]
+            }
             for setup, run in chosen.items()
         }
     ).T
     return _save_table(table, "table-main")
 
 
-def generalization_table(runs: dict[str, dict[str, Any]]) -> pd.DataFrame:
-    """Returns the report accuracy of each setup on dev and on test.
-
-    The test reports are also split into the templates that dev has too and
-    the held-out ones, which nothing was tuned on.
-    """
-    by_split = {split: newest(runs, split) for split in ("dev", "test")}
-    parts = {
-        "seen in dev": "Test, templates that dev has",
-        "held out": "Test, held-out templates",
-    }
+def safety_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    """Returns clinical safety, grounding, and category macro-F1 per setup."""
     rows = {}
-    for setup in dict.fromkeys([*by_split["dev"], *by_split["test"]]):
-        row = {}
-        if setup in by_split["dev"]:
-            dev = runs[by_split["dev"][setup]]
-            row["Dev"] = interval(dev["main"]["report_accuracy"])
-        if setup in by_split["test"]:
-            test = runs[by_split["test"][setup]]
-            row["Test"] = interval(test["main"]["report_accuracy"])
-            for value, title in parts.items():
-                n = test["groups"].get("held_out", {}).get(value)
-                if n:
-                    right = round(n["report_accuracy"] * n["reports"])
-                    row[title] = (
-                        f"{interval(wilson(right, n['reports']))}, n={n['reports']}"
-                    )
-        rows[setup] = row
-    table = pd.DataFrame(rows, dtype=object).T.fillna("")
-    return _save_table(table, "table-generalization")
+    for setup, run in chosen.items():
+        safety = run.get("safety")
+        if not safety:
+            continue
+        rows[setup] = {
+            "P/LP variant recall, %": pct(safety.get("pathogenic_variant_recall")),
+            "P/LP clinical recall, %": pct(safety.get("pathogenic_clinical_recall")),
+            "Actionable ACMG F1, %": pct(safety.get("actionable_acmg_f1")),
+            "ACMG macro-F1, %": pct(safety.get("classification_macro_f1")),
+            "Overall result macro-F1, %": pct(safety.get("result_macro_f1")),
+            "Negative-report specificity, %": pct(safety.get("negative_specificity")),
+            "False-positive variant rate, %": pct(
+                safety.get("false_positive_variant_rate")
+            ),
+            "Hallucination rate, %": pct(safety.get("hallucination_rate")),
+            "Distractor entities copied": safety.get("distractor_entities"),
+        }
+    return _save_table(pd.DataFrame(rows, dtype=object).T, "table-safety")
 
 
-def repeats_table(runs: dict[str, dict[str, Any]], split: str) -> pd.DataFrame:
+def clinical_errors_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
+    """Returns counts of clinical errors by severity category per setup."""
+    rows = {}
+    for setup, run in chosen.items():
+        ce = run.get("clinical_errors")
+        if not ce:
+            continue
+        wrong = sum(not report["correct"] for report in run["by_report"].values())
+        rows[setup] = {
+            "Wrong reports": wrong,
+            "Missed P/LP variant": ce.get("missed_pathogenic_variant", 0),
+            "Missed other variant": ce.get("missed_other_variant", 0),
+            "Extra variant": ce.get("extra_variant", 0),
+            "Actionable ACMG flip": ce.get("actionable_acmg_flip", 0),
+            "Other ACMG error": ce.get("other_acmg_error", 0),
+            "Wrong zygosity / CN": ce.get("wrong_zygosity_or_cn", 0),
+            "Wrong result / karyotype": ce.get("wrong_result_or_karyotype", 0),
+        }
+    return _save_table(pd.DataFrame(rows, dtype=object).T, "table-clinical-errors")
+
+
+def repeats_table(runs: dict[str, dict[str, Any]]) -> pd.DataFrame:
     """Returns the mean and the range of the main numbers over repeated runs."""
     rows = {}
-    for setup, names in repeats(runs, split).items():
+    for setup, names in repeats(runs).items():
         if len(names) < 2:
             continue
         same = [runs[name] for name in names]
@@ -604,7 +720,7 @@ def repeats_table(runs: dict[str, dict[str, Any]], split: str) -> pd.DataFrame:
             for report in shared
         )
         row: dict[str, Any] = {"Runs": len(names)}
-        for name in ("report_accuracy", "value_f1", "variant_f1"):
+        for name in ("report_accuracy", "value_f1", "clinical_variant_f1"):
             values = [run["main"][name]["value"] for run in same]
             values = [value for value in values if value is not None]
             if values:
@@ -630,24 +746,26 @@ def transcribe_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
     for setup, run in chosen.items():
         if "select" not in run["runs"] or run.get("label"):
             continue
-        pages, funnel = run["pages"], run["funnel"]
+        pages = run["pages"]
         recall, precision = pages["ocr_word_recall"], pages["ocr_word_precision"]
         f1 = (
             2 * recall * precision / (recall + precision)
             if recall and precision
             else None
         )
+        word_f1 = (
+            f"{pct(f1)} ({pct(precision)} / {pct(recall)})" if f1 is not None else ""
+        )
         rows[setup] = {
             "Pages sent to OCR, %": pct(pages["ocr"] / pages["total"], 0),
-            "Pages without text": pages["empty"],
-            "OCR word recall, %": pct(recall),
-            "OCR word precision, %": pct(precision),
-            "OCR word F1, %": pct(f1),
-            "Values lost in transcribe, per 100": _per_100(
-                funnel["lost"]["transcribe"], funnel["stated"]
+            "Empty pages": pages["empty"],
+            "OCR word F1 (P / R), %": word_f1,
+            "Stated values preserved, %": pct(pages.get("values_preserved_rate")),
+            "Critical values preserved, %": pct(
+                pages.get("critical_values_preserved_rate")
             ),
             "Report accuracy, %": pct(run["main"]["report_accuracy"]["value"]),
-            "Difference to native, points (95% CI)": (
+            "Δ vs. native, pp (95% CI, p)": (
                 difference(native, run) if native and run is not native else ""
             ),
         }
@@ -669,16 +787,18 @@ def select_pages_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
         other = select["other_kept"] + select["other_dropped"]
         rows[setup] = {
             "Pages": select["pages"],
-            "Needed pages": needed,
-            "Needed pages kept, %": pct(select["needed_kept"] / max(needed, 1)),
-            "Other pages": other,
-            "Other pages dropped, %": pct(select["other_dropped"] / max(other, 1)),
+            "Needed kept, %": pct(select["needed_kept"] / max(needed, 1)),
+            "Other dropped, %": pct(select["other_dropped"] / max(other, 1)),
             "Pages kept, %": pct(
                 (select["needed_kept"] + select["other_kept"]) / max(select["pages"], 1)
             ),
-            "Stated values on a kept page, %": pct(
+            "Values reachable, %": pct(
                 select["values_reachable"] / max(select["values"], 1)
             ),
+            "AUROC": "" if select.get("auroc") is None else f"{select['auroc']:.3f}",
+            "AUPRC": "" if select.get("auprc") is None else f"{select['auprc']:.3f}",
+            "Brier": "" if select.get("brier") is None else f"{select['brier']:.3f}",
+            "ECE": "" if select.get("ece") is None else f"{select['ece']:.3f}",
         }
     return _save_table(pd.DataFrame(rows, dtype=object).T, "table-select-pages")
 
@@ -725,8 +845,239 @@ def extract_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
             "Value recall over all stated values, %": pct(
                 run["main"]["value_recall"]["value"]
             ),
+            "Exact-match value F1, %": pct(
+                (run["main"].get("strict_value_f1") or {}).get("value")
+            ),
         }
     return _save_table(pd.DataFrame(rows, dtype=object).T, "table-extract")
+
+
+def public_reports_table() -> pd.DataFrame:
+    """Returns how the pages of the public sample reports reach gentrex transcribe.
+
+    Each page is routed as gentrex transcribe routes it, to its text layer
+    or to OCR, without a model. The speed is that of this machine.
+
+    Returns:
+        The table, or an empty one if the PDFs aren't in
+        data/gentrex-bench/public/pdf.
+    """
+    from gentrex import config
+    from gentrex.transcribe import native
+
+    paths = sorted((ROOT / "data" / "gentrex-bench" / "public" / "pdf").glob("*.pdf"))
+    if not paths:
+        return pd.DataFrame()
+    least = config.load_settings()["transcribe"]["native_min_chars"]
+    started = time.perf_counter()
+    reports = [
+        [page.source for page in native.classify_pages(path, least)] for path in paths
+    ]
+    seconds = time.perf_counter() - started
+    pages = [source for report in reports for source in report]
+    kinds = [set(report) for report in reports]
+    lengths = [len(report) for report in reports]
+    rows = {
+        "Reports": len(reports),
+        "Reports with a text layer on every page": kinds.count({"native"}),
+        "Reports with scanned pages only": kinds.count({"scanned"}),
+        "Reports with both kinds of page": kinds.count({"native", "scanned"}),
+        "Pages": len(pages),
+        "Pages with a text layer": pages.count("native"),
+        "Scanned pages": pages.count("scanned"),
+        "Pages per report, median (most)": (
+            f"{statistics.median(lengths):g} ({max(lengths)})"
+        ),
+        "Pages per second on this machine, without OCR": round(len(pages) / seconds),
+    }
+    table = pd.Series(rows, name="Public sample reports", dtype=object).to_frame()
+    return _save_table(table, "table-public-reports")
+
+
+def realism_table(run: dict[str, Any]) -> pd.DataFrame:
+    """Returns the length of the benchmark reports next to the public ones.
+
+    Words are counted on the reports whose every page has a text layer,
+    because a scanned page has no words without OCR.
+
+    Returns:
+        The table, or an empty one if the PDFs aren't in
+        data/gentrex-bench/public/pdf.
+    """
+    from gentrex import config
+    from gentrex.transcribe import native
+
+    paths = sorted((ROOT / "data" / "gentrex-bench" / "public" / "pdf").glob("*.pdf"))
+    if not paths:
+        return pd.DataFrame()
+    least = config.load_settings()["transcribe"]["native_min_chars"]
+    reports = [native.classify_pages(path, least) for path in paths]
+    lengths = [len(pages) for pages in reports]
+    words = [
+        sum(len(page.text.split()) for page in pages)
+        for pages in reports
+        if all(page.source == "native" for page in pages)
+    ]
+    scanned = sum(page.source == "scanned" for pages in reports for page in pages)
+    with (ROOT / "gentrex-bench" / "public" / "catalog.csv").open() as fh:
+        laboratory = {row["id"]: row["laboratory"] for row in csv.DictReader(fh)}
+    laboratories = {laboratory.get(path.stem) for path in paths} - {None}
+
+    def spread(median: float | None, iqr: list[float] | None) -> str:
+        if median is None:
+            return ""
+        return (
+            f"{median:,.0f} ({iqr[0]:,.0f}–{iqr[1]:,.0f})" if iqr else f"{median:,.0f}"
+        )
+
+    def quartiles(values: list[int]) -> list[float]:
+        q1, _, q3 = statistics.quantiles(values, n=4)
+        return [q1, q3]
+
+    data = run["data"]
+    table = pd.DataFrame(
+        {
+            "gentrex-bench": {
+                "Reports": data["reports"],
+                "Laboratories": len(run["groups"].get("laboratory", {})),
+                "Pages per report, median (IQR)": spread(
+                    data["pages_median"], data.get("pages_iqr")
+                ),
+                "Words per report, median (IQR)": spread(
+                    data.get("words_median"), data.get("words_iqr")
+                ),
+                "Pages without a text layer, %": "0 (native copy)",
+            },
+            "Public sample reports": {
+                "Reports": len(reports),
+                "Laboratories": len(laboratories),
+                "Pages per report, median (IQR)": spread(
+                    statistics.median(lengths), quartiles(lengths)
+                ),
+                "Words per report, median (IQR)": spread(
+                    statistics.median(words), quartiles(words)
+                ),
+                "Pages without a text layer, %": pct(scanned / sum(lengths), 0),
+            },
+        },
+        dtype=object,
+    )
+    return _save_table(table, "table-realism")
+
+
+def _models(run: dict[str, Any], command: str) -> str:
+    """Returns the models that a command of a run used."""
+    settings = run["runs"][command]["settings"]
+    if command == "transcribe":
+        return (settings.get("ocr") or {}).get("model") or ""
+    if command == "normalize":
+        return ", ".join(
+            m["name"] for m in (settings.get("hpo") or {}).get("models", [])
+        )
+    return settings.get("model") or ""
+
+
+def _each(count: float | None, of: float | None, digits: int = 0) -> Any:
+    """Returns a count for each of some things, or nothing if either is unknown."""
+    if count is None or not of:
+        return ""
+    return round(count / of, digits) if digits else round(count / of)
+
+
+def speed_table(chosen: dict[str, dict[str, Any]], command: str) -> pd.DataFrame:
+    """Returns the time, the requests and the tokens of one command in each setup.
+
+    The time is the command's own. The seconds that its model server took to
+    load the model come in a column of their own. The pages are all pages of
+    the reports, and for gentrex extract the pages that it read.
+    """
+    rows = {}
+    for setup, run in chosen.items():
+        numbers = run["performance"]["commands"].get(command)
+        if not numbers or not numbers.get("seconds"):
+            continue
+        files, pages = run["performance"]["files"], run["pages"]
+        seconds = numbers["seconds"]
+        read = pages["total"] if pages["kept"] is None else pages["kept"]
+        latency = run["performance"].get("extract_seconds_per_report") or {}
+        rows[setup] = {
+            "Model": _models(run, command),
+            "GPUs": numbers["gpus"] if _models(run, command) else 0,
+            "Pages sent to OCR, %": pct(pages["ocr"] / max(pages["total"], 1), 0),
+            "Seconds per report": _each(seconds, files, 2),
+            "Pages per minute": _each(
+                (read if command == "extract" else pages["total"]) * 60, seconds
+            ),
+            "Request, median s (90th percentile)": (
+                f"{latency['median']:g} ({latency['p90']:g})" if latency else ""
+            ),
+            "Requests per report": _each(numbers["requests"], files, 1),
+            "Tokens read per report": _each(numbers["prompt_tokens"], files),
+            "Tokens written per report": _each(numbers["completion_tokens"], files),
+            "Model loading, s": numbers.get("server_start_seconds") or "",
+        }
+    table = pd.DataFrame(rows, dtype=object).T
+    drop = {
+        "transcribe": ["Request, median s (90th percentile)"],
+        "select": ["Pages sent to OCR, %", "Request, median s (90th percentile)"],
+        "extract": ["Pages sent to OCR, %"],
+        "normalize": [
+            "Pages sent to OCR, %",
+            "Pages per minute",
+            "Request, median s (90th percentile)",
+            "Requests per report",
+            "Tokens read per report",
+            "Tokens written per report",
+            "Model loading, s",
+        ],
+    }
+    table = table.drop(columns=drop[command], errors="ignore")
+    return _save_table(table, f"table-speed-{command}")
+
+
+SELECT_METHOD_LABELS = {
+    "questions": "Three questions, first token (gentrex select)",
+    "one_question": "One general question, first token",
+    "page_extract": "A record of each page",
+}
+
+
+def select_methods_table(run: dict[str, Any]) -> pd.DataFrame:
+    """Returns gentrex select next to two other ways of choosing the pages.
+
+    All three ran on the same pages and the same model server, with
+    gentrex-bench/run.py --select-methods. A needed page is the only page of
+    its report that prints a stated value.
+
+    Returns:
+        The table, or an empty one for a run that didn't compare them.
+    """
+    compared = run.get("select_methods")
+    if not compared:
+        return pd.DataFrame()
+    rows = {}
+    for name, m in compared["methods"].items():
+        needed = m["needed_kept"] + m["needed_dropped"]
+        other = m["other_kept"] + m["other_dropped"]
+        rows[SELECT_METHOD_LABELS.get(name, name)] = {
+            "Needed pages kept, %": pct(m["needed_kept"] / max(needed, 1)),
+            "Other pages dropped, %": pct(m["other_dropped"] / max(other, 1)),
+            "Pages kept, %": pct(
+                (m["needed_kept"] + m["other_kept"]) / max(m["pages"], 1)
+            ),
+            "Stated values on a kept page, %": pct(
+                m["values_reachable"] / max(m["values"], 1)
+            ),
+            "Page AUROC": "" if m.get("auroc") is None else f"{m['auroc']:.3f}",
+            "Page AUPRC": "" if m.get("auprc") is None else f"{m['auprc']:.3f}",
+            "Pages per minute": _each(m["pages"] * 60, m["seconds"]),
+            "Requests per page": _each(m["requests"], m["pages"], 1),
+            "Tokens read per page": _each(m["prompt_tokens"], m["pages"]),
+            "Tokens written per page": _each(m["completion_tokens"], m["pages"], 1),
+            "Pages kept after a failed request": m["failed"],
+        }
+    table = pd.DataFrame(rows, dtype=object).T
+    return _save_table(table, "table-select-methods")
 
 
 def select_figure(run: dict[str, Any]) -> None:
@@ -851,8 +1202,13 @@ def efficiency_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
         loading = sum(c.get("server_start_seconds") or 0 for c in commands.values())
         prompt = sum(c.get("prompt_tokens") or 0 for c in commands.values())
         written = sum(c.get("completion_tokens") or 0 for c in commands.values())
+        reports = run.get("reports") or 0
+        completed = (
+            pct((reports - run.get("without_record", 0)) / reports) if reports else ""
+        )
         rows[setup] = {
             "Report accuracy, %": pct(run["main"]["report_accuracy"]["value"]),
+            "Completed reports, %": completed,
             "GPU-hours per 1,000 reports": performance["gpu_hours_per_1000_files"],
             "Seconds per report": round(
                 sum(c["seconds"] for c in commands.values()) / files, 1
@@ -1042,17 +1398,27 @@ def review_table(run: dict[str, Any]) -> pd.DataFrame:
     """
     review = run["review"]
     every = review["checks"]["any"]
+    unflagged_acc = every.get("unflagged_accuracy")
+    extra = (
+        f" Accuracy on the remaining {review['reports'] - every['flagged']}"
+        f" unflagged reports is {pct(unflagged_acc)}%."
+        if unflagged_acc is not None
+        else ""
+    )
     print(
         f"A person who looks at every report with a flag looks at"
         f" {every['flagged']} of {review['reports']} reports, and finds"
-        f" {every['flagged_and_wrong']} of the {review['wrong']} wrong ones."
+        f" {every['flagged_and_wrong']} of the {review['wrong']} wrong ones." + extra
     )
+    total = review["reports"]
     rows = {
         CHECK_LABELS.get(name, name): {
             "Reports flagged": c["flagged"],
+            "Workload avoided, %": pct((total - c["flagged"]) / total) if total else "",
             "of which wrong": c["flagged_and_wrong"],
             "Precision, %": pct(c["precision"]),
             "Recall, %": pct(c["recall"]),
+            "Unflagged accuracy, %": pct(c.get("unflagged_accuracy")),
         }
         for name, c in review["checks"].items()
     }
@@ -1154,6 +1520,65 @@ def findings(run: dict[str, Any], chosen: dict[str, dict[str, Any]]) -> list[str
     return sentences
 
 
+def abstract(run: dict[str, Any], chosen: dict[str, dict[str, Any]]) -> Any:
+    """Returns the abstract of the paper, with the numbers of the runs.
+
+    Args:
+        run: The main run, on the native PDFs.
+        chosen: The newest run of each setup, for the scans and faxes.
+    """
+    from IPython.display import Markdown
+
+    main = run["main"]
+
+    def share(name: str) -> str:
+        number = main[name]
+        return (
+            f"{pct(number['value'])}% (95% CI {pct(number['low'])}"
+            f"–{pct(number['high'])})"
+        )
+
+    copies = [
+        f"{pct(chosen[copy]['main']['report_accuracy']['value'])}% on {name}"
+        for copy, name in (("scan", "office scans"), ("fax", "faxes"))
+        if copy in chosen
+    ]
+    review = run["review"]["checks"]["any"]
+    wrong = run["review"]["wrong"]
+    scanned = (
+        f" Report accuracy was {' and '.join(copies)} of the same reports."
+        if copies
+        else ""
+    )
+    caught = (
+        f" The automatic checks flagged {review['flagged']} of {run['reports']}"
+        f" reports, among them {review['flagged_and_wrong']} of the {wrong}"
+        " wrong reports."
+        if wrong
+        else ""
+    )
+    return Markdown(
+        "**Motivation.** Clinical genetic test reports reach hospitals as PDFs,"
+        " and each laboratory lays them out differently. Their variants,"
+        " classifications and clinical features are copied into registries and"
+        " research databases by hand. Patient data may not leave the hospital,"
+        " which rules out cloud language models at most sites.\n\n"
+        "**Results.** Gentrex turns these PDFs into standardized records with"
+        " open-weight models on local GPUs. It reads each page from its text"
+        " layer or with OCR, drops pages without findings, extracts a fixed"
+        " schema with one request per report, and maps genes, conditions and"
+        " features to HGNC, MONDO and HPO. We tested it on"
+        f" {run['reports']} synthetic reports from 21 layouts, generated with"
+        " known ground truth. On the native PDFs, every clinically relevant value"
+        f" was right in {share('report_accuracy')} of reports, and the"
+        f" clinical variant F1 was {share('clinical_variant_f1')}."
+        f"{scanned}{caught}\n\n"
+        "**Availability and implementation.** Gentrex and the benchmark"
+        " generator are written in Python and released under the MIT license"
+        " at https://github.com/hieutdle/gentrex. All models have open weights."
+    )
+
+
 def headline(
     run: dict[str, Any], chosen: dict[str, dict[str, Any]] | None = None
 ) -> Any:
@@ -1175,10 +1600,11 @@ def headline(
         f"{pct(run['main'][name]['low'])} to {pct(run['main'][name]['high'])}</div>"
         "</div>"
         for name, title in MAIN.items()
+        if name in run["main"]
     )
     caption = (
-        f"{run['reports']} reports of the {run['split']} split,"
-        f" {html.escape(setup_of(run))}. The small print is the 95% interval."
+        f"{run['reports']} reports, {html.escape(setup_of(run))}."
+        " The small print is the 95% interval."
     )
     said = "".join(
         f"<li>{html.escape(sentence)}</li>" for sentence in findings(run, chosen or {})
@@ -1508,9 +1934,10 @@ def groups_figure(
             return found
         return sorted(found, key=lambda item: item[1]["report_accuracy"])
 
+    names = ("lab", "laboratory")
     sections = {
         GROUP_LABELS[group]: {
-            f"{value if group == 'lab' else label(value)}  ({n['reports']})": wilson(
+            f"{value if group in names else label(value)}  ({n['reports']})": wilson(
                 round(n["report_accuracy"] * n["reports"]), n["reports"]
             )
             for value, n in rows(group)
@@ -1536,23 +1963,32 @@ def groups_figure(
     _save_figure(figure, name)
 
 
-# One report, for the walkthrough
+# One report
 
 
 def example_report(run: dict[str, Any]) -> str:
     """Returns a report of a run that shows every command at work.
 
-    That is the first report of which gentrex select dropped a page, or else
-    the first report.
+    Prefers a report where gentrex select dropped a page and at least one
+    variant was found, falling back to any dropped-page report, any report
+    with a variant, or the first report.
     """
-    dropped = [
-        d["file"] for d in records(run, "select", "decisions.jsonl") if not d["keep"]
-    ]
     names = sorted(run["by_report"])
-    return next(
-        (pathlib.Path(d).stem for d in dropped if pathlib.Path(d).stem in names),
-        names[0],
-    )
+    dropped = {
+        pathlib.Path(d["file"]).stem
+        for d in records(run, "select", "decisions.jsonl")
+        if not d["keep"]
+    }
+    has_variant = {
+        name
+        for name, summary in run["by_report"].items()
+        if (summary.get("variants") or {}).get("matched", 0) > 0
+    }
+    for pool in (dropped & has_variant, dropped, has_variant):
+        match = next((name for name in names if name in pool), None)
+        if match is not None:
+            return match
+    return names[0]
 
 
 def report_files(run: dict[str, Any], report: str) -> dict[str, Any]:
@@ -1563,7 +1999,8 @@ def report_files(run: dict[str, Any], report: str) -> dict[str, Any]:
         path of the PDF that the run read or None; `pages` and `decisions`,
         the report's lines of gentrex transcribe and gentrex select; `data`,
         `not_in_pages` and `normalized`, the record of gentrex extract, its
-        check and the standard values. What is not on this machine is empty.
+        check and the standard values; `record`, the report's whole line of
+        gentrex normalize or None. What is not on this machine is empty.
     """
     benchmark = (run["benchmark"] or {}).get("version", "")
     version = ROOT / "data" / "gentrex-bench" / benchmark
@@ -1592,6 +2029,7 @@ def report_files(run: dict[str, Any], report: str) -> dict[str, Any]:
         "data": extraction.get("data") or {},
         "not_in_pages": extraction.get("not_in_pages"),
         "normalized": normalized.get("normalized") or {},
+        "record": normalized or None,
     }
 
 
@@ -1602,7 +2040,7 @@ def case_table(run: dict[str, Any], report: str) -> pd.DataFrame:
         "Template": case["lab"],
         "Kind of test": label(case["kind"] or ""),
         "Result": label(case["scenario"] or ""),
-        "Challenges": ", ".join(label(tag) for tag in case["tags"] or []),
+        "Challenges": ", ".join(label(name) for name in case["challenges"] or []),
     }
     return pd.Series(rows, name=report, dtype=object).to_frame().T
 
@@ -1843,3 +2281,433 @@ def features_table(files: dict[str, Any]) -> pd.DataFrame:
             }
         )
     return pd.DataFrame(rows).fillna("")
+
+
+# What the records become
+
+
+def database(run: dict[str, Any]) -> Any:
+    """Returns a database with the records of a run, as gentrex load writes them.
+
+    The database is SQLite in memory. It has the HPO hierarchy if the HPO
+    release of `load.hpo_release` in settings.yaml is on this machine.
+
+    Returns:
+        The database's engine, or None if the run's normalized.jsonl is not
+        on this machine.
+    """
+    from gentrex import config
+    from gentrex.load import hpo
+    from gentrex.load import run as load_run
+
+    folder = run_folder(run, "normalize")
+    if folder is None or not (folder / "normalized.jsonl").is_file():
+        return None
+    release = ROOT / config.load_settings()["load"]["hpo_release"]
+    tree = (
+        hpo.HpoTree.from_release(release)
+        if release.is_file()
+        else hpo.HpoTree({}, {}, "")
+    )
+    engine = load_run.make_engine("sqlite://")
+    # Without the release, gentrex load warns of every matched HPO term.
+    log = logging.getLogger("gentrex.load.run")
+    level = log.level
+    log.setLevel(logging.ERROR)
+    try:
+        load_run.run(folder / "normalized.jsonl", engine, tree)
+    finally:
+        log.setLevel(level)
+    return engine
+
+
+def query(engine: Any, sql: str) -> pd.DataFrame:
+    """Returns the rows that a SQL query finds in the database of database()."""
+    import sqlalchemy as sa
+
+    if engine is None:
+        return pd.DataFrame()
+    with engine.connect() as conn:
+        return pd.read_sql(sa.text(sql), conn)
+
+
+def _exported(files: dict[str, Any]) -> tuple[str, Any] | None:
+    """Returns the patient key and the record of a report, as the exports read it."""
+    from gentrex.load import run as load_run
+
+    if not (files["record"] or {}).get("data"):
+        return None
+    report = load_run.read_report(json.dumps(files["record"]))
+    return load_run.patient_key(report.file, report.data or {}), report
+
+
+def phenopacket(run: dict[str, Any], files: dict[str, Any]) -> dict[str, Any]:
+    """Returns the Phenopacket that gentrex export phenopackets writes for a report.
+
+    Returns:
+        The Phenopacket, or nothing if the report's record is not on this
+        machine.
+    """
+    from gentrex.export import phenopacket as phenopacket_lib
+
+    found = _exported(files)
+    if found is None:
+        return {}
+    settings = run["runs"]["normalize"]["settings"]
+    versions = {
+        "hpo": settings.get("hpo_version"),
+        "mondo": settings.get("mondo_version"),
+    }
+    created = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    return phenopacket_lib.build(found[0], [found[1]], versions, created)
+
+
+def print_json(document: dict[str, Any], *keys: str) -> None:
+    """Prints a JSON document, or only some of its keys."""
+    shown = (
+        {key: document[key] for key in keys if key in document} if keys else document
+    )
+    print(json.dumps(shown, indent=2, ensure_ascii=False))
+
+
+def _concept(concept: dict[str, Any]) -> str:
+    """Returns the text of a FHIR CodeableConcept, or its first code's name."""
+    codes = concept.get("coding") or [{}]
+    return concept.get("text") or codes[0].get("display") or codes[0].get("code") or ""
+
+
+def fhir_table(files: dict[str, Any]) -> pd.DataFrame:
+    """Returns the resources of the FHIR Bundle that gentrex export fhir writes.
+
+    Each resource has a row with its profile in the Genomics Reporting
+    guide, if it has one, and what it holds.
+    """
+    from gentrex.export import fhir
+
+    found = _exported(files)
+    if found is None:
+        return pd.DataFrame()
+    bundle = fhir.bundle(found[1], fhir.patient(found[0], [found[1]]))
+    rows = []
+    for entry in bundle["entry"]:
+        resource = entry["resource"]
+        profile = ((resource.get("meta") or {}).get("profile") or [""])[0]
+        holds = [i["value"] for i in resource.get("identifier") or []]
+        holds += [
+            resource[key] for key in ("name", "gender", "birthDate") if key in resource
+        ]
+        holds += [
+            _concept(resource[key]) for key in ("type", "code") if key in resource
+        ]
+        if "valueCodeableConcept" in resource:
+            holds.append(_concept(resource["valueCodeableConcept"]))
+        for part in resource.get("component") or []:
+            value = next(
+                (
+                    _concept(v) if isinstance(v, dict) else str(v)
+                    for key, v in part.items()
+                    if key.startswith("value")
+                ),
+                "",
+            )
+            holds.append(f"{_concept(part['code'])}: {value}")
+        if "conclusion" in resource:
+            holds.append(resource["conclusion"])
+        rows.append(
+            {
+                "Resource": resource["resourceType"],
+                "Profile": profile.rpartition("/")[2],
+                "Holds": "; ".join(filter(None, holds)),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def schema_table() -> pd.DataFrame:
+    """Returns a section-level summary of Gentrex's extraction schema."""
+    from gentrex import config
+
+    schema = config.load_schema()
+    top = schema["properties"]
+    variant = top["variants"]["items"]["properties"]
+    phenotype = top["patient_phenotypes"]["items"]["properties"]
+    patient_keys = (
+        "mrn",
+        "submitter_patient_id",
+        "lab_accession_number",
+        "date_of_birth",
+        "sex",
+        "specimen_type",
+        "collection_date",
+        "received_date",
+    )
+    report_keys = tuple(
+        k
+        for k in top
+        if k not in patient_keys and k not in ("variants", "patient_phenotypes")
+    )
+    groups = [
+        (
+            "Patient and specimen",
+            {k: top[k] for k in patient_keys if k in top},
+            "MRN, DOB, sex, specimen, collection and received dates",
+        ),
+        (
+            "Test and report",
+            {k: top[k] for k in report_keys},
+            "Test name and type, report date, overall result, karyotype, genome build",
+        ),
+        (
+            "Variants (per finding)",
+            variant,
+            "Gene, transcript, HGVS c./p., copy number, ACMG class, zygosity, page",
+        ),
+        (
+            "Clinical features (per feature)",
+            phenotype,
+            "Verbatim symptom text and presence or absence flag",
+        ),
+    ]
+    rows = {}
+    for title, fields, examples in groups:
+        enums = sum("enum" in spec for spec in fields.values())
+        raw = sum(name.endswith("_raw") for name in fields)
+        rows[title] = {
+            "Fields": len(fields),
+            "Controlled enums": enums,
+            "Verbatim _raw fields": raw,
+            "Examples": examples,
+        }
+    return _save_table(pd.DataFrame(rows, dtype=object).T, "table-schema")
+
+
+def copies_figure() -> None:
+    """Draws page 1 of an example report as native PDF, office scan, and fax."""
+    import pypdfium2
+
+    folder = ROOT / "gentrex-bench" / "examples"
+    copies = [
+        ("Native PDF", folder / "carrier-banner.pdf"),
+        ("Office scan", folder / "carrier-banner-scan.pdf"),
+        ("Fax", folder / "carrier-banner-fax.pdf"),
+    ]
+    if not all(path.is_file() for _, path in copies):
+        print("Example scan and fax PDFs are not on this machine.")
+        return
+    figure, axes = plt.subplots(1, 3, figsize=(_WIDTH, 3.1))
+    for ax, (title, path) in zip(axes, copies, strict=True):
+        document = pypdfium2.PdfDocument(path)
+        bitmap = document[0].render(scale=0.8)  # pyright: ignore[reportArgumentType]
+        ax.imshow(bitmap.to_pil())
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.grid(visible=False)
+        for spine in ax.spines.values():
+            spine.set_visible(True)
+            spine.set_color(_GRID)
+            spine.set_linewidth(0.8)
+        ax.set_title(title, fontweight="normal", fontsize=8.5)
+    figure.tight_layout()
+    _save_figure(figure, "figure-copies")
+
+
+_HPO_SETUP_LABELS = {
+    "cambridgeltl/SapBERT-from-PubMedBERT-fulltext"
+    " + google/embeddinggemma-2 (prompt SentenceSimilarity)": (
+        "SapBERT + EmbeddingGemma 2 (Gentrex default)"
+    ),
+    "cambridgeltl/SapBERT-from-PubMedBERT-fulltext": "SapBERT alone",
+    "google/embeddinggemma-2 (prompt SentenceSimilarity)": (
+        "EmbeddingGemma 2 (SentenceSimilarity prompt)"
+    ),
+    "google/embeddinggemma-2": "EmbeddingGemma 2 (no prompt)",
+    "cambridgeltl/SapBERT-from-PubMedBERT-fulltext"
+    " + google/embeddinggemma-2 (prompt SentenceSimilarity) + BM25": (
+        "SapBERT + EmbeddingGemma 2 + BM25"
+    ),
+}
+
+
+def hpo_benchmark_table() -> pd.DataFrame:
+    """Returns the real-text GSC+ HPO normalization ablation table."""
+    path = ROOT / "evaluation_results" / "hpo_normalization.json"
+    if not path.is_file():
+        return pd.DataFrame()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    speed = data.get("speed") or {}
+    baseline = data["run"]["baseline"]
+    rows = {}
+    for name, metrics in data["setups"].items():
+        ms = (speed.get(name) or {}).get("ms_per_feature")
+        rows[_HPO_SETUP_LABELS.get(name, name)] = {
+            "Top-1, %": f"{metrics['top1']:.1f}",
+            "Top-1 (rephrased), %": f"{metrics['top1_different']:.1f}",
+            "Top-5, %": f"{metrics['top5']:.1f}",
+            "Top-10, %": f"{metrics['top10']:.1f}",
+            "Top-1 p vs. default": (
+                "baseline" if name == baseline else _p_value(metrics.get("p_top1"))
+            ),
+            "ms / feature": "" if ms is None else f"{ms:.1f}",
+        }
+    agree = data.get("agreement") or {}
+    if agree:
+        print(
+            f"On {data['run']['mentions']} GSC+ mentions"
+            f" ({data['run']['worded_differently']} worded differently from HPO),"
+            f" both encoders agreed on {agree['agree']:.1f}% of mentions"
+            f" (top-1 accuracy {agree['top1_when_agree']:.1f}% when agreeing"
+            f" vs. {agree['top1_when_disagree']:.1f}% when disagreeing)."
+        )
+    return _save_table(pd.DataFrame(rows, dtype=object).T, "table-hpo-gsc")
+
+
+def mondo_benchmark_table() -> pd.DataFrame:
+    """Returns the ClinVar MONDO disease lookup evaluation table."""
+    path = ROOT / "evaluation_results" / "mondo_normalization.json"
+    if not path.is_file():
+        return pd.DataFrame()
+    data = json.loads(path.read_text(encoding="utf-8"))
+    run_info = data["run"]
+    rows = {
+        f"Distinct ClinVar condition names ({run_info['names']:,})": {
+            "Exact match, %": f"{data['names']['same ID']:.1f}",
+            "Unmapped, %": f"{data['names']['unmapped']:.1f}",
+            "Different ID, %": f"{data['names']['other ID']:.1f}",
+            "Ambiguous, %": f"{data['names']['ambiguous']:.1f}",
+        },
+        f"Weighted by ClinVar variants ({run_info['variants']:,})": {
+            "Exact match, %": f"{data['variants']['same ID']:.1f}",
+            "Unmapped, %": f"{data['variants']['unmapped']:.1f}",
+            "Different ID, %": f"{data['variants']['other ID']:.1f}",
+            "Ambiguous, %": f"{data['variants']['ambiguous']:.1f}",
+        },
+    }
+    return _save_table(pd.DataFrame(rows, dtype=object).T, "table-mondo-clinvar")
+
+
+def challenge_impact_table(run: dict[str, Any]) -> pd.DataFrame:
+    """Compares report accuracy on reports with and without each challenge.
+
+    Each challenge gets an exact two-sided Fisher test. The table makes one
+    test per challenge, so the p-values are also given after Holm's
+    correction for multiple tests. The rows go from the largest drop in
+    accuracy to the smallest.
+    """
+    summaries = list((run.get("by_report") or {}).values())
+    posed = [set((s.get("case") or {}).get("challenges") or []) for s in summaries]
+    rows = []
+    for name in sorted(set().union(*posed)):
+        posing = [
+            s["correct"] for s, c in zip(summaries, posed, strict=True) if name in c
+        ]
+        other = [
+            s["correct"] for s, c in zip(summaries, posed, strict=True) if name not in c
+        ]
+        if not posing or not other:
+            continue
+        a, c = sum(posing), sum(other)
+        p = score.fisher_exact(a, len(posing) - a, c, len(other) - c)
+        rows.append((a / len(posing) - c / len(other), name, len(posing), a, c, p))
+    if not rows:
+        return pd.DataFrame()
+    rows.sort()
+    by_p = sorted(range(len(rows)), key=lambda i: rows[i][5])
+    holm, running = [0.0] * len(rows), 0.0
+    for rank, i in enumerate(by_p):
+        running = max(running, min(1.0, (len(rows) - rank) * rows[i][5]))
+        holm[i] = running
+    table = pd.DataFrame(
+        {
+            label(name): {
+                "Reports": n,
+                "Accuracy with it, %": pct(a / n),
+                "Accuracy without it, %": pct(c / (len(summaries) - n)),
+                "Difference, points": f"{gap * 100:+.1f}",
+                "Fisher p": _p_value(p),
+                "Holm-adjusted p": _p_value(holm[i]),
+            }
+            for i, (gap, name, n, a, c, p) in enumerate(rows)
+        },
+        dtype=object,
+    ).T
+    return _save_table(table, "table-challenges")
+
+
+def export_summary_table(run: dict[str, Any]) -> pd.DataFrame:
+    """Runs SQL, Phenopacket, pseudonymized Phenopacket, and FHIR exports on a run."""
+    from gentrex.export import fhir
+    from gentrex.export import phenopacket as phenopacket_lib
+    from gentrex.export import pseudonyms as pseudonyms_lib
+    from gentrex.export import run as export_run
+
+    folder = run_folder(run, "normalize")
+    if folder is None or not (folder / "normalized.jsonl").is_file():
+        return pd.DataFrame()
+    _, _, by_patient = export_run._read(folder / "normalized.jsonl")
+    if not by_patient:
+        return pd.DataFrame()
+    settings = run["runs"]["normalize"]["settings"]
+    versions = {
+        "hpo": settings.get("hpo_version"),
+        "mondo": settings.get("mondo_version"),
+    }
+    created = datetime.datetime.now(datetime.UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    db = database(run)
+    sql_reports = int(query(db, "SELECT count(*) AS n FROM reports")["n"].iloc[0])
+    sql_variants = int(query(db, "SELECT count(*) AS n FROM variants")["n"].iloc[0])
+    sql_features = int(
+        query(db, "SELECT count(*) AS n FROM patient_phenotypes")["n"].iloc[0]
+    )
+
+    packets = [
+        phenopacket_lib.build(key, reports, versions, created)
+        for key, reports in by_patient.items()
+    ]
+    pseudo = pseudonyms_lib.Pseudonyms("paper-demo-key")
+    pseudo_packets = [
+        phenopacket_lib.build(key, reports, versions, created, pseudo)
+        for key, reports in by_patient.items()
+    ]
+    pseudo_ids_ok = all(pkt["subject"]["id"].startswith("P-") for pkt in pseudo_packets)
+
+    bundles = [
+        fhir.bundle(report, fhir.patient(key, reports))
+        for key, reports in by_patient.items()
+        for report in reports
+    ]
+    fhir_resources = sum(len(b["entry"]) for b in bundles)
+
+    rows = {
+        "SQL (`gentrex load`)": {
+            "Artifacts": f"{sql_reports} report rows",
+            "Contents": (
+                f"{len(by_patient)} patients, {sql_variants} variants,"
+                f" {sql_features} clinical features"
+            ),
+            "Verification": "Loaded into SQLite with HPO hierarchy",
+        },
+        "GA4GH Phenopackets": {
+            "Artifacts": f"{len(packets)} JSON packets",
+            "Contents": (
+                f"{sum(len(p.get('interpretations') or []) for p in packets)}"
+                " interpretations,"
+                f" {sum(len(p.get('phenotypicFeatures') or []) for p in packets)}"
+                " HPO features"
+            ),
+            "Verification": "1 packet per linked patient",
+        },
+        "GA4GH Phenopackets (`--pseudonymize`)": {
+            "Artifacts": f"{len(pseudo_packets)} JSON packets",
+            "Contents": f"{len(pseudo.issued)} HMAC-SHA256 pseudonyms issued",
+            "Verification": (
+                "All subject IDs masked (P-...)" if pseudo_ids_ok else "Unmasked ID"
+            ),
+        },
+        "HL7 FHIR Genomics Bundles": {
+            "Artifacts": f"{len(bundles)} transaction Bundles",
+            "Contents": f"{fhir_resources} FHIR resources total",
+            "Verification": "1 Bundle per report",
+        },
+    }
+    return _save_table(pd.DataFrame(rows, dtype=object).T, "table-exports")

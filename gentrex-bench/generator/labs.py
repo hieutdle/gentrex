@@ -8,8 +8,7 @@ tests it reports. `based_on` names the sample reports. The lab names are
 invented, and no template copies a lab's name, logo or text. Each name is a
 colour that starts with the same letter as the real lab, as Indigo for
 Invitae. Templates that follow the same real lab share a fictional name,
-because a lab uses different layouts for different tests. Templates with
-`held_out` set appear only in the test split.
+because a lab uses different layouts for different tests.
 """
 
 import dataclasses
@@ -158,7 +157,6 @@ class Lab:
             literature, which is a distractor.
         results_to_note: Whether the report lists other results that aren't
             variants, such as FMR1 repeats, which are distractors.
-        held_out: Whether the template is kept out of the dev split.
         build: The genome build that the layout names for sequencing tests,
             or None if it names none.
         disomy: Whether the layout can report a uniparental disomy.
@@ -199,7 +197,6 @@ class Lab:
     trio: bool = False
     literature_variant: bool = False
     results_to_note: bool = False
-    held_out: bool = False
     build: str | None = None
     disomy: bool = False
     array: ArrayStyle | None = None
@@ -392,7 +389,6 @@ LABS = [
         position="chr{chromosome}:{start}",
         prints_started=True,
         trio=True,
-        held_out=True,
         build="GRCh38",
         disomy=True,
     ),
@@ -616,7 +612,6 @@ LABS = [
         inheritance=_TITLE_INHERITANCE,
         carrier_name="Comprehensive Carrier Screen",
         results_to_note=True,
-        held_out=True,
     ),
     Lab(
         key="chart",
@@ -653,7 +648,6 @@ LABS = [
         zygosity=_LOWER_ZYGOSITY,
         inheritance=_LOWER_INHERITANCE,
         missing=("date_of_birth", "mrn", "submitter_patient_id"),
-        held_out=True,
     ),
     Lab(
         key="microarray-printout",

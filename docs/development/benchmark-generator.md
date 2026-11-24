@@ -7,7 +7,7 @@ can then be compared with the truth, value by value. Real reports can't be
 shared for this, because they hold patient data.
 
 You give the generator a seed and a number of cases. For each case you get
-the report as five PDFs and one truth file.
+the report as three PDFs and one truth file.
 [Generate benchmark reports](generate-benchmark-reports.md) shows how to run
 it.
 
@@ -64,7 +64,7 @@ a paragraph that give different zygosities.
 
 A report is made in five steps:
 
-![The five steps of the generator. Code and a seed sample the case, with one of the report templates, and write the truth file. An LLM writes the report's free text, code fills the template's HTML with the truth and that text, and Chrome renders it as a PDF. check.py compares the PDF text with the truth file, and a case that fails is written again. The PDFs that pass are scanned at two levels with Pillow and copied as clean images, so each report comes as a native, scan, fax, mixed or image PDF, all with one truth file.](../images/benchmark-generator.svg)
+![The five steps of the generator. Code and a seed sample the case, with one of the report templates, and write the truth file. An LLM writes the report's free text, code fills the template's HTML with the truth and that text, and Chrome renders it as a PDF. check.py compares the PDF text with the truth file, and a case that fails is written again. The PDFs that pass are scanned at two levels with Pillow, so each report comes as a native, scan or fax PDF, all with one truth file.](../images/benchmark-generator.svg)
 
 ## Step 1: Sample the case
 
@@ -88,7 +88,7 @@ First comes the test, and with it the possible results:
 | SMN1 copy number, for spinal muscular atrophy | 3% | a carrier, affected, normal |
 | Methylation of 15q11.2q13, for Prader-Willi and Angelman syndromes | 2% | positive, with no variant to extract, or normal |
 
-The dev and test cases each have these shares, rounded to whole cases.
+The cases have these shares, rounded to whole cases.
 
 Panels, exomes, single-gene tests and tests of one known variant belong to
 one of nine clinical areas, such as epilepsy, cardiomyopathy or hereditary
@@ -108,8 +108,7 @@ complex for a MYO15A variant. A condition is therefore left out too if
 fewer than 1 in 50 of the gene's ClinVar entries name it. So the
 HGVS, classification, condition and IDs of every variant are real. Deletions
 and duplications of whole exons qualify too, written as ClinVar writes them,
-as c.(?_5299)_(5572_?)del. No variant or copy-number change is drawn twice,
-so the dev and test cases share none.
+as c.(?_5299)_(5572_?)del. No variant or copy-number change is drawn twice across the benchmark.
 
 The copy-number changes of microarrays come from ClinVar as well. A change
 qualifies when it is a gain or loss of 50 kb to 15 Mb with the same review
@@ -135,20 +134,20 @@ templates. The kinds that the fewest templates report come first, and then
 cases move from fuller to emptier templates. A case can only move to a
 template of its kind, so a move may pass through a template in between,
 which takes a case of one kind and gives up a case of another. So every
-template gets about the same share, at least 8 of the 200 test cases.
+template gets about the same share, at least 12 of the 300 cases.
 
 The templates can't all get the same number of cases, because the shares of
 the tests are fixed first. The `karyotype` template is the only one that
 reports chromosome analysis, and it reports nothing else. It therefore gets
-that test's 5% of the cases, which is 10 of the 200 test cases. The four
-templates that report only carrier screens share the 32 carrier cases and
-get 8 each. A template that reports several tests may get cases of only
+that test's 5% of the cases, which is 15 of the 300 cases. The four
+templates that report only carrier screens share the 48 carrier cases and
+get 12 each. A template that reports several tests may get cases of only
 some of them, because its other tests go to templates that would otherwise
 have too few cases. The table under [Templates](#templates) gives every
 template's count.
 
 The case also gets the IDs and dates in its template's formats, and its
-challenge tags, which the section [Challenge tags](#challenge-tags) below
+challenges, which the section [Challenges](#challenges) below
 describes.
 
 ## Step 2: Write the report
@@ -197,6 +196,13 @@ default is Meta's Muse Glimmer 30B.
 
 ## Step 3: Render the PDF
 
+A report gets zero to five appendix pages after its last page, as the
+packets of real laboratories have them. The pages cover the methods and
+limitations of the test, information for patients, resources, billing and
+regulatory statements. Their text is in `templates/_appendix.html` and
+states none of the patient's findings. With them, a report has about as many
+pages as the public sample reports, which have a median of six.
+
 Gentrex reads PDFs, so the filled HTML is printed to PDF by Google Chrome,
 which runs in the background without a window. Every page gets a footer that
 marks the report as synthetic:
@@ -224,20 +230,18 @@ variant. Nobody edits a truth file by hand.
 
 ## Step 5: Scan
 
-Each report comes in five versions, so that Gentrex can also be tested on
+Each report comes in three versions, so that Gentrex can also be tested on
 scanned pages:
 
 | Version | What it looks like |
 | --- | --- |
 | `native` | The PDF as Chrome printed it, with a text layer |
-| `scan` | Page images with a slight skew, blur, noise and JPEG compression, as from an office scanner |
-| `fax` | Page images at three quarters of the vertical resolution, with a larger skew, in black and white, with a few speckles and thin streaks |
-| `mixed` | The native PDF with about a third of its pages scanned, and none if the report has one page |
-| `image` | Clean page images whose only text is a short document code, as some labs' PDFs come |
+| `scan` | Page images with a slight skew, a little blur and noise, and JPEG compression, as from a good office scanner |
+| `fax` | Page images at seven eighths of the vertical resolution, with a larger skew, in black and white, with a few speckles and at most one thin streak |
 
 The damage is drawn from a random stream seeded with the case ID, so a
-report always gets the same copies. All five versions share one truth file.
-Every report gets all five, and none is drawn at a rate.
+report always gets the same copies. All three versions share one truth file.
+Every report gets all three, and none is drawn at a rate.
 [Benchmark design](benchmark.md#benchmark-set) gives the reason.
 
 ## Templates
@@ -249,34 +253,32 @@ reports behind each template. The lab names are invented. Each is a colour
 that starts with the same letter as the real lab, as Indigo for Invitae, and
 templates that follow the same real lab share it.
 
-| Template | Fictional lab | Follows | Tests | Dev cases | Test cases |
-| --- | --- | --- | --- | --- | --- |
-| `graybar-panel` | Aqua Genetics | Ambry | panel, single gene | 6 | 12 |
-| `exome-box` | Aqua Genetics | Ambry | exome | 6 | 9 |
-| `genome-card` | Aqua Genetics | Ambry | genome, with uniparental disomy | 0 | 8 |
-| `snp-array` | Aqua Genetics | Ambry | chromosomal microarray, on GRCh38 | 5 | 12 |
-| `chart` | Apricot Reference Laboratories | ARUP | one known variant | 7 | 8 |
-| `lis-printout` | Apricot Reference Laboratories | ARUP | single gene, one known variant | 0 | 8 |
-| `findings-grid` | Bronze Clinical Genomics | Blueprint | panel, mitochondrial genome | 6 | 11 |
-| `screen-badge` | Bronze Clinical Genomics | Blueprint | carrier screen | 5 | 8 |
-| `results-statement` | Bronze Clinical Genomics | Blueprint | panel | 6 | 12 |
-| `exome-findings` | Bronze Clinical Genomics | Blueprint | exome | 5 | 8 |
-| `dx-banner` | Indigo Genetic Testing | Invitae | panel, single gene | 6 | 11 |
-| `carrier-grid` | Indigo Genetic Testing | Invitae | carrier screen | 0 | 8 |
-| `teal-banner` | Lilac Molecular Laboratory | Labcorp | single gene, carrier screen | 5 | 8 |
-| `enterprise` | Lilac Molecular Laboratory | Labcorp | carrier screen, single gene, FMR1 repeats, SMN1 copy number | 5 | 11 |
-| `carrier-banner` | Lilac Molecular Laboratory | Labcorp | carrier screen | 5 | 8 |
-| `microarray-printout` | Lilac Molecular Laboratory | Labcorp | chromosomal microarray, on GRCh37 | 6 | 11 |
-| `karyotype` | Lilac Molecular Laboratory | Labcorp | chromosome analysis | 5 | 10 |
-| `patient-page` | Navy Genomic Laboratory | NHS | carrier test of CFTR, in UK style | 5 | 8 |
-| `one-page` | Navy Genomic Laboratory | NHS | single gene, carrier test of CFTR, in UK style | 5 | 8 |
-| `summary-line` | Plum Genetics | PreventionGenetics | panel, single gene, chromosomal microarray on GRCh37, HTT and C9orf72 repeats, methylation | 6 | 12 |
-| `summary-sidebar` | Plum Genetics | PreventionGenetics | exome | 6 | 9 |
+| Template | Fictional lab | Follows | Tests | Cases |
+| --- | --- | --- | --- | --- |
+| `graybar-panel` | Aqua Genetics | Ambry | panel, single gene | 17 |
+| `exome-box` | Aqua Genetics | Ambry | exome | 13 |
+| `genome-card` | Aqua Genetics | Ambry | genome, with uniparental disomy | 13 |
+| `snp-array` | Aqua Genetics | Ambry | chromosomal microarray, on GRCh38 | 17 |
+| `chart` | Apricot Reference Laboratories | ARUP | one known variant | 12 |
+| `lis-printout` | Apricot Reference Laboratories | ARUP | single gene, one known variant | 12 |
+| `findings-grid` | Bronze Clinical Genomics | Blueprint | panel, mitochondrial genome | 17 |
+| `screen-badge` | Bronze Clinical Genomics | Blueprint | carrier screen | 12 |
+| `results-statement` | Bronze Clinical Genomics | Blueprint | panel | 18 |
+| `exome-findings` | Bronze Clinical Genomics | Blueprint | exome | 13 |
+| `dx-banner` | Indigo Genetic Testing | Invitae | panel, single gene | 17 |
+| `carrier-grid` | Indigo Genetic Testing | Invitae | carrier screen | 12 |
+| `teal-banner` | Lilac Molecular Laboratory | Labcorp | single gene, carrier screen | 12 |
+| `enterprise` | Lilac Molecular Laboratory | Labcorp | carrier screen, single gene, FMR1 repeats, SMN1 copy number | 17 |
+| `carrier-banner` | Lilac Molecular Laboratory | Labcorp | carrier screen | 12 |
+| `microarray-printout` | Lilac Molecular Laboratory | Labcorp | chromosomal microarray, on GRCh37 | 17 |
+| `karyotype` | Lilac Molecular Laboratory | Labcorp | chromosome analysis | 15 |
+| `patient-page` | Navy Genomic Laboratory | NHS | carrier test of CFTR, in UK style | 12 |
+| `one-page` | Navy Genomic Laboratory | NHS | single gene, carrier test of CFTR, in UK style | 12 |
+| `summary-line` | Plum Genetics | PreventionGenetics | panel, single gene, chromosomal microarray on GRCh37, HTT and C9orf72 repeats, methylation | 18 |
+| `summary-sidebar` | Plum Genetics | PreventionGenetics | exome | 12 |
 
-The counts are those of the default settings, with 100 dev cases, 200 test
-cases and the seed `gentrex-synthetic-1`. `genome-card`, `carrier-grid` and
-`lis-printout` appear only in the test cases. They show how Gentrex does on
-layouts that it wasn't tuned on.
+The counts are those of the default settings, with 300 cases and the seed
+`gentrex-synthetic-2`.
 
 A template fixes everything that stays the same between a lab's reports:
 
@@ -293,36 +295,59 @@ Each lab's look is in a CSS file, such as `templates/aqua.css`. The
 wording, the formats of IDs and dates, and the tests a template reports are
 in `gentrex-bench/generator/labs.py`.
 
-## Challenge tags
+## Challenges
 
-Each case draws one or two challenge tags. A tag makes the report harder in
-one known way, and the truth file lists the case's tags, so results can be
-split by tag. Each tag appears in 11 to 17 of the 200 test cases. A tag that
-can't change a report, such as `legacy_gene_symbol` for a gene without a
-previous symbol, is dropped from it, which leaves 10 of the 200 test cases
-without a tag. A table can only split across pages with two variants, so
-`table_split_across_pages` brings `multiple_variants` with it, and 8 test
-cases have three tags.
+Each case draws one or two challenges. A challenge makes the report harder
+in one known way, and the truth file lists the case's challenges under
+`challenges`, so results can be split by challenge. Each of the eight
+challenges appears in 49 to 52 of the 300 cases.
+
+| Challenge | What it changes in the report | Tags |
+| --- | --- | --- |
+| `split_table` | The variant table breaks across two pages | `table_split_across_pages` |
+| `late_page` | Values that Gentrex needs come late in the report | `late_page_evidence`, `provided_phenotype_page` |
+| `similar_ids` | The report prints IDs that are easy to mix up | `similar_identifiers`, `multiple_patient_ids` |
+| `distractor_variants` | Genes or a DNA change that aren't the patient's findings | `gene_list_distractor`, `boilerplate_variant_notation` |
+| `family_history` | A relative's feature | `family_history_distractor` |
+| `negated_features` | One feature is absent or uncertain | `negated_or_uncertain_phenotypes` |
+| `unusual_notation` | A value is written in a way that `gentrex normalize` has to resolve | `legacy_gene_symbol`, `nonstandard_hgvs`, `unusual_date_format` |
+| `missing_values` | A value is left out or marked as not provided | `explicitly_unavailable`, `missing_optional_fields` |
+
+A challenge has one to three tags, and a case gets one tag of each challenge
+it draws. The tag names the exact change, and the truth file lists it under
+`tags`:
+
+| Tag | What it changes in the report |
+| --- | --- |
+| `table_split_across_pages` | The variant table breaks across two pages |
+| `late_page_evidence` | A cover sheet and a page about the report come first, so the variants are on page 3 or later |
+| `provided_phenotype_page` | The patient's features appear only on a page of their own at the end |
+| `similar_identifiers` | Two more IDs that look like the lab number |
+| `multiple_patient_ids` | The submitter's patient ID field holds two IDs |
+| `gene_list_distractor` | The panel's genes are listed, most of them without a finding |
+| `boilerplate_variant_notation` | The methods give an example DNA change that isn't the patient's |
+| `family_history_distractor` | A relative's feature, as "Family history is notable for a maternal aunt with Hyperreflexia." |
+| `negated_or_uncertain_phenotypes` | One feature is absent or uncertain, as "no seizures" or "possible seizures" |
+| `legacy_gene_symbol` | The gene appears under a previous HGNC symbol |
+| `nonstandard_hgvs` | The protein change is in one-letter code, as p.R412W |
+| `unusual_date_format` | Dates in a format that few laboratories print, as 6.12.2019 for June 12 |
+| `explicitly_unavailable` | The MRN, submitter's patient ID or collection date reads "Not provided" |
+| `missing_optional_fields` | One or two fields are left out with their labels, such as the date received |
+
+A tag that can't change a report is dropped from it, such as
+`legacy_gene_symbol` for a gene without a previous symbol. That leaves 12 of
+the 300 cases without a challenge. A table can only split across pages with
+two variants, so `table_split_across_pages` brings `multiple_variants` with
+it.
+
+Four more tags vary the reports and belong to no challenge. A case gets each
+one that fits it at a rate of one in ten:
 
 | Tag | What it changes in the report |
 | --- | --- |
 | `multiple_variants` | A second variant, of uncertain significance in another gene |
-| `table_split_across_pages` | The variant table breaks across two pages |
-| `late_page_evidence` | A cover sheet and a page about the report come first, so the variants are on page 3 or later |
-| `provided_phenotype_page` | The patient's features appear only on a page of their own at the end |
-| `repeated_variant` | The model's text names each variant again, with its DNA change |
 | `trio_columns` | An exome of a child and both parents, with the parents' genotypes and the variant's origin |
-| `negated_or_uncertain_phenotypes` | One feature is absent or uncertain, as "no seizures" or "possible seizures" |
-| `family_history_distractor` | A relative's feature, as "Family history is notable for a maternal aunt with Hyperreflexia." |
-| `gene_list_distractor` | The panel's genes are listed, most of them without a finding |
-| `boilerplate_variant_notation` | The methods give an example DNA change that isn't the patient's |
-| `similar_identifiers` | Two more IDs that look like the lab number |
-| `multiple_patient_ids` | The submitter's patient ID field holds two IDs |
-| `explicitly_unavailable` | The MRN, submitter's patient ID or collection date reads "Not provided" |
-| `missing_optional_fields` | One or two fields are left out with their labels, such as the date received |
-| `legacy_gene_symbol` | The gene appears under a previous HGNC symbol |
-| `nonstandard_hgvs` | The protein change is in one-letter code, as p.R412W |
-| `unusual_date_format` | Dates in a format that few laboratories print, as 6.12.2019 for June 12 |
+| `repeated_variant` | The model's text names each variant again, with its DNA change |
 | `ambiguous_specimen` | A specimen without a clear category, as "Saliva/Buccal" |
 
 Some templates add distractors of their own, as real reports do. The
@@ -352,4 +377,4 @@ The generator is in `gentrex-bench/generator/`:
 | `fill.py` | Fills a template with a case and the model's text |
 | `render.py` | Prints HTML to PDF with Chrome |
 | `check.py` | Checks a PDF against its case and writes the truth file |
-| `scan.py` | Makes the scan, fax, mixed and image copies |
+| `scan.py` | Makes the scan and fax copies |

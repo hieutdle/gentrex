@@ -8,7 +8,7 @@ work:
 - `build` makes each report and checks it against its truth. A language model
   writes each report's text, so `build` needs a model server.
 
-For the 300 cases of a version you get 1,500 PDFs, five versions of each
+For the 300 cases of a version you get 900 PDFs, three versions of each
 report, and 300 truth files.
 [How the benchmark generator works](benchmark-generator.md) explains what
 happens inside.
@@ -79,11 +79,8 @@ If you have already run `gentrex normalize`, the last three files are in
 uv run python gentrex-bench/generator/generate.py --version v1 sample
 ```
 
-This writes 300 cases to `data/gentrex-bench/v1/cases/`, one JSON file per
-case:
-
-- SYN-0001 to SYN-0100 are dev cases, for tuning Gentrex.
-- SYN-0101 to SYN-0300 are test cases, for scoring Gentrex.
+This writes 300 cases (`SYN-0001` to `SYN-0300`) to
+`data/gentrex-bench/v1/cases/`, one JSON file per case.
 
 `--version` names the folder. The same settings and reference files always
 give the same cases, so `v1` is the same on every computer.
@@ -197,15 +194,13 @@ cases that failed:
 | `pdf/native/<case>.pdf` | The report with its text layer |
 | `pdf/scan/<case>.pdf` | Page images, as from an office scanner |
 | `pdf/fax/<case>.pdf` | Page images, as from a fax |
-| `pdf/mixed/<case>.pdf` | The native PDF with about a third of its pages scanned, and none if the report has one page |
-| `pdf/image/<case>.pdf` | Clean page images whose only text is a document code |
 | `truth/<case>.json` | The truth of a report that passed the check |
 
 A truth file has six keys:
 
 | Key | Holds |
 | --- | --- |
-| `case` | The split, template, test, result, challenge tags, the kind of each variant, and the writing model with the attempt that passed |
+| `case` | The template and its laboratory, the test, result, challenges, tags, the kind of each variant, and the writing model with the attempt that passed |
 | `record` | What `gentrex extract` should write, with the page of each variant |
 | `normalized` | What `gentrex normalize` should add, such as ISO dates and HGNC, MONDO and HPO IDs |
 | `pages` | The text of each page of the native PDF |
@@ -216,7 +211,7 @@ The JSON and HTML files also hold a canary string, in the JSON files under
 `canary`. It is a fixed sentence with a random ID that appears nowhere else.
 Model makers can search their training data for it and leave the benchmark's
 files out, so that no model is tested on reports it was trained on. The
-native and image PDFs carry the string in their title, which no page shows.
+native PDFs carry the string in their title, which no page shows.
 The scanned and faxed copies have no text and carry none.
 
 [Run the benchmark](run-benchmark.md) shows how to run Gentrex on the
@@ -253,9 +248,8 @@ on each:
 
 | Setting | Default | What it does |
 | --- | --- | --- |
-| `sample.seed` | `gentrex-synthetic-1` | Starts the random stream that picks the cases. Another seed gives other cases. |
-| `sample.dev` | `100` | The number of dev cases |
-| `sample.test` | `200` | The number of test cases |
+| `sample.seed` | `gentrex-synthetic-2` | Starts the random stream that picks the cases. Another seed gives other cases. |
+| `sample.cases` | `300` | The number of cases |
 | `sample.clinvar`, `hpo`, `hpoa`, `mondo`, `hgnc` | the paths of step 1 | Where the reference files are |
 | `build.model` | `meta-models/Muse-Glimmer-30B` | The model that writes the text, as the server names it |
 | `build.max_tokens` | `16384` | The longest answer, in tokens. A longer answer counts as a failed attempt. |

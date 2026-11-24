@@ -1,0 +1,78 @@
+{# Pages after the report, as the packets of real laboratories have them:
+   boilerplate that states none of the patient's findings. `appendix` names
+   the pages of this report. #}
+{% if "methods" in appendix %}
+<section class="inserted page-break">
+  <h1>Appendix: Test Methodology and Limitations</h1>
+  <p>Genomic DNA is isolated from the submitted specimen and checked for quantity and quality before testing begins. Specimens that fail these checks are not tested, and the ordering clinician is asked for a new specimen. All testing is performed at {{ lab.name }}, {{ details.address }}.</p>
+  <p>Regions of interest are enriched with hybridization probes and sequenced on a massively parallel sequencing instrument. Reads are aligned to the human reference genome, and differences from the reference are identified with validated software. The analysis covers the coding exons of the targeted genes and the adjacent intronic bases. A region that does not reach the minimum read depth is completed with an orthogonal method where this is technically possible.</p>
+  <p>Findings that meet the laboratory's reporting criteria are confirmed with a second method when the confirmation policy requires it. The interpretation follows the joint recommendations of the American College of Medical Genetics and Genomics and the Association for Molecular Pathology, and draws on population databases, the published literature and the laboratory's own data.</p>
+  <h2>Limitations</h2>
+  <p>No genetic test detects every possible change. This assay may not detect changes in regions that were not targeted, large rearrangements, changes in regions with high sequence similarity to other parts of the genome, low-level mosaicism, or changes in the number of short tandem repeats, unless the test description names them. Rare differences under a probe or primer can prevent a region from being read.</p>
+  <p>A result reflects the knowledge available on the day of the report. The laboratory does not reanalyze data routinely. A clinician may request a reanalysis when new clinical information becomes available. Results must be interpreted together with the clinical findings, the family history and other laboratory data. Errors in the labeling of a specimen, a bone marrow transplant from a donor, or a recent blood transfusion can lead to an incorrect result.</p>
+  <p>This test was developed and its performance characteristics were determined by {{ lab.name }}. It has not been cleared or approved by the U.S. Food and Drug Administration.</p>
+</section>
+{% endif %}
+{% if "patients" in appendix %}
+<section class="inserted page-break">
+  <h1>Information for Patients and Families</h1>
+  <p>This page explains in general terms how to read a genetic test report. It is not about your own result. Please talk to your doctor or a genetic counselor about what your result means for you.</p>
+  <h2>What a genetic test looks for</h2>
+  <p>Genes are instructions that the body uses to grow and to work. Everyone has small differences in their genes, and most of them have no effect on health. A genetic test reads some or all of a person's genes and looks for differences that are known or suspected to cause a medical condition.</p>
+  <h2>What the result can and cannot tell you</h2>
+  <p>A report can describe a difference that explains a person's symptoms, a difference whose meaning is not yet understood, or no reportable difference at all. A report without a finding lowers the chance that a condition has a genetic cause, but it does not rule one out, because no test examines everything. The meaning of a difference can also change as researchers learn more.</p>
+  <h2>What it can mean for relatives</h2>
+  <p>Family members share part of their genes. A finding in one person can therefore matter for parents, brothers, sisters and children. Whether relatives should be tested, and when, depends on the condition and on each person's wishes. A genetic counselor can help a family decide who might want testing and how to talk about it.</p>
+  <h2>Privacy</h2>
+  <p>Genetic information is protected health information. In the United States, the Genetic Information Nondiscrimination Act limits how health insurers and employers may use it. The law does not cover life insurance, disability insurance or long-term care insurance. You may wish to ask about these before you share a result.</p>
+  <h2>Questions</h2>
+  <p>Our client services team cannot give medical advice, but it can help your clinician reach one of our genetic counselors. Clinicians can call {{ details.toll_free }} on weekdays.</p>
+</section>
+{% endif %}
+{% if "resources" in appendix %}
+<section class="inserted page-break">
+  <h1>Support and Resources</h1>
+  <p>The organizations below offer general information about genetic conditions and testing. {{ lab.name }} is not affiliated with them and is not responsible for their content.</p>
+  <table>
+    <tr><th>Genetic counseling</th><td>The National Society of Genetic Counselors keeps a directory of counselors who see patients in person or by telehealth.</td></tr>
+    <tr><th>Condition summaries</th><td>MedlinePlus Genetics, from the National Library of Medicine, describes genetic conditions and genes in plain language.</td></tr>
+    <tr><th>Clinical summaries</th><td>GeneReviews offers peer-reviewed descriptions of inherited conditions for clinicians, with sections on diagnosis, management and counseling.</td></tr>
+    <tr><th>Rare diseases</th><td>The National Organization for Rare Disorders and Global Genes list patient organizations and assistance programs.</td></tr>
+    <tr><th>Research studies</th><td>ClinicalTrials.gov lists studies that are looking for participants, by condition and by location.</td></tr>
+  </table>
+  <h2>Family testing</h2>
+  <p>When a report describes a finding that can be passed on in a family, relatives can usually be tested for that one finding. The ordering clinician can request a family testing form from client services. The form asks for the accession number of the original report, so please keep this report with the patient's records.</p>
+  <h2>Reclassification</h2>
+  <p>The laboratory reviews the evidence for its classifications over time. When the classification of a reported finding changes in a way that could affect care, an amended report is sent to the ordering clinician on record. Please tell us when the patient's clinician changes.</p>
+  <h2>Data sharing</h2>
+  <p>To help other laboratories and researchers, {{ lab.name }} submits de-identified findings and their classifications to public databases. No names, dates of birth or record numbers are shared. Patients who do not want their de-identified findings shared can opt out through their clinician.</p>
+</section>
+{% endif %}
+{% if "billing" in appendix %}
+<section class="inserted page-break">
+  <h1>Billing and Insurance Information</h1>
+  <p>This page is for the patient's records. It is not a bill. A statement is sent separately once the claim has been processed.</p>
+  <h2>Insurance</h2>
+  <p>{{ lab.name }} bills the insurance plan on file for the test. The plan decides how much it pays and how much the patient owes, according to the terms of the policy. Some plans ask for prior authorization. When a plan denies a claim, the laboratory files an appeal on the patient's behalf where the plan allows it, and may ask the ordering clinician for a letter of medical necessity.</p>
+  <h2>Explanation of benefits</h2>
+  <p>After a claim is processed, the insurance plan sends an explanation of benefits. This document lists the amount that was billed and the amount that the plan paid. It often shows a balance before the laboratory's own adjustments have been applied, so the amount on the laboratory's statement can be lower.</p>
+  <h2>Patients without insurance</h2>
+  <p>Patients who pay for the test themselves receive a fixed price before testing begins. A financial assistance program lowers the price for households below an income limit. The application form is available from client services and must be received within 90 days of the statement.</p>
+  <h2>Institutional accounts</h2>
+  <p>Hospitals and clinics with an account are invoiced monthly. Questions about an invoice should name the invoice number and the laboratory's client number, not the patient's name.</p>
+  <h2>Contact</h2>
+  <p>The billing office answers questions on weekdays at {{ details.toll_free }}, option 3. Please have the statement at hand. Written questions can be sent to Billing, {{ lab.name }}, {{ details.address }}.</p>
+</section>
+{% endif %}
+{% if "regulatory" in appendix %}
+<section class="inserted page-break">
+  <h1>Regulatory Statements and Disclaimers</h1>
+  <p>{{ lab.name }} is certified under the Clinical Laboratory Improvement Amendments of 1988 (CLIA number {{ details.clia }}) to perform high-complexity clinical laboratory testing. The laboratory takes part in external proficiency testing for the methods it uses.</p>
+  <p>This report is intended for the ordering clinician and should be explained to the patient by a qualified health professional. It does not replace a clinical examination. Decisions about diagnosis and treatment are the responsibility of the treating clinician.</p>
+  <p>The interpretation relies on the information that was provided with the test order. Incomplete or incorrect information about the patient's symptoms, family history or ancestry can affect it. The laboratory assumes that the specimen belongs to the patient named on the order and that any stated family relationships are correct.</p>
+  <p>Raw sequence data are kept for at least two years, and the report for at least ten years, as the applicable regulations require. Remaining DNA may be used for quality control and for the validation of new tests after all identifiers have been removed, unless the order form says otherwise.</p>
+  <p>This document contains confidential health information that is protected by law. It may be used or disclosed only as the law permits. If you are not the intended recipient, you may not read, copy or distribute it. Please notify the laboratory at {{ details.phone }} and destroy all copies.</p>
+  <p>The names of genes and the nomenclature of findings follow the recommendations of the HUGO Gene Nomenclature Committee and the Human Genome Variation Society that were current when the report was issued. Reference sequences and genome builds are named in the report where they apply.</p>
+  <p>No part of this report may be reproduced for commercial purposes without the written permission of {{ lab.name }}.</p>
+</section>
+{% endif %}

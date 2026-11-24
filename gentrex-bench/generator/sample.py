@@ -11,6 +11,7 @@ import dataclasses
 import datetime
 import random
 import re
+from collections.abc import Iterable
 from typing import Any
 
 import labs
@@ -20,7 +21,7 @@ from gentrex import config
 
 _VERSION = "gentrex-synthetic-1"
 
-# The share of each kind of test in percent. Each split gets these shares,
+# The share of each kind of test in percent. The cases get these shares,
 # rounded to whole cases, and _Sampler.plans spreads the cases of each kind
 # over the templates that report it.
 _KIND_WEIGHTS = {
@@ -164,6 +165,44 @@ TAGS = (
     "unusual_date_format",
     "ambiguous_specimen",
 )
+# The challenges that results are split by, and the tags that pose each. A
+# case draws its challenges and gets one tag of each. The tags of no
+# challenge only vary the reports.
+CHALLENGES = {
+    "split_table": ("table_split_across_pages",),
+    "late_page": ("late_page_evidence", "provided_phenotype_page"),
+    "similar_ids": ("similar_identifiers", "multiple_patient_ids"),
+    "distractor_variants": ("gene_list_distractor", "boilerplate_variant_notation"),
+    "family_history": ("family_history_distractor",),
+    "negated_features": ("negated_or_uncertain_phenotypes",),
+    "unusual_notation": (
+        "legacy_gene_symbol",
+        "nonstandard_hgvs",
+        "unusual_date_format",
+    ),
+    "missing_values": ("explicitly_unavailable", "missing_optional_fields"),
+}
+_CHALLENGE_OF = {tag: name for name, tags in CHALLENGES.items() for tag in tags}
+# How often a case gets each tag of no challenge that fits it.
+_OTHER_TAG_RATE = 0.1
+# The pages that a report can have after its last page, in their order
+# (templates/_appendix.html), and how many of them a report gets. The public
+# sample reports have a median of six pages, about three more than a
+# template prints.
+APPENDIX_PAGES = ("methods", "patients", "resources", "billing", "regulatory")
+_APPENDIX_COUNTS = (0, 1, 1, 2, 2, 2, 3, 3, 3, 4, 4, 5)
+
+
+def _appendix(case_id: str) -> list[str]:
+    """Returns the appendix pages of a case, drawn from a stream of its own."""
+    rng = random.Random(f"{case_id}:appendix")
+    chosen = rng.sample(APPENDIX_PAGES, rng.choice(_APPENDIX_COUNTS))
+    return [page for page in APPENDIX_PAGES if page in chosen]
+
+
+def challenges(tags: Iterable[str]) -> list[str]:
+    """Returns the challenges that a case's tags pose."""
+    return sorted({_CHALLENGE_OF[tag] for tag in tags if tag in _CHALLENGE_OF})
 
 
 @dataclasses.dataclass(frozen=True)
@@ -722,6 +761,7 @@ class _Sampler:
     def __init__(self, refs: sources.References, seed: str) -> None:
         self._refs = refs
         self._rng = random.Random(seed)
+        self._challenge_counts: collections.Counter[str] = collections.Counter()
         self._tag_counts: collections.Counter[str] = collections.Counter()
         # ClinVar IDs of the variants drawn so far, so that none repeats.
         self._used: set[str] = set()
@@ -730,11 +770,7 @@ class _Sampler:
         self._variant_fields = list(schema["variants"]["items"]["properties"])
         self._array_features = tuple(t for t in _ARRAY_FEATURES if t in refs.terms)
 
-    def start_split(self) -> None:
-        """Starts the counts of tags anew, for the next split."""
-        self._tag_counts.clear()
-
-    def plans(self, split: str, count: int) -> list[tuple[str, labs.Lab]]:
+    def plans(self, count: int) -> list[tuple[str, labs.Lab]]:
         """Returns the kind of test and the template of `count` cases.
 
         The kinds have the shares of _KIND_WEIGHTS, rounded to whole cases by
@@ -753,12 +789,7 @@ class _Sampler:
         for kind in by_remainder[: count - sum(quotas.values())]:
             quotas[kind] += 1
         eligible = {
-            kind: [
-                lab
-                for lab in labs.LABS
-                if kind in lab.kinds and (split == "test" or not lab.held_out)
-            ]
-            for kind in quotas
+            kind: [lab for lab in labs.LABS if kind in lab.kinds] for kind in quotas
         }
         load: collections.Counter[str] = collections.Counter()
         cases: collections.Counter[tuple[str, str]] = collections.Counter()
@@ -898,16 +929,25 @@ class _Sampler:
             allowed -= {"negated_or_uncertain_phenotypes", "provided_phenotype_page"}
         if "submitter_patient_id" not in plan.lab.ids(random.Random(0)):
             allowed.discard("multiple_patient_ids")
-        if "provided_phenotype_page" in allowed and "late_page_evidence" in allowed:
-            allowed.discard(
-                rng.choice(["provided_phenotype_page", "late_page_evidence"])
-            )
-        count = rng.choice([1, 2])
-        # Sorted first, because a set's order changes from process to process.
+        posed = {
+            name: [tag for tag in tags if tag in allowed]
+            for name, tags in CHALLENGES.items()
+        }
         ranked = sorted(
-            sorted(allowed), key=lambda t: (self._tag_counts[t], rng.random())
+            (name for name, tags in posed.items() if tags),
+            key=lambda name: (self._challenge_counts[name], rng.random()),
         )
-        chosen = ranked[:count]
+        chosen = [
+            min(posed[name], key=lambda tag: (self._tag_counts[tag], rng.random()))
+            for name in ranked[: rng.choice([1, 2])]
+        ]
+        # Counted when drawn, so that a tag that rarely fits a case doesn't
+        # keep the other tags of its challenge from being drawn.
+        self._tag_counts.update(chosen)
+        # Sorted first, because a set's order changes from process to process.
+        for tag in sorted(allowed - set(_CHALLENGE_OF)):
+            if rng.random() < _OTHER_TAG_RATE:
+                chosen.append(tag)
         if "table_split_across_pages" in chosen and "multiple_variants" in allowed:
             chosen.append("multiple_variants")
         return set(chosen)
@@ -1041,7 +1081,7 @@ class _Sampler:
             dates["test_started_date"] = started
         return dates
 
-    def case(self, number: int, split: str, kind: str, lab: labs.Lab) -> dict[str, Any]:
+    def case(self, number: int, kind: str, lab: labs.Lab) -> dict[str, Any]:
         """Returns one case of a kind of test and a template: its truth,
         distractors and card."""
         plan = self._plan(kind, lab)
@@ -1057,8 +1097,8 @@ class _Sampler:
         else:
             found = self._sequenced(plan)
         if found is None:
-            return self.case(number, split, kind, lab)
-        return self._assemble(number, split, plan, found)
+            return self.case(number, kind, lab)
+        return self._assemble(number, plan, found)
 
     def _item(self, **values: Any) -> dict[str, Any]:
         """Returns a variant of the record, with every field of the schema."""
@@ -1831,9 +1871,7 @@ class _Sampler:
             details={"genes": rng.randint(600, 1400), "size": _size(entry.length)},
         )
 
-    def _assemble(
-        self, number: int, split: str, plan: _Plan, found: _Found
-    ) -> dict[str, Any]:
+    def _assemble(self, number: int, plan: _Plan, found: _Found) -> dict[str, Any]:
         """Returns the case: the record around the findings, and the card."""
         rng = self._rng
         lab, tags = plan.lab, found.tags
@@ -1950,7 +1988,7 @@ class _Sampler:
                 record[field] = None
             if not omitted:
                 tags.discard("missing_optional_fields")
-        self._tag_counts.update(tags)
+        self._challenge_counts.update(challenges(tags))
 
         normalized = {
             field: (dates[field].isoformat() if record[field] is not None else None)
@@ -1996,13 +2034,14 @@ class _Sampler:
         }
         return {
             "case_id": case_id,
-            "split": split,
             "generator": _VERSION,
             "lab": lab.key,
+            "laboratory": lab.name,
             "based_on": list(lab.based_on),
             "kind": plan.kind,
             "scenario": plan.scenario,
             "tags": sorted(tags),
+            "challenges": challenges(tags),
             "patient": patient,
             "dates": {field: value.isoformat() for field, value in dates.items()},
             "date_format": date_format,
@@ -2015,6 +2054,7 @@ class _Sampler:
             "normalized": normalized,
             "distractors": distractors,
             "unavailable": unavailable,
+            "appendix": _appendix(case_id),
             "omitted": omitted,
             "card": card,
         }
@@ -2110,12 +2150,10 @@ def _card_variant(variant: dict[str, Any]) -> dict[str, Any]:
     return {key: value for key, value in card.items() if value}
 
 
-def sample(refs: sources.References, seed: str, dev: int, test: int) -> list[dict]:
-    """Returns `dev` dev cases and then `test` test cases, numbered from 1."""
+def sample(refs: sources.References, seed: str, count: int) -> list[dict]:
+    """Returns `count` cases, numbered from 1."""
     sampler = _Sampler(refs, seed)
     cases = []
-    for split, count in (("dev", dev), ("test", test)):
-        sampler.start_split()
-        for kind, lab in sampler.plans(split, count):
-            cases.append(sampler.case(len(cases) + 1, split, kind, lab))
+    for kind, lab in sampler.plans(count):
+        cases.append(sampler.case(len(cases) + 1, kind, lab))
     return cases

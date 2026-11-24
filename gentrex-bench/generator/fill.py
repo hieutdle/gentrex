@@ -257,6 +257,7 @@ def context(case: dict[str, Any], prose: dict[str, Any]) -> dict[str, Any]:
         "features": [] if feature_page else features,
         "all_features": features,
         "feature_page": feature_page,
+        "appendix": case.get("appendix", []),
         "family_history": (
             f"Family history is notable for a {family[0]['relative']} with "
             f"{family[0]['text']}."

@@ -45,7 +45,7 @@ them.
 
 ## Step 1: Choose the reports
 
-A benchmark version holds five copies of every report, and each run reads
+A benchmark version holds three copies of every report, and each run reads
 one of them:
 
 | `--copy` | The reports as |
@@ -53,13 +53,6 @@ one of them:
 | `native` | PDFs with their text layer |
 | `scan` | Page images, as from an office scanner |
 | `fax` | Page images, as from a fax |
-| `mixed` | PDFs with about a third of their pages scanned |
-| `image` | Clean page images whose only text is a document code |
-
-`--split` picks the dev or the test reports. Tune Gentrex on `dev`, which is
-the default. Run `test` only for the numbers you report, with the settings
-you have already decided on. Otherwise you tune on the test reports without
-noticing, and the test numbers come out too high.
 
 ## Step 2: Check the script that starts the model servers
 
@@ -112,7 +105,7 @@ commands do. `gentrex select` and `gentrex extract` read the same address,
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --copy native --split dev --gpus 1 1 2 \
+  --version v1 --copy native --gpus 1 1 2 \
   --serve evaluation/local/serve.sh
 ```
 
@@ -128,7 +121,7 @@ result:
 ```text
 2026-11-10 10:37:52,623 waiting for lightonai/LightOnOCR-3-4B at http://localhost:50945/v1
 ...
-2026-11-10 11:02:11,306 report accuracy 91.0% on 100 reports; wrote results/gentrex-bench/20261110-103752
+2026-11-10 11:02:11,306 report accuracy 91.0% on 300 reports; wrote results/gentrex-bench/20261110-103752
 ```
 
 To score another copy, run the command again with another `--copy`.
@@ -150,13 +143,12 @@ command that finished to `--from-run`:
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --split dev --gpus 1 1 2 --serve evaluation/local/serve.sh \
+  --version v1 --gpus 1 1 2 --serve evaluation/local/serve.sh \
   --from-run results/select/20261110-103801
 ```
 
 The run then starts with `gentrex extract`. The scores still give the time
-of every command, because each run folder records its own. Keep `--version`
-and `--split` as they were. `--copy` isn't needed, because the run folder
+of every command, because each run folder records its own. Keep `--version` as it was. `--copy` isn't needed, because the run folder
 already holds the pages.
 
 ## Check the result
@@ -170,6 +162,7 @@ Each run of `run.py` gets a folder named after its start time, such as
 | `scores.json` | The same numbers and the result of every report, for the notebook and your own scripts |
 | `errors.jsonl` | Every value that isn't right, one per line |
 | `native/` | Links to the PDFs that the run read, named after `--copy` |
+| `select-methods/` | With `--select-methods`, the pages that each other way of choosing pages kept ([Compare ways to choose pages](#compare-ways-to-choose-pages)) |
 
 The four commands write their own run folders under `results/`, as in any
 other run, and `scores.json` names them.
@@ -215,7 +208,7 @@ The tables below the main numbers answer what to fix:
 | Checks | For each check of Gentrex, how many values it flagged, how many of those were wrong, and what share of the wrong values it flagged. Then how many reports a person would look at, and how many of the wrong reports are among them. |
 | Pages | The pages that went to OCR and the pages that `gentrex select` kept. The share of the words of the scanned pages that OCR wrote, against the truth files. How many stated values each command lost. |
 | Fields | The accuracy and the F1 of every field of the record |
-| Groups | Report accuracy by template, test, result, challenge tag and number of variants, and for the templates that the dev set doesn't have |
+| Groups | Report accuracy by laboratory, template, test, result, challenge, number of variants and page count |
 | Speed and cost | The time, requests and tokens of each command |
 
 To see the errors themselves, open `errors.jsonl`. Each line names the
@@ -245,7 +238,7 @@ extract:
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --split dev --gpus 1 1 1 --serve evaluation/local/serve.sh \
+  --version v1 --gpus 1 1 1 --serve evaluation/local/serve.sh \
   --settings one-model.yaml
 ```
 
@@ -266,25 +259,52 @@ up ClinVar IDs, and the scorer scores them
 
 The notebook gives the difference between two runs with its interval.
 
-## Compare runs in the notebook
+## Compare ways to choose pages
 
-`evaluation_results/analysis.ipynb` reads every `scores.json` under
-`results/gentrex-bench/` and shows the runs side by side:
+`gentrex select` asks three yes/no questions about each page and reads the
+answers from the probabilities of the first token
+([Select the pages to keep](../user-guide/select.md#how-it-works)).
+`--select-methods` shows what that is worth. After `gentrex select`, it
+chooses the pages of the same reports in two other ways, while the server of
+`select.model` is still running:
+
+| Way | How it chooses |
+| --- | --- |
+| `one_question` | It asks one general question about each page, whether the page is important for a record of the patient's test. The answer is read from the first token, as in `gentrex select`. |
+| `page_extract` | The model fills the extraction schema from each page alone. The page is kept if its record has a result, a karyotype, a variant, a clinical feature, a reason for testing or the date of the collection, the receipt or the report. |
 
 ```bash
-uv run --group notebook jupyter lab evaluation_results/analysis.ipynb
+uv run --extra hpo python gentrex-bench/run.py \
+  --version v1 --copy native --gpus 1 1 2 \
+  --serve evaluation/local/serve.sh --select-methods
+```
+
+The run then goes on with `gentrex extract`, which reads the pages that
+`gentrex select` kept. The other two ways only choose pages, so the scores
+of the records don't change. `scores.md` gets a table with the three ways
+under Pages, and `scores.json` has the numbers under `select_methods`. Each
+way has the needed pages that it kept, the time, requests and tokens that it
+took, and under `failed` the pages that it kept because a request failed.
+`questions` is `gentrex select` itself.
+
+`page_extract` writes a whole record for every page, so it takes the
+longest of the three. `--select-methods` does nothing in a run with
+`--no-select`, and in a run that `--from-run` starts after `gentrex select`.
+
+## Compare runs in the notebook
+
+`presentation.ipynb`, in the Gentrex folder, reads every `scores.json` under
+`results/gentrex-bench/` and shows the newest run of each setup in the
+tables and figures of the paper:
+
+```bash
+uv run --group notebook jupyter lab presentation.ipynb
 ```
 
 `--group notebook` installs JupyterLab, pandas and matplotlib on the first
-run. The notebook has the tables and figures of a results section, for the
-newest run of each setup, which is a copy of the reports with or without
-`gentrex select`. It writes each table as CSV and LaTeX and each figure as
-PDF and PNG to `evaluation_results/paper/`.
-[The notebooks](../../evaluation_results/README.md#read-the-notebooks) lists
-them.
-
-`evaluation_results/walkthrough.ipynb` follows one report of a run through
-the four commands.
+run. A setup is a copy of the reports with or without `gentrex select`.
+[The presentation](../../evaluation_results/README.md#read-the-presentation)
+says more.
 
 Some tables quote values from the reports. After a run on real reports,
 clear a notebook's outputs before you save or share it.
@@ -297,7 +317,7 @@ files for your own reports:
 
 ```bash
 uv run python gentrex-bench/scorer/score.py \
-  --truth data/gentrex-bench/v1/truth --run results/normalize/latest --split dev
+  --truth data/gentrex-bench/v1/truth --run results/normalize/latest
 ```
 
 `--run` is a run folder of `gentrex normalize`. Its `run.yaml` names the run
@@ -309,12 +329,11 @@ The scorer pairs each truth file with the PDF of the same name, so
 `SYN-0001.json` is the truth of `SYN-0001.pdf`. A truth file for a report of
 your own has the keys that
 [Generate benchmark reports](generate-benchmark-reports.md#check-the-result)
-lists, without `pages`. Score such files with `--split all`, which scores
-every truth file in the folder.
+lists, without `pages`. The scorer scores every truth file in the folder.
 
 ## How it works
 
-`run.py` links the PDFs of the split into its results folder and runs
+`run.py` links the benchmark PDFs into its results folder and runs
 `gentrex transcribe` on that folder. Each later command reads the run folder
 of the command before it, through `--input`. Nothing else differs from a run
 on your own reports, so the benchmark measures the Gentrex that you use.
@@ -399,6 +418,7 @@ it. `scores.json` has these under:
 | --- | --- |
 | `pages` | The pages that went to OCR, and the share of the true words of those pages that OCR wrote, whatever their order |
 | `select` | The pages that `gentrex select` kept and dropped, split into needed pages, which are the only page to print a stated value, and the others. `sweep` gives the same at other values of `select.keep_threshold`, from the probabilities of "yes" in `decisions.jsonl`. `only_by` counts the pages that only one question kept. |
+| `select_methods` | With `--select-methods`, the same counts as `select` for each way of choosing pages, with the time, requests and tokens that it took |
 | `funnel` | Of the values that reached `gentrex extract`, the share that it got right (`extract_recall`). `fields` gives the same for each field as `recall_given_input`. |
 | `normalize` | Each standard value, end to end and given a right source, with the HGNC IDs split by whether the report prints the approved symbol |
 | `hpo` | For the clinical features whose text was found: the share whose term is right, whose true term is the first candidate or among the five, and that got no term, also split by whether the two embedding models agreed |
@@ -448,19 +468,19 @@ GPU-hours, because a server starts once however many PDFs a run reads.
 | --- | --- | --- |
 | `--version` | `v1` | The benchmark version, a folder under `data/gentrex-bench/` |
 | `--copy` | `native` | The copy of the reports to read |
-| `--split` | `dev` | The split to run and score, `dev`, `test` or `all` |
 | `--gpus` | none | The GPUs of the servers of `gentrex transcribe`, `gentrex select` and `gentrex extract`, for the GPU-hours |
 | `--serve` | none | The script that starts a model server. Without it, the servers in `.env` are used. |
 | `--no-hpo` | off | Runs `gentrex normalize` without HPO terms, which then aren't scored |
 | `--settings` | none | A settings file of your own, which every command then reads |
 | `--no-select` | off | Skips `gentrex select`, so that `gentrex extract` reads every page |
+| `--select-methods` | off | After `gentrex select`, chooses the pages in two other ways on the same model server, and scores all three |
 | `--from-run` | none | A finished run folder of `gentrex transcribe`, `gentrex select` or `gentrex extract`. The run starts with the command after it. |
 
 Both take `--label`, a name of the run's setup that the scores keep, as in
 `--label qwen` for a run with another model. The notebook then compares the
 run as a setup of its own instead of as a newer run of the same copy.
 
-`score.py` takes `--split`, `--gpus` and `--label` as well, and these:
+`score.py` takes `--gpus` and `--label` as well, and these:
 
 | Option | Default | What it does |
 | --- | --- | --- |
@@ -476,7 +496,7 @@ commands used them.
 | Problem | What to do |
 | --- | --- |
 | `data/gentrex-bench/v1/pdf/native not found` | The version or the copy doesn't exist. Check `--version` and `--copy` against the folders in `data/gentrex-bench/`. |
-| `has no truth files of the split` | No truth file names that split. Generated versions have `dev` and `test`. For your own truth files, use `--split all`. |
+| `has no truth files` | The truth folder has no JSON files. Check `--truth` or build the benchmark version first. |
 | `serve.sh ended before ... was ready` | The server couldn't start. Run the script by hand, as in `evaluation/local/serve.sh google/gemma-4-31B-it 8000`, and read what the server prints. |
 | The log stays at `waiting for ...` | The server runs but doesn't answer on the port it was given. Check that the script passes `$2` to the server as its port. |
 | `gentrex transcribe did not finish (exit code 2)` | Without `--serve`, the command didn't find its server's address. Add `--env-file .env` after `uv run`. |
