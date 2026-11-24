@@ -64,6 +64,9 @@ node:
 bsub -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
 ```
 
+The six hours are for the first time, when the script downloads about
+215 GB. If the serving folder already holds the models, ask for `-W 1:00`.
+
 In the session, log in to Hugging Face, go to the Gentrex folder and run the
 script:
 
