@@ -45,7 +45,7 @@ fi
 
 echo "== The models of Gentrex and the model that writes the reports"
 for model in lightonai/LightOnOCR-3-4B google/gemma-4-26B-A4B-it \
-  google/gemma-4-31B-it meta-models/Muse-Glimmer-30B; do
+  meta-models/Muse-Glimmer-30B; do
   uvx --from huggingface_hub hf download "$model" \
     --local-dir "$SERVING/models/${model##*/}"
 done

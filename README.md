@@ -53,7 +53,7 @@ Four commands turn the PDFs into records. Run them in this order:
 | --- | --- | --- |
 | [`gentrex transcribe`](docs/user-guide/transcribe.md) | Reads the text of every page. Scanned pages go through OCR. | LightOnOCR-3-4B on one GPU, for scanned pages only |
 | [`gentrex select`](docs/user-guide/select.md) | Keeps the pages with the result or the patient's clinical features. Most other pages only describe the test. | Gemma 4 26B-A4B on one GPU with 80 GB |
-| [`gentrex extract`](docs/user-guide/extract.md) | Turns the kept pages of each report into one record. | Gemma 4 31B on two GPUs with 80 GB, or one B200 |
+| [`gentrex extract`](docs/user-guide/extract.md) | Turns the kept pages of each report into one record. | The same model and GPU as `gentrex select` |
 | [`gentrex normalize`](docs/user-guide/normalize.md) | Adds ISO dates, categories for the specimen and the result, HGNC IDs, MONDO IDs, HPO terms and, with ClinVar's file, ClinVar IDs. | SapBERT and EmbeddingGemma 2 on the CPU |
 
 The other commands all read the output of `gentrex normalize`, so you run

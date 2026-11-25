@@ -12,12 +12,8 @@ case "$1" in
     options=(--max-model-len 18000
       --default-chat-template-kwargs '{"enable_thinking": false}') ;;
   google/gemma-4-26B-A4B-it)
-    options=(--max-model-len 16384) ;;
-  google/gemma-4-31B-it)
-    # For two GPUs with 80 GB each. On one GPU with more memory, such as a
-    # B200, remove --tensor-parallel-size 2.
-    options=(--tensor-parallel-size 2 --max-model-len 32768
-      --gpu-memory-utilization 0.95) ;;
+    # The model of gentrex select and gentrex extract.
+    options=(--max-model-len 32768) ;;
   meta-models/Muse-Glimmer-30B)
     # The model that writes the benchmark reports. The parser keeps its
     # reasoning out of the answer, and needs vLLM 0.28 or newer.

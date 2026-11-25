@@ -6,7 +6,8 @@ Runs gentrex transcribe, select, extract and normalize on one copy of the
 reports, and scores the result with scorer/score.py. The scores
 go to a new folder under results/gentrex-bench/. With --serve, the script
 starts the model server of each command and stops it afterwards, so that one
-machine can serve the three models in turn. --settings and --no-select run
+machine can serve each model in turn, reusing the server when consecutive
+commands share a model. --settings and --no-select run
 another setup, to compare it with the default one. --select-methods chooses
 the pages in two other ways as well, to compare gentrex select with them
 (select_methods.py). --from-run goes on after a command that already
@@ -15,6 +16,7 @@ docs/development/run-benchmark.md explains it.
 """
 
 import argparse
+import itertools
 import json
 import logging
 import os
@@ -301,37 +303,44 @@ def main() -> int:
     statuses: dict[str, int] = {}
     starts: dict[str, float] = {}
     methods: dict[str, dict[str, Any]] = {}
-    for command, variable, model in steps:
-        arguments = ["--input-dir" if command == "transcribe" else "--input"]
-        arguments.append(str(run_dir))
-        if command == "normalize" and args.no_hpo:
-            arguments.append("--no-hpo")
-        if args.settings:
-            arguments += ["--settings", str(args.settings)]
-        env = dict(os.environ)
+    for model, group in itertools.groupby(steps, key=lambda step: step[2]):
         try:
             started = time.perf_counter()
             script = args.serve if model else None
             with servers.served(script, model or "") as base_url:
-                if variable and base_url:
-                    env[variable] = base_url
-                    starts[command] = round(time.perf_counter() - started, 1)
-                if variable:
-                    versions[command] = _server_version(env.get(variable))
-                found, statuses[command] = _gentrex(command, arguments, env)
-                if command == "select" and args.select_methods and found:
-                    methods = select_methods.compare(
-                        run_dir / "pages.jsonl",
-                        out / "select-methods",
-                        settings,
-                        env["GENTREX_LLM_BASE_URL"],
-                    )
+                start_seconds = (
+                    round(time.perf_counter() - started, 1) if base_url else None
+                )
+                for index, (command, variable, _) in enumerate(group):
+                    arguments = [
+                        "--input-dir" if command == "transcribe" else "--input",
+                        str(run_dir),
+                    ]
+                    if command == "normalize" and args.no_hpo:
+                        arguments.append("--no-hpo")
+                    if args.settings:
+                        arguments += ["--settings", str(args.settings)]
+                    env = dict(os.environ)
+                    if variable and base_url:
+                        env[variable] = base_url
+                        if index == 0 and start_seconds is not None:
+                            starts[command] = start_seconds
+                    if variable:
+                        versions[command] = _server_version(env.get(variable))
+                    found, statuses[command] = _gentrex(command, arguments, env)
+                    if command == "select" and args.select_methods and found:
+                        methods = select_methods.compare(
+                            run_dir / "pages.jsonl",
+                            out / "select-methods",
+                            settings,
+                            env["GENTREX_LLM_BASE_URL"],
+                        )
+                    if found is None:
+                        return 1
+                    run_dir = found
         except RuntimeError as exc:
             _logger.error("%s", exc)
             return 1
-        if found is None:
-            return 1
-        run_dir = found
 
     scores, errors = score.score(version_dir / "truth", run_dir, args.gpus, args.label)
     scores["performance"]["server_versions"] = versions

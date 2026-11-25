@@ -97,10 +97,10 @@ The first release.
   date and commit of the sampling in `manifest.json`.
 - The benchmark reports get up to five appendix pages after the report, so
   that they are about as long as the public sample reports.
-- `evaluation/minerva/run_pipeline.lsf` also makes a run with Gemma 4
-  26B-A4B as the extraction model, to compare it with the default. The job
-  asks for one H100 NVL GPU instead of two, and serves the extraction model
-  on it.
+- `gentrex extract` uses Gemma 4 26B-A4B, the model of `gentrex select`,
+  in place of Gemma 4 31B. One model server on one GPU with 80 GB then does
+  for both commands. A request holds 16,384 tokens instead of 32,768.
+- `evaluation/minerva/run_pipeline.lsf` asks for one GPU instead of two.
 - `gentrex-bench/run.py` finds each command's run by the folder it read, so
   that jobs in the same Gentrex folder don't mix up their runs.
 - `presentation.ipynb` holds the text, numbered tables and figures of the

@@ -1166,7 +1166,7 @@ def select_table(chosen: dict[str, dict[str, Any]]) -> pd.DataFrame:
                 "Prompt tokens of extract per report": round(
                     commands["extract"]["prompt_tokens"] / files
                 ),
-                "Seconds of the three models per report": round(seconds / files, 1),
+                "Seconds of the GPU steps per report": round(seconds / files, 1),
                 "GPU-hours per 1,000 reports": run["performance"][
                     "gpu_hours_per_1000_files"
                 ],

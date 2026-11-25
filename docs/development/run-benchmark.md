@@ -31,9 +31,9 @@ You need:
 - A benchmark version in `data/gentrex-bench/`, such as `v1`, with its `pdf/`
   and `truth/` folders. [Generate benchmark reports](generate-benchmark-reports.md)
   makes one.
-- GPUs for Gentrex's three models, one after another. The largest, the model
-  of `gentrex extract`, needs two NVIDIA GPUs with 80 GB each
-  ([Extract report data](../user-guide/extract.md#before-you-start)).
+- A GPU for Gentrex's models, one after another. The larger one, the model
+  of `gentrex select` and `gentrex extract`, needs an NVIDIA GPU with 80 GB
+  ([Select the pages to keep](../user-guide/select.md#before-you-start)).
 - [vLLM](https://docs.vllm.ai) 0.25 or newer, or another model server that
   `gentrex select` works with.
 
@@ -56,8 +56,9 @@ one of them:
 
 ## Step 2: Check the script that starts the model servers
 
-`gentrex transcribe`, `gentrex select` and `gentrex extract` each use their
-own model, and the three rarely fit on the GPUs together. `run.py` therefore
+`gentrex transcribe` uses one model, and `gentrex select` and
+`gentrex extract` share another. The two rarely fit on a GPU together.
+`run.py` therefore
 starts the model server of each command before the command and stops it
 afterwards. It does so with a script, which it calls with the model's name
 and a free port.
@@ -70,24 +71,20 @@ case "$1" in
     options=(--max-model-len 18000
       --default-chat-template-kwargs '{"enable_thinking": false}') ;;
   google/gemma-4-26B-A4B-it)
-    options=(--max-model-len 16384) ;;
-  google/gemma-4-31B-it)
-    options=(--tensor-parallel-size 2 --max-model-len 32768
-      --gpu-memory-utilization 0.95) ;;
+    options=(--max-model-len 32768) ;;
   ...
 esac
 
 exec vllm serve "$1" --port "$2" "${options[@]}"
 ```
 
-The three names are the models in `transcribe.ocr.model`, `select.model` and
-`extract.model` in settings.yaml. The options are those of each command's own
+The names are the models in `transcribe.ocr.model`, `select.model` and
+`extract.model` in settings.yaml, and the last two name the same model. The options are those of each command's own
 page, which explains them
 ([transcribe](../user-guide/transcribe.md#step-3-start-the-ocr-server),
 [select](../user-guide/select.md#step-1-start-the-model-server),
-[extract](../user-guide/extract.md#step-1-start-the-model-server)). The model
-of `gentrex extract` gets two GPUs. On one GPU with more memory, remove
-`--tensor-parallel-size 2`. If you benchmark another model, add a line for it
+[extract](../user-guide/extract.md#step-1-start-the-model-server)). If you
+benchmark another model, add a line for it
 to the script ([Run another setup](#run-another-setup)).
 
 A script of your own for another model server works too. It must serve the
@@ -105,11 +102,11 @@ commands do. `gentrex select` and `gentrex extract` read the same address,
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --copy native --gpus 1 1 2 \
+  --version v1 --copy native --gpus 1 1 1 \
   --serve evaluation/local/serve.sh
 ```
 
-`--gpus 1 1 2` tells the scorer how many GPUs the servers of
+`--gpus 1 1 1` tells the scorer how many GPUs the servers of
 `gentrex transcribe`, `gentrex select` and `gentrex extract` run on, in that
 order. With it, the scores include GPU-hours. Without `--serve`, add
 `--env-file .env` after `uv run`.
@@ -143,7 +140,7 @@ command that finished to `--from-run`:
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --gpus 1 1 2 --serve evaluation/local/serve.sh \
+  --version v1 --gpus 1 1 1 --serve evaluation/local/serve.sh \
   --from-run results/select/20261110-103801
 ```
 
@@ -228,24 +225,24 @@ again with one thing changed, and compare the two runs.
 
 `--settings` runs every command with a
 [settings file of your own](../user-guide/runs-and-results.md#change-the-settings).
-This file, saved as `one-model.yaml`, makes `gentrex extract` use the smaller
-model of `gentrex select`:
+This file, saved as `larger-model.yaml`, makes `gentrex extract` use a larger
+model than `gentrex select`:
 
 ```yaml
 extract:
-  model: google/gemma-4-26B-A4B-it
+  model: google/gemma-4-31B-it
 ```
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --gpus 1 1 1 --serve evaluation/local/serve.sh \
-  --settings one-model.yaml
+  --version v1 --gpus 1 1 2 --serve evaluation/local/serve.sh \
+  --settings larger-model.yaml
 ```
 
-`serve.sh` starts this model with the options that `gentrex select` needs.
-For `gentrex extract`, raise its `--max-model-len` to 32768, so that the
-kept pages of a long report fit. For a model that `serve.sh` doesn't know
-yet, add a line to the script.
+`serve.sh` doesn't know this model yet, so add a line with its name and
+vLLM's options to the script. This one needs two GPUs with 80 GB, which
+`--tensor-parallel-size 2` splits it across, and `--gpus 1 1 2` tells the
+scorer.
 
 `--no-select` skips `gentrex select`, so that `gentrex extract` reads every
 page of a report. Compared with a normal run, it shows what selecting pages
@@ -275,7 +272,7 @@ chooses the pages of the same reports in two other ways, while the server of
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --copy native --gpus 1 1 2 \
+  --version v1 --copy native --gpus 1 1 1 \
   --serve evaluation/local/serve.sh --select-methods
 ```
 
@@ -497,7 +494,7 @@ commands used them.
 | --- | --- |
 | `data/gentrex-bench/v1/pdf/native not found` | The version or the copy doesn't exist. Check `--version` and `--copy` against the folders in `data/gentrex-bench/`. |
 | `has no truth files` | The truth folder has no JSON files. Check `--truth` or build the benchmark version first. |
-| `serve.sh ended before ... was ready` | The server couldn't start. Run the script by hand, as in `evaluation/local/serve.sh google/gemma-4-31B-it 8000`, and read what the server prints. |
+| `serve.sh ended before ... was ready` | The server couldn't start. Run the script by hand, as in `evaluation/local/serve.sh google/gemma-4-26B-A4B-it 8000`, and read what the server prints. |
 | The log stays at `waiting for ...` | The server runs but doesn't answer on the port it was given. Check that the script passes `$2` to the server as its port. |
 | `gentrex transcribe did not finish (exit code 2)` | Without `--serve`, the command didn't find its server's address. Add `--env-file .env` after `uv run`. |
 | `gentrex normalize did not finish (exit code 1)` | The lines above name a missing file. Follow steps 1 to 3 of [Normalize report data](../user-guide/normalize.md#step-1-download-the-hgnc-complete-set), or pass `--no-hpo`. |

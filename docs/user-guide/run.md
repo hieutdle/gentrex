@@ -14,7 +14,7 @@ servers and what to check in each output.
 You need:
 
 - Gentrex installed ([Transcribe PDF pages](transcribe.md#step-1-install)).
-- GPUs that can serve each of the three models, one at a time
+- A GPU that can serve each of the models, one at a time
   ([transcribe](transcribe.md#step-3-start-the-ocr-server),
   [select](select.md#step-1-start-the-model-server),
   [extract](extract.md#step-1-start-the-model-server)).
@@ -33,20 +33,16 @@ case "$1" in
     options=(--max-model-len 18000
       --default-chat-template-kwargs '{"enable_thinking": false}') ;;
   google/gemma-4-26B-A4B-it)
-    options=(--max-model-len 16384) ;;
-  google/gemma-4-31B-it)
-    options=(--tensor-parallel-size 2 --max-model-len 32768
-      --gpu-memory-utilization 0.95) ;;
+    options=(--max-model-len 32768) ;;
   ...
 esac
 
 exec vllm serve "$1" --port "$2" "${options[@]}"
 ```
 
-The options are those of each command's own page. The model of
-`gentrex extract` gets two GPUs. On one GPU with more memory, remove
-`--tensor-parallel-size 2`. If you changed a model in a settings file, add a
-line with its name.
+The options are those of each command's own page. `gentrex select` and
+`gentrex extract` use the same model. If you changed a model in a settings
+file, add a line with its name.
 
 A script of your own for another model server works too. It must serve the
 model at the port it is given, and keep running for as long as the server
@@ -72,8 +68,8 @@ The output is that of the four commands, with two lines around each model
 server:
 
 ```
-waiting for google/gemma-4-31B-it at http://localhost:52311/v1
-google/gemma-4-31B-it is ready after 212 s
+waiting for google/gemma-4-26B-A4B-it at http://localhost:52311/v1
+google/gemma-4-26B-A4B-it is ready after 212 s
 ```
 
 ## Check the result
@@ -100,6 +96,6 @@ didn't finish stops it.
 
 | Message | What to do |
 | --- | --- |
-| `serve.sh ended before google/gemma-4-31B-it was ready` | The server didn't start. Run the script by hand to see why, as in `evaluation/local/serve.sh google/gemma-4-31B-it 8000`. |
+| `serve.sh ended before google/gemma-4-26B-A4B-it was ready` | The server didn't start. Run the script by hand to see why, as in `evaluation/local/serve.sh google/gemma-4-26B-A4B-it 8000`. |
 | `gentrex extract did not finish, so the run stops here` | The lines above it say why. The commands before it are done. Fix the cause and go on with the command's own page, which reads `results/select/latest`. |
 | Failed files at the end of a command | Redo them with the command's `--retry` ([Redo failed files](runs-and-results.md#redo-failed-files)), and then run the commands after it. |

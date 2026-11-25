@@ -66,7 +66,7 @@ first 5 terms held it for 88.6%, in 7.2 terms on average. A better way to
 choose among the candidates could gain a few more points. In the
 OntologyAligner study (arXiv 2609.10055), a large language model that chose
 among the candidates raised the share of right first terms by about 4 points
-on seven HPO test sets. Gentrex already runs Gemma 4 31B in
+on seven HPO test sets. Gentrex already runs a Gemma 4 model in
 `gentrex extract`, so this could be tried on Minerva.
 
 ## Examples

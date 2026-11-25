@@ -16,16 +16,8 @@ case "$1" in
       --limit-mm-per-prompt '{"image": 1}'
       --mm-processor-cache-gb 0 --no-enable-prefix-caching) ;;
   google/gemma-4-26B-A4B-it)
-    options=(--max-model-len 16384) ;;
-  google/gemma-4-31B-it)
-    # On one H100 NVL, which the jobs ask for and which has 94 GB.
-    # EXTRACT_CONTEXT is the longest request in tokens, and a shorter one
-    # needs less memory. EXTRACT_GPUS=2 splits the model over two GPUs.
-    options=(--max-model-len "${EXTRACT_CONTEXT:-32768}"
-      --gpu-memory-utilization 0.95)
-    if [ "${EXTRACT_GPUS:-1}" != 1 ]; then
-      options+=(--tensor-parallel-size "$EXTRACT_GPUS")
-    fi ;;
+    # The model of gentrex select and gentrex extract.
+    options=(--max-model-len 32768) ;;
   meta-models/Muse-Glimmer-30B)
     # The model that writes the benchmark reports. The parser keeps its
     # reasoning out of the answer, and needs vLLM 0.28 or newer.

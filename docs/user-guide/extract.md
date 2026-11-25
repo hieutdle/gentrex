@@ -6,8 +6,9 @@ features and every reported variant. It writes the records to
 `extractions.jsonl` in `results/extract/`, one line per report.
 [`gentrex normalize`](normalize.md) then adds standard values to them.
 
-A language model, Gemma 4 31B, reads the pages that `gentrex select` kept for a
-report and answers with the record as JSON.
+A language model, Gemma 4 26B-A4B, reads the pages that `gentrex select` kept
+for a report and answers with the record as JSON. It is the model that
+`gentrex select` uses, on the same model server.
 
 ## Before you start
 
@@ -15,8 +16,8 @@ You need:
 
 - Gentrex installed ([Transcribe PDF pages](transcribe.md#step-1-install)).
 - A finished run of `gentrex select`, in `results/select/`.
-- Two NVIDIA GPUs with 80 GB each, or one with more memory, such as a B200,
-  and [vLLM](https://docs.vllm.ai) 0.19.1 or newer.
+- An NVIDIA GPU with 80 GB of memory, and [vLLM](https://docs.vllm.ai) 0.25 or
+  newer.
 - A [Hugging Face](https://huggingface.co) account, if the model download asks
   you to log in.
 
@@ -26,55 +27,38 @@ steps below. Then come back to [Check the result](#check-the-result).
 
 ## Step 1: Start the model server
 
-If the server for `gentrex select` is still running, stop it with Ctrl-C in its
-terminal. Every model server uses port 8000, and this model needs the GPUs'
-memory.
+`gentrex extract` uses the model server of `gentrex select`. If that server is
+still running, leave it and go on with step 2.
 
-If vLLM isn't installed yet, its
-[installation guide](https://docs.vllm.ai/en/latest/getting_started/installation/)
-shows how. Gentrex sends the text of every report to the server, so use a
-machine approved for patient data. Start vLLM in a second terminal and leave it
-running while Gentrex works. On two GPUs:
+If it isn't, start vLLM in a second terminal and leave it running while
+Gentrex works. Gentrex sends the text of every report to the server, so use a
+machine approved for patient data:
 
 ```bash
-vllm serve google/gemma-4-31B-it \
-  --tensor-parallel-size 2 \
-  --max-model-len 32768 \
-  --gpu-memory-utilization 0.95
+vllm serve google/gemma-4-26B-A4B-it --max-model-len 32768
 ```
 
-The first start downloads the model's weights, about 62 GB, into
-`~/.cache/huggingface/`. Gentrex asks for the model by its Hugging Face name
-(`extract.model` in settings.yaml). `--tensor-parallel-size 2` splits the
-model across the two GPUs, so each GPU stores half of the weights. Leave it out
-on a single B200.
+[Select the pages to keep](select.md#step-1-start-the-model-server) explains
+the download of the model, its memory and what to do if Hugging Face refuses
+it. Gentrex asks for the model by its Hugging Face name (`extract.model` in
+settings.yaml).
 
 `--max-model-len 32768` sets the context length, the most tokens one request
 can hold. Tokens are words or pieces of words. The instruction and the schema
 take about 2,000 tokens and the answer up to 4,096 (`extract.max_tokens` in
 settings.yaml). That leaves about 26,000 tokens for the report's pages. A
-longer report fails ([When something goes wrong](#when-something-goes-wrong)).
+longer report fails
+([When something goes wrong](#when-something-goes-wrong)).
 
-`--gpu-memory-utilization 0.95` lets vLLM use 95% of each GPU's memory. The
-weights take 62 GB, and the rest becomes the KV cache, where vLLM keeps the
-reports it is working on. On one 80 GB GPU, too little is left for a
-32,768-token request, so vLLM stops at startup.
-
-vLLM's [Gemma 4 guide](https://recipes.vllm.ai/Google/gemma-4-31B-it) adds
+vLLM's [Gemma 4 guide](https://recipes.vllm.ai/Google/gemma-4-26B-A4B-it) adds
 `--reasoning-parser gemma4` to some of its commands. Leave it out. A reasoning
 parser separates the model's reasoning from its answer, and Gentrex turns
 thinking off, which leaves nothing to separate. When thinking is off, the
 parser can also stop vLLM from enforcing the schema
 ([vLLM issue 39130](https://github.com/vllm-project/vllm/issues/39130)).
 
-If the download stops with an error that access to the model is restricted,
-accept Google's terms on the
-[model's page](https://huggingface.co/google/gemma-4-31B-it), log in
-([Select the pages to keep](select.md#step-1-start-the-model-server)) and
-start vLLM again.
-
 vLLM is ready when `curl http://localhost:8000/v1/models` lists
-`google/gemma-4-31B-it`.
+`google/gemma-4-26B-A4B-it`.
 
 ## Step 2: Point Gentrex at the model server
 
@@ -331,11 +315,11 @@ Three errors come from the report rather than the server:
   `timeout_seconds` in settings.yaml and run again with `--retry`.
 - `BadRequestError: Error code: 400`, with a message about the maximum context
   length, means the report is longer than `--max-model-len` allows. Start vLLM
-  with a higher `--max-model-len` and run again with `--retry`. vLLM refuses
-  to start if the GPUs lack the memory for it.
+  with a higher `--max-model-len`, such as 65536, and run again with
+  `--retry`. vLLM refuses to start if the GPU lacks the memory for it.
 
 If every report fails with the same error, the cause is the server. Check that
-it runs `google/gemma-4-31B-it` with the model's own chat template, and that it
+it runs `google/gemma-4-26B-A4B-it` with the model's own chat template, and that it
 supports structured output with a JSON schema (`response_format`), as vLLM
 does.
 

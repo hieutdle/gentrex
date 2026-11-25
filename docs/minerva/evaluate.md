@@ -16,14 +16,13 @@ You need:
 
 - A Minerva account and an allocation. Allocation names start with `acc_`,
   and `mybalance` on a login node lists yours.
-- A serving folder with about 215 GB free, for vLLM and four models. Pick a
+- A serving folder with about 155 GB free, for vLLM and three models. Pick a
   folder in your work directory.
 - About 2 GB more for the reference files and the reports, in the Gentrex
   folder.
 - A [Hugging Face](https://huggingface.co) account that has accepted
-  Google's terms on the pages of
-  [Gemma 4 26B-A4B](https://huggingface.co/google/gemma-4-26B-A4B-it) and
-  [Gemma 4 31B](https://huggingface.co/google/gemma-4-31B-it).
+  Google's terms on the page of
+  [Gemma 4 26B-A4B](https://huggingface.co/google/gemma-4-26B-A4B-it).
 
 If you're off campus, connect to the Mount Sinai VPN. Then log in to a
 Minerva login node with `ssh`.
@@ -65,7 +64,7 @@ bsub -q interactive -n 4 -W 6:00 -R "rusage[mem=4000]" -Is /bin/bash
 ```
 
 The six hours are for the first time, when the script downloads about
-215 GB. If the serving folder already holds the models, ask for `-W 1:00`.
+155 GB. If the serving folder already holds the models, ask for `-W 1:00`.
 
 In the session, log in to Hugging Face, go to the Gentrex folder and run the
 script:
@@ -84,7 +83,7 @@ The script gets these, and keeps what is already there:
 | ClinVar, HPO, MONDO and HGNC, and the HPO index | `data/clinvar/`, `data/ontology/` |
 | The 300 cases, each with the truth of one report | `data/gentrex-bench/v1/cases/` |
 | vLLM, as the container image `vllm.sif` | the serving folder |
-| The three models of Gentrex and the writing model, Muse Glimmer 30B | `models/` in the serving folder |
+| The two models of Gentrex and the writing model, Muse Glimmer 30B | `models/` in the serving folder |
 | Chrome, which prints the reports to PDF | the serving folder |
 
 It ends with `Minerva is ready for generate_reports.lsf and
@@ -169,7 +168,7 @@ every run, and scores compare only on the same reports.
 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
-The job makes seven runs of the 300 benchmark reports, one after another:
+The job makes six runs of the 300 benchmark reports, one after another:
 
 | Run | Reads | Shows |
 | --- | --- | --- |
@@ -177,13 +176,10 @@ The job makes seven runs of the 300 benchmark reports, one after another:
 | 2 and 3 | The native PDFs again | How much the results vary between identical runs |
 | 4 and 5 | The scan and fax copies | What OCR loses on scanned and faxed pages |
 | 6 | The native PDFs without `gentrex select` | What selecting pages is worth |
-| 7 | The native PDFs, with Gemma 4 26B-A4B as the extraction model | What the larger extraction model is worth |
 
-A run is the four commands and the scoring. The job asks for eight hours
-and one H100 NVL GPU, which has 94 GB of memory and holds each of the
-models. They are served one after another. The settings of run 7 are in
-`evaluation/settings-extract-26b.yaml`, and its run is labelled
-`extract-26B-A4B`.
+A run is the four commands and the scoring. The job asks for six hours
+and one H100 GPU, which holds each of the models. They are served one after
+another.
 
 Follow the job with `bjobs` and `tail -f run-pipeline.*.log`. Each run ends
 with a line that gives its report accuracy and the folder with its scores:
@@ -205,10 +201,10 @@ A job that ends in `TERM_RUNLIMIT` ran out of time. The runs that it
 finished are scored and kept. Submit the missing runs with more time, as in
 the next section.
 
-### Run as seven short jobs
+### Run as six short jobs
 
-To wait less in the queue and run the seven benchmark runs concurrently on
-separate H100 NVL GPUs, submit them as seven short 1-GPU jobs (three hours
+To wait less in the queue and make the six runs at the same time on
+separate GPUs, submit them as six short 1-GPU jobs (three hours
 for the first run with `--select-methods`, two hours for the others):
 
 ```bash
@@ -228,7 +224,7 @@ The same job makes fewer runs when it gets fewer copies. Name the copies in
 This makes only the first run, without that comparison:
 
 ```bash
-COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 EXTRACT_26B= bsub < evaluation/minerva/run_pipeline.lsf
+COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 By default the job runs `native` three times (`REPEATS=3`) to measure
@@ -278,7 +274,7 @@ label. The notebook then shows them as a setup of their own next to the
 default one:
 
 ```bash
-OPTIONS="--label new-prompt" COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 EXTRACT_26B= bsub < evaluation/minerva/run_pipeline.lsf
+OPTIONS="--label new-prompt" COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 To change a setting of Gentrex, add it to `evaluation/settings.yaml`, which
@@ -342,13 +338,10 @@ Both jobs take their settings from environment variables:
 | `NO_SELECT` | `native` | `run_pipeline.lsf` | The copies to read once more without `gentrex select`. `NO_SELECT=` reads none. |
 | `SELECT_METHODS` | `native` | `run_pipeline.lsf` | The copies whose pages are also chosen in two other ways. `SELECT_METHODS=` compares none. |
 | `REPEATS` | `3` | `run_pipeline.lsf` | Total runs of `REPEAT_COPY` (`native` by default) to measure repeatability. Set `REPEATS=1` to skip repeats. |
-| `EXTRACT_26B` | `native` | `run_pipeline.lsf` | The copies to read once more with Gemma 4 26B-A4B as the extraction model. `EXTRACT_26B=` reads none. |
-| `EXTRACT_GPUS` | `1` | `run_pipeline.lsf`, `serve.sh` | The GPUs that serve the model of `gentrex extract`. With `2`, also pass `-gpu num=2` to `bsub`. |
-| `EXTRACT_CONTEXT` | `32768` | `serve.sh` | The longest request of the model of `gentrex extract`, in tokens. A shorter one needs less GPU memory. Set `16384` if vLLM reports too little memory for this model. |
 | `OPTIONS` | none | `run_pipeline.lsf` | More options of `run.py`, for every run |
 
 Options of `bsub` on the command line replace the `#BSUB` lines of a job
-script, as `-W 10:00` does above. The scripts have no `-P` line, so `bsub`
+script, as `-W 3:00` does above. The scripts have no `-P` line, so `bsub`
 takes the allocation from `LSB_DEFAULTPROJECT`, or from `-P acc_xxx` on the
 command line.
 

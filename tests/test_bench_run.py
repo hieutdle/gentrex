@@ -210,3 +210,69 @@ def test_every_way_to_choose_pages_is_scored_like_gentrex_select(tmp_path):
         1,
     )
     assert "page_extract" in run.score.markdown(scores)
+
+
+def test_benchmark_run_reuses_server_across_select_and_extract(tmp_path, monkeypatch):
+    """Benchmark runs load Gemma 4 26B-A4B once for select and extract."""
+    import contextlib
+
+    monkeypatch.chdir(tmp_path)
+    truth = scorer_tests._truth()
+    version_dir = tmp_path / "data" / "gentrex-bench" / "v1"
+    (version_dir / "truth").mkdir(parents=True)
+    (version_dir / "pdf" / "native").mkdir(parents=True)
+    (version_dir / "truth" / "SYN-0001.json").write_text(json.dumps(truth))
+    (version_dir / "pdf" / "native" / "SYN-0001.pdf").write_bytes(b"%PDF")
+
+    served_models: list[str] = []
+
+    @contextlib.contextmanager
+    def fake_served(script, model):
+        if script is not None:
+            served_models.append(model)
+            yield f"http://localhost:9999/{len(served_models)}/v1"
+        else:
+            yield None
+
+    def fake_gentrex(command, arguments, env):
+        folder = tmp_path / "results" / command / "20261125-100000"
+        folder.mkdir(parents=True, exist_ok=True)
+        return folder, 0
+
+    fake_scores = {
+        "reports": 1,
+        "main": {"report_accuracy": {"value": 1.0}},
+        "runs": {
+            name: {"path": str(tmp_path / "results" / name / "20261125-100000")}
+            for name in ("transcribe", "select", "extract", "normalize")
+        },
+        "performance": {
+            "commands": {
+                name: {} for name in ("transcribe", "select", "extract", "normalize")
+            }
+        },
+    }
+    monkeypatch.setattr(run, "_DATA_DIR", tmp_path / "data" / "gentrex-bench")
+    monkeypatch.setattr(
+        run.score, "_RESULTS_DIR", tmp_path / "results" / "gentrex-bench"
+    )
+    monkeypatch.setattr(run.servers, "served", fake_served)
+    monkeypatch.setattr(run, "_server_version", lambda *_: "0.28.0")
+    monkeypatch.setattr(run, "_gpu_names", lambda: ["NVIDIA H100 NVL"])
+    monkeypatch.setattr(run, "_gentrex", fake_gentrex)
+    monkeypatch.setattr(run.score, "score", lambda *_: (fake_scores, []))
+    monkeypatch.setattr(run.score, "write", lambda *_: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        ["run.py", "--version", "v1", "--serve", str(tmp_path / "serve.sh")],
+    )
+
+    assert run.main() == 0
+    assert served_models == [
+        "lightonai/LightOnOCR-3-4B",
+        "google/gemma-4-26B-A4B-it",
+    ]
+    cmds = fake_scores["performance"]["commands"]
+    assert cmds["select"]["server_start_seconds"] is not None
+    assert cmds["extract"]["server_start_seconds"] is None

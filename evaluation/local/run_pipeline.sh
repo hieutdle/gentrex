@@ -42,11 +42,10 @@ esac
 status=0
 options=("$@")
 run() {
-  # --gpus names the GPUs that serve.sh gives each model: one for the models
-  # of gentrex transcribe and gentrex select, and two for gentrex extract.
+  # --gpus names the GPUs that serve.sh gives each model.
   uv run $hpo python gentrex-bench/run.py \
     --version "$VERSION" \
-    --gpus 1 1 2 --serve evaluation/local/serve.sh --settings "$settings" \
+    --gpus 1 1 1 --serve evaluation/local/serve.sh --settings "$settings" \
     ${options[@]+"${options[@]}"} "$@" || status=1
 }
 for copy in ${COPIES:-native scan fax}; do

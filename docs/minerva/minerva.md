@@ -49,8 +49,8 @@ uv sync
 
 Pick a folder for vLLM and the models, for example in your work directory.
 The job scripts call it the serving folder. It needs at least 40 GB free for
-vLLM and the model of `gentrex transcribe`. The model of `gentrex select` adds
-about 50 GB, and the model of `gentrex extract` about 62 GB.
+vLLM and the model of `gentrex transcribe`. The model of `gentrex select` and
+`gentrex extract` adds about 50 GB.
 
 ```bash
 mkdir -p /path/to/serving && cd /path/to/serving
@@ -286,7 +286,7 @@ apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
   vllm serve /models/gemma-4-26B-A4B-it \
     --served-model-name google/gemma-4-26B-A4B-it \
     --port "$port" \
-    --max-model-len 16384 &
+    --max-model-len 32768 &
 server=$!
 
 until curl -sf "http://localhost:$port/v1/models" > /dev/null; do
@@ -305,7 +305,7 @@ exit $status
 It works like `transcribe.lsf`, with these differences:
 
 - `select[h100nvl]` asks for an H100 GPU.
-- vLLM loads `gemma-4-26B-A4B-it` with `--max-model-len 16384`, which
+- vLLM loads `gemma-4-26B-A4B-it` with `--max-model-len 32768`, which
   [Select the pages to keep](../user-guide/select.md#step-1-start-the-model-server)
   explains.
 - Prefix caching stays on, because Gentrex asks all its questions about a page
@@ -344,20 +344,8 @@ Continue on the page of `gentrex select`:
 
 ## Extract report data
 
-Run `gentrex extract` after the job of `gentrex select` has finished.
-
-### Download the model
-
-Once, on a login node, download the model into the serving folder:
-
-```bash
-cd /path/to/serving
-uvx --from huggingface_hub hf download google/gemma-4-31B-it \
-  --local-dir models/gemma-4-31B-it
-```
-
-If Hugging Face refuses it, accept Google's terms and log in as for the model
-of `gentrex select`.
+Run `gentrex extract` after the job of `gentrex select` has finished. It uses
+the model of `gentrex select`, so there is nothing more to download.
 
 ### Write the job script
 
@@ -371,7 +359,7 @@ lines.
 #BSUB -q gpu
 #BSUB -n 4
 #BSUB -W 0:30
-#BSUB -gpu num=2
+#BSUB -gpu num=1
 #BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
 #BSUB -oo extract.%J.log
 
@@ -384,12 +372,10 @@ port=$((10000 + LSB_JOBID % 20000))
 
 apptainer exec --nv --home "$SERVING/home" --env HF_HUB_OFFLINE=1 \
   -B "$SERVING/models:/models" "$SERVING/vllm.sif" \
-  vllm serve /models/gemma-4-31B-it \
-    --served-model-name google/gemma-4-31B-it \
+  vllm serve /models/gemma-4-26B-A4B-it \
+    --served-model-name google/gemma-4-26B-A4B-it \
     --port "$port" \
-    --tensor-parallel-size 2 \
-    --max-model-len 32768 \
-    --gpu-memory-utilization 0.95 &
+    --max-model-len 32768 &
 server=$!
 
 until curl -sf "http://localhost:$port/v1/models" > /dev/null; do
@@ -405,32 +391,17 @@ kill "$server"
 exit $status
 ```
 
-It works like `select.lsf`, with these differences:
-
-- `-gpu num=2` asks for two GPUs, and `span[hosts=1]` keeps them on one node.
-- vLLM splits `gemma-4-31B-it` across the two GPUs with
-  `--tensor-parallel-size 2`.
-  [Extract report data](../user-guide/extract.md#step-1-start-the-model-server)
-  explains `--max-model-len 32768` and `--gpu-memory-utilization 0.95`.
-- Prefix caching stays on, because every request starts with the same
-  instruction and schema, which vLLM then reads once.
+It is `select.lsf` with `gentrex extract` in place of `gentrex select`. vLLM
+loads the same model with the same options.
+[Extract report data](../user-guide/extract.md#step-1-start-the-model-server)
+explains how many pages fit into `--max-model-len 32768`. Prefix caching
+stays on, because every request starts with the same instruction and schema,
+which vLLM then reads once.
 
 ### Choose the GPU and time limit
 
-The model's weights take about 62 GB. On one 80 GB GPU, that leaves too little
-memory for a 32,768-token request, and vLLM stops at startup. Use one H100 NVL,
-two 80 GB GPUs or one B200:
-
-- **One H100 NVL**, with 94 GB. Change `-gpu num=2` to `-gpu num=1` and
-  remove `--tensor-parallel-size 2`. This is what `run_pipeline.lsf` uses.
-- **Two GPUs**, as in the script above. `a10080g` and `h10080g` from the
-  [table for `gentrex transcribe`](#choose-the-gpu-and-time-limit) also work
-  in place of `h100nvl`.
-- **One B200**, with 192 GB. Change `-gpu num=2` to `-gpu num=1` and
-  `select[h100nvl]` to `select[b200]`, and remove `--tensor-parallel-size 2`.
-  The B200 nodes run jobs only for some allocations. If the job stays in PEND
-  and `bjobs -p3 <job ID>` shows `aims_limit`, yours isn't one of them.
-  Cancel the job with `bkill` and use two H100s.
+The job needs what `select.lsf` needs, one GPU with 80 GB
+([Choose the GPU and time limit](#choose-the-gpu-and-time-limit-1)).
 
 `gentrex extract` is the slowest command. A report that times out takes about
 21 minutes before Gentrex gives up on it, after four tries of 300 seconds each
@@ -457,7 +428,7 @@ Continue on the page of `gentrex extract`:
 ### Use Minerva's AI service instead of a job
 
 Minerva runs a shared AI service at `https://assistant.hpc.mssm.edu` that
-serves `gemma4:31b`, a build of the model in `extract.lsf`. If
+serves `gemma4:31b`, a larger Gemma 4 model than the one in `extract.lsf`. If
 `gentrex extract` sends its requests there, you need no GPU, no model
 download and no job script, and it runs in an interactive session. The model
 runs in [Ollama](https://ollama.com), another model server. Open WebUI sits in
@@ -487,7 +458,7 @@ To run `gentrex extract` on the service:
      model: gemma4:31b
    ```
 
-   Change it back to `google/gemma-4-31B-it` before you next submit
+   Change it back to `google/gemma-4-26B-A4B-it` before you next submit
    `extract.lsf`, because that's the name the job's vLLM serves.
 3. If the `gentrex` folder has no `.env` file yet, create it from the example
    file:
@@ -692,8 +663,8 @@ and keeps what is already there:
   It also downloads ClinVar's file and HPO's disease annotations, which the
   generator samples the cases from.
 - The cases, which it samples into `data/gentrex-bench/v1/cases/`.
-- vLLM and Gentrex's three models in the serving folder, as in
-  [Pull vLLM](#pull-vllm) and the three sections on downloading a model.
+- vLLM and Gentrex's two models in the serving folder, as in
+  [Pull vLLM](#pull-vllm) and the two sections on downloading a model.
 - The writing model, Muse Glimmer 30B. Its weights take about 60 GB, which
   fits on one GPU with 80 GB. It needs vLLM 0.28 or newer. If your
   `vllm.sif` is older, delete it before you run the script, which then
@@ -766,7 +737,7 @@ that already has a truth file is skipped. If the job ends in
 
 [Run the benchmark](../development/run-benchmark.md) runs Gentrex on
 benchmark reports and scores its records against their truth files. On
-Minerva, one batch job does all of it on a single H100 NVL GPU (94 GB),
+Minerva, one batch job does all of it on a single H100 GPU,
 serving each model in turn and stopping it before starting the next.
 
 The job needs what
@@ -781,14 +752,14 @@ cd /path/to/gentrex
 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
-`evaluation/minerva/submit_pipeline.sh` submits the same seven runs as short
+`evaluation/minerva/submit_pipeline.sh` submits the same six runs as short
 1-GPU jobs (2 to 3 hours each), which wait less in the queue and can run
 concurrently on separate GPUs
 ([Evaluate Gentrex on Minerva](evaluate.md#step-5-run-gentrex-on-the-benchmark-reports)).
 
-The `#BSUB` lines of `run_pipeline.lsf` ask for eight hours and one H100
-NVL GPU, which has 94 GB of memory and holds each of the models. The script then runs `gentrex-bench/run.py`, which does the work
-of the three job scripts. It picks a free port, starts
+The `#BSUB` lines of `run_pipeline.lsf` ask for six hours and one H100
+GPU, which holds each of the models. The script then runs
+`gentrex-bench/run.py`, which does the work of the three job scripts. It picks a free port, starts
 `evaluation/minerva/serve.sh` for the model of `gentrex transcribe`, waits
 until vLLM answers, runs the command and stops vLLM. It does the same for
 `gentrex select` and `gentrex extract`, and then runs `gentrex normalize`
@@ -802,10 +773,9 @@ of each model. `run_pipeline.lsf` sets two more things:
 - `--settings evaluation/settings.yaml` turns on the lookup of ClinVar IDs,
   so that the scorer scores them.
 
-By default the job makes seven runs of the 300 benchmark reports, one after
+By default the job makes six runs of the 300 benchmark reports, one after
 another. It reads the native copy three times, then the scan and fax
-copies, the native copy without `gentrex select`, and the native copy with
-Gemma 4 26B-A4B as the extraction model. The first run also chooses the
+copies, and the native copy without `gentrex select`. The first run also chooses the
 pages in two other ways, to compare `gentrex select` with them
 ([Compare ways to choose pages](../development/run-benchmark.md#compare-ways-to-choose-pages)).
 [Evaluate Gentrex on Minerva](evaluate.md#make-a-single-run) lists the

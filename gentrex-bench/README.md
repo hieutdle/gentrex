@@ -61,7 +61,7 @@ explains the plan and what it takes from other benchmarks.
 
 ```bash
 uv run --extra hpo python gentrex-bench/run.py \
-  --version v1 --copy native --gpus 1 1 2 \
+  --version v1 --copy native --gpus 1 1 1 \
   --serve evaluation/local/serve.sh
 ```
 

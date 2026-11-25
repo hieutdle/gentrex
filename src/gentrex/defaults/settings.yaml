@@ -79,8 +79,9 @@ select:
 # from the pages that `gentrex select` kept. The fields to extract are in
 # schema.yaml, next to this file.
 extract:
-  # Name of the text model, as listed at GENTREX_LLM_BASE_URL/models.
-  model: google/gemma-4-31B-it
+  # Name of the text model, as listed at GENTREX_LLM_BASE_URL/models. It is
+  # the model of `gentrex select`, so one model server does for both.
+  model: google/gemma-4-26B-A4B-it
   # System message of every request. The schema follows it, as JSON.
   instruction: >-
     You extract structured data from one clinical genetic test report. You are

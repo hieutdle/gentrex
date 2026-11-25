@@ -49,7 +49,7 @@ approved for patient data. Start vLLM in a second terminal and leave it running
 while Gentrex works:
 
 ```bash
-vllm serve google/gemma-4-26B-A4B-it --max-model-len 16384
+vllm serve google/gemma-4-26B-A4B-it --max-model-len 32768
 ```
 
 The first start downloads the model's weights, about 50 GB, into
@@ -57,9 +57,10 @@ The first start downloads the model's weights, about 50 GB, into
 model needs a GPU with 80 GB. Gentrex asks for the model by its Hugging Face
 name (`select.model` in settings.yaml).
 
-`--max-model-len 16384` sets the context length, the most tokens one request
+`--max-model-len 32768` sets the context length, the most tokens one request
 can hold. Tokens are words or pieces of words. One page and one question come
-to a few thousand tokens, even for a dense page.
+to a few thousand tokens, and 32,768 also gives `gentrex extract` enough room
+when both commands share this server.
 
 vLLM's [Gemma 4 guide](https://recipes.vllm.ai/Google/gemma-4-26B-A4B-it) adds
 `--reasoning-parser gemma4` to some of its commands. Leave it out. A reasoning

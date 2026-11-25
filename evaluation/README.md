@@ -19,11 +19,10 @@ evaluation can run on any computer that can serve Gentrex's models.
 | `minerva/prepare.sh` | Downloads what the two Minerva jobs need |
 | `minerva/generate_reports.lsf` | The Minerva job that makes the benchmark reports |
 | `minerva/run_pipeline.lsf` | The Minerva job that runs Gentrex on the reports and scores it |
-| `minerva/submit_pipeline.sh` | Submits the seven runs of `run_pipeline.lsf` as short 1-GPU jobs |
+| `minerva/submit_pipeline.sh` | Submits the six runs of `run_pipeline.lsf` as short 1-GPU jobs |
 | `minerva/serve.sh` | Starts vLLM with one model in a Minerva job. The two jobs call it. |
 | `download_reference_files.sh` | Downloads ClinVar, HPO, MONDO and HGNC. The other scripts call it. |
 | `settings.yaml` | The settings of the evaluation that differ from Gentrex's defaults |
-| `settings-extract-26b.yaml` | The same settings with Gemma 4 26B-A4B as the extraction model, for the comparison run |
 | `hpo_normalization.py` | Measures the HPO matching of `gentrex normalize` on its own, which [Evaluate HPO matching](hpo-matching.md) describes |
 | `mondo_normalization.py` | Measures the MONDO matching of `gentrex normalize` on its own, which [Evaluate MONDO matching](mondo-matching.md) describes |
 
@@ -33,10 +32,9 @@ On your own machine you need:
 
 - Gentrex installed
   ([Transcribe PDF pages](../docs/user-guide/transcribe.md#step-1-install)).
-- [vLLM](https://docs.vllm.ai) 0.28 or newer, and two NVIDIA GPUs with 80 GB
-  each for the model of `gentrex extract`.
+- [vLLM](https://docs.vllm.ai) 0.28 or newer, and an NVIDIA GPU with 80 GB.
 - Google Chrome or Chromium, which prints the reports to PDF.
-- About 185 GB of free disk for the four models, 600 MB for the reference
+- About 125 GB of free disk for the three models, 600 MB for the reference
   files and 1.2 GB for the reports.
 
 On Minerva you need:
@@ -44,7 +42,7 @@ On Minerva you need:
 - An account, an allocation and the Gentrex folder, from
   [Log in](../docs/minerva/minerva.md#log-in) and
   [Install Gentrex](../docs/minerva/minerva.md#install-gentrex).
-- A serving folder with about 215 GB free, for vLLM and the four models. The
+- A serving folder with about 155 GB free, for vLLM and the three models. The
   scripts read its path from `SERVING`. If the folder already holds a
   `vllm.sif` older than vLLM 0.28, delete it, and `prepare.sh` pulls the
   newest one.
@@ -166,7 +164,7 @@ evaluation/minerva/prepare.sh
 
 It installs the packages of `gentrex normalize`, downloads the reference
 files, builds the HPO index and samples the cases. Into the serving folder
-it puts vLLM, Gentrex's three models, the writing model and Chrome. What is
+it puts vLLM, Gentrex's two models, the writing model and Chrome. What is
 already there is kept, so you can run the script again if the session ends
 early. It ends with `Minerva is ready for generate_reports.lsf and
 run_pipeline.lsf`.
@@ -205,21 +203,19 @@ can be submitted again and goes on where it stopped.
 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
-The job makes seven runs of the 300 reports in eight hours, on one H100 NVL
-GPU. It reads `native` three times, the first also with `--select-methods`,
-then `scan`, `fax`, `native` with `--no-select`, and `native` with Gemma 4
-26B-A4B as the extraction model. The three models of a run are served one
-after another, each stopped before the next starts. To wait less in the
-queue and run them concurrently on separate GPUs, run
-`evaluation/minerva/submit_pipeline.sh` to submit seven short 1-GPU jobs
-(2 to 3 hours each). Follow jobs with `bjobs` and
+The job makes six runs of the 300 reports in six hours, on one H100 GPU.
+It reads `native` three times, the first also with `--select-methods`, then
+`scan`, `fax` and `native` with `--no-select`. The models of a run are
+served one after another, each stopped before the next starts. To wait less
+in the queue and run them at the same time on separate GPUs, run
+`evaluation/minerva/submit_pipeline.sh`, which submits six short 1-GPU jobs
+of 2 to 3 hours each. Follow jobs with `bjobs` and
 `tail -f run-pipeline.*.log`. Each run ends with a line that gives its
 report accuracy and the folder with its scores.
 
 `COPIES`, `NO_SELECT`, `SELECT_METHODS`, and `REPEATS` work as they do on your own
 machine (`REPEATS` defaults to `3` on Minerva and `1` locally). To give a job more time, pass `-W` to `bsub`, as in
 `bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf`.
-`EXTRACT_26B=` leaves out the run with the 26B extraction model.
 
 `OPTIONS` passes options to every run of `gentrex-bench/run.py`, as in
 `OPTIONS=--no-hpo`.
@@ -297,11 +293,10 @@ On Minerva, options of `bsub` on the command line replace the `#BSUB` lines
 of a job script, as `-W 10:00` does above.
 
 The two `serve.sh` scripts hold vLLM's options for each model, which are
-those of the commands' own pages. The local one gives the model of
-`gentrex extract` two GPUs, and Minerva's gives it one H100 NVL. If yours
-differ, change the model's line in `serve.sh`, and tell
-the scorer with `--gpus`, as in
-`evaluation/local/run_pipeline.sh --gpus 1 1 1`. The three numbers are the
+those of the commands' own pages. Each model runs on one GPU. If you give
+a model more, change its line in `serve.sh`, and tell the scorer with
+`--gpus`, as in `evaluation/local/run_pipeline.sh --gpus 1 2 2`. The three
+numbers are the
 GPUs of the models of `gentrex transcribe`, `gentrex select` and
 `gentrex extract`, and the GPU-hours in the scores come from them.
 
