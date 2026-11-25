@@ -212,7 +212,7 @@ with more time, as in the next section.
 
 ### Run everything in one job
 
-`run_pipeline.lsf` makes the first six runs one after another in one job of
+`run_pipeline.lsf` makes the seven runs one after another in one job of
 eight hours. It waits longer in the queue, but needs only one `bsub`:
 
 ```bash
@@ -227,7 +227,7 @@ copies to read once more without `gentrex select`. The run of each copy in
 This makes only the first run, without that comparison:
 
 ```bash
-COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 bsub < evaluation/minerva/run_pipeline.lsf
+COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 EXTRACT_26B= bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 By default the job runs `native` three times (`REPEATS=3`) to measure
@@ -277,7 +277,7 @@ label. The notebook then shows them as a setup of their own next to the
 default one:
 
 ```bash
-OPTIONS="--label new-prompt" COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 bsub < evaluation/minerva/run_pipeline.lsf
+OPTIONS="--label new-prompt" COPIES=native NO_SELECT= SELECT_METHODS= REPEATS=1 EXTRACT_26B= bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
 To change a setting of Gentrex, add it to `evaluation/settings.yaml`, which
@@ -341,6 +341,7 @@ Both jobs take their settings from environment variables:
 | `NO_SELECT` | `native` | `run_pipeline.lsf` | The copies to read once more without `gentrex select`. `NO_SELECT=` reads none. |
 | `SELECT_METHODS` | `native` | `run_pipeline.lsf` | The copies whose pages are also chosen in two other ways. `SELECT_METHODS=` compares none. |
 | `REPEATS` | `3` | `run_pipeline.lsf` | Total runs of `REPEAT_COPY` (`native` by default) to measure repeatability. Set `REPEATS=1` to skip repeats. |
+| `EXTRACT_26B` | `native` | `run_pipeline.lsf` | The copies to read once more with Gemma 4 26B-A4B as the extraction model. `EXTRACT_26B=` reads none. |
 | `OPTIONS` | none | `run_pipeline.lsf` | More options of `run.py`, for every run |
 
 Options of `bsub` on the command line replace the `#BSUB` lines of a job

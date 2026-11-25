@@ -215,12 +215,13 @@ two GPUs for its whole time. Follow them with `bjobs` and
 `tail -f run-pipeline.*.log`. Each run ends with a line that gives its
 report accuracy and the folder with its scores.
 
-`bsub < evaluation/minerva/run_pipeline.lsf` makes the first six runs in one
+`bsub < evaluation/minerva/run_pipeline.lsf` makes the seven runs in one
 job of eight hours.
 
 `COPIES`, `NO_SELECT`, `SELECT_METHODS`, and `REPEATS` work as they do on your own
 machine (`REPEATS` defaults to `3` on Minerva and `1` locally). To give a job more time, pass `-W` to `bsub`, as in
 `bsub -W 10:00 < evaluation/minerva/run_pipeline.lsf`.
+`EXTRACT_26B=` leaves out the run with the 26B extraction model.
 
 `OPTIONS` passes options to every run of `gentrex-bench/run.py`, as in
 `OPTIONS=--no-hpo`.

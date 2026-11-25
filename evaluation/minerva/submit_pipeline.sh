@@ -4,9 +4,9 @@
 #   SERVING=/path/to/serving evaluation/minerva/submit_pipeline.sh [bsub options]
 #
 # LSF starts short jobs sooner than one long one, and the jobs can run at the
-# same time. Six jobs make the runs that run_pipeline.lsf makes in one job:
-# the native PDFs three times, the first also with --select-methods, the
-# scan and fax copies, and the native PDFs without gentrex select. A seventh
+# same time. The seven jobs make the runs that run_pipeline.lsf makes in one
+# job: the native PDFs three times, the first also with --select-methods, the
+# scan and fax copies, and the native PDFs without gentrex select. The seventh
 # job reads the native PDFs with Gemma 4 26B-A4B as the extraction model
 # (evaluation/settings-extract-26b.yaml), on one GPU. Each job asks for two
 # hours, and the one with --select-methods for three.
@@ -19,7 +19,7 @@ set -euo pipefail
 submit() {
   local hours=$1 gpus=$2
   shift 2
-  env "$@" REPEATS=1 NO_SELECT= bsub -W "$hours" -gpu "num=$gpus" \
+  env "$@" REPEATS=1 NO_SELECT= EXTRACT_26B= bsub -W "$hours" -gpu "num=$gpus" \
     ${options[@]+"${options[@]}"} < evaluation/minerva/run_pipeline.lsf
 }
 options=("$@")

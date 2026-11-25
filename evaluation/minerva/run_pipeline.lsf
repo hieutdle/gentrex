@@ -4,7 +4,7 @@
 #
 #   SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
 #
-# submit_pipeline.sh submits the same runs as six short jobs instead, which
+# submit_pipeline.sh submits the same runs as seven short jobs instead, which
 # wait less in the queue.
 #
 # gentrex-bench/run.py runs gentrex transcribe, select, extract and normalize
@@ -13,14 +13,16 @@
 # GPUs of gentrex extract for its whole time. The scores go to
 # results/gentrex-bench/, one folder for each run.
 #
-# By default the job makes six runs of the benchmark reports: native (3 runs
-# for repeatability, the first with --select-methods), scan, fax, and native
-# without gentrex select. VERSION names the benchmark version (v1), COPIES
+# By default the job makes seven runs of the benchmark reports: native (3 runs
+# for repeatability, the first with --select-methods), scan, fax, native
+# without gentrex select, and native with Gemma 4 26B-A4B as the extraction
+# model (evaluation/settings-extract-26b.yaml). VERSION names the benchmark version (v1), COPIES
 # the copies to read, NO_SELECT the copies to read once more without gentrex
 # select (native, and NO_SELECT= for none), SELECT_METHODS the copies whose
 # pages are also chosen in two other ways (native, and SELECT_METHODS= for
 # none), REPEATS total runs of REPEAT_COPY (3 on native, set REPEATS=1 for
-# none), and OPTIONS extra options of run.py for every run. The job fails if
+# none), EXTRACT_26B the copies to read once more with the 26B extraction
+# model (native, and EXTRACT_26B= for none), and OPTIONS extra options of run.py for every run. The job fails if
 # a command had failed files, after the scores are written.
 #BSUB -J gentrex-pipeline
 #BSUB -q gpu
@@ -58,6 +60,11 @@ case " $OPTIONS " in
   *" --no-select "*) ;;
   *) for copy in ${NO_SELECT-native}; do run --copy "$copy" --no-select; done ;;
 esac
+# Later options of run.py replace the earlier ones of run().
+for copy in ${EXTRACT_26B-native}; do
+  run --copy "$copy" --settings evaluation/settings-extract-26b.yaml \
+    --gpus 1 1 1 --label extract-26B-A4B
+done
 # Every scored run, so that the log ends with the results.
 .venv/bin/python gentrex-bench/scorer/score.py --list
 exit $status
