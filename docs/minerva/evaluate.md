@@ -219,6 +219,24 @@ eight hours. It waits longer in the queue, but needs only one `bsub`:
 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
+### Run on a B200 GPU
+
+`run_pipeline_b200.lsf` makes the same runs on one B200 GPU. A B200 has about
+180 GB of memory, so it holds the model of `gentrex extract` alone, and the
+job asks for one GPU instead of two H100s. Use it when the H100 nodes are
+busy and `bhosts -gpu` shows free B200s:
+
+```bash
+bsub < evaluation/minerva/run_pipeline_b200.lsf
+```
+
+It reads the same variables as `run_pipeline.lsf`. Its `-R` line names the
+B200 nodes with the tag `b200`. If `lshosts lg01e03` lists another tag under
+`RESOURCES`, change the line. Speed and GPU-hours of runs on different GPU
+models don't compare, so make all runs of one comparison on one model.
+
+### Make a single run
+
 The same job makes a single run when it gets fewer copies. Name the copies in `COPIES`, and in `NO_SELECT` the
 copies to read once more without `gentrex select`. The run of each copy in
 `SELECT_METHODS` also chooses the pages in two other ways, to compare
@@ -342,6 +360,7 @@ Both jobs take their settings from environment variables:
 | `SELECT_METHODS` | `native` | `run_pipeline.lsf` | The copies whose pages are also chosen in two other ways. `SELECT_METHODS=` compares none. |
 | `REPEATS` | `3` | `run_pipeline.lsf` | Total runs of `REPEAT_COPY` (`native` by default) to measure repeatability. Set `REPEATS=1` to skip repeats. |
 | `EXTRACT_26B` | `native` | `run_pipeline.lsf` | The copies to read once more with Gemma 4 26B-A4B as the extraction model. `EXTRACT_26B=` reads none. |
+| `EXTRACT_GPUS` | `2` | `run_pipeline.lsf`, `serve.sh` | The GPUs that serve the model of `gentrex extract`. `run_pipeline_b200.lsf` sets it to `1`. |
 | `OPTIONS` | none | `run_pipeline.lsf` | More options of `run.py`, for every run |
 
 Options of `bsub` on the command line replace the `#BSUB` lines of a job
@@ -364,6 +383,7 @@ its model, which `scores.json` gives as `server_start_seconds`.
 | `module: command not found` in `prepare.sh` | Run `module load apptainer` and start the script again. |
 | Hugging Face refuses a download | Accept Google's terms on the model's page, run `uvx --from huggingface_hub hf auth login` and start `prepare.sh` again. |
 | `vLLM stopped; see above` or `serve.sh ended before ... was ready` | vLLM couldn't start, and its own messages are right above this line. Often the model's download is incomplete, or the job didn't get a GPU with 80 GB. If vLLM doesn't know `muse_glimmer`, `vllm.sif` is older than vLLM 0.28. |
+| vLLM stops with `OSError: [Errno 30] Read-only file system` and a folder outside the serving folder | The serving folder was moved, and vLLM's cache of compiled code still names the old place. Delete it with `rm -rf "$SERVING/home/.cache/vllm"` and submit the job again. vLLM builds the cache anew. |
 | `serve.sh has no options for ...` | A settings file names a model that `serve.sh` doesn't know. Add a line for it. |
 | Chrome names a missing library, such as `libnss3.so` | The node lacks a library that Chrome needs. Ask Minerva's support to install it. |
 | `No usable sandbox!` in the log of `generate_reports.lsf` | Start Chrome without its sandbox. Save `exec /path/to/serving/chrome-headless-shell-linux64/chrome-headless-shell --no-sandbox "$@"` after a `#!/bin/bash` line in `chrome.sh`, run `chmod +x chrome.sh`, and give the path of `chrome.sh` to `--chrome` in `generate_reports.lsf`. |

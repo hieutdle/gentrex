@@ -5,7 +5,7 @@
 #   SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
 #
 # submit_pipeline.sh submits the same runs as seven short jobs instead, which
-# wait less in the queue.
+# wait less in the queue. run_pipeline_b200.lsf makes them on one B200 GPU.
 #
 # gentrex-bench/run.py runs gentrex transcribe, select, extract and normalize
 # on each copy of the reports and scores the records. It serves the model of
@@ -37,10 +37,11 @@
 module load apptainer
 status=0
 run() {
-  # --gpus names the GPUs that serve.sh gives each model.
+  # --gpus names the GPUs that serve.sh gives each model. EXTRACT_GPUS is the
+  # number for the model of gentrex extract, 2 unless the job sets it.
   .venv/bin/python gentrex-bench/run.py \
     --version "${VERSION:-v1}" \
-    --gpus 1 1 2 --serve evaluation/minerva/serve.sh \
+    --gpus 1 1 "${EXTRACT_GPUS:-2}" --serve evaluation/minerva/serve.sh \
     --settings evaluation/settings.yaml $OPTIONS "$@" || status=1
 }
 for copy in ${COPIES:-native scan fax}; do

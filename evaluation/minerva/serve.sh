@@ -18,10 +18,12 @@ case "$1" in
   google/gemma-4-26B-A4B-it)
     options=(--max-model-len 16384) ;;
   google/gemma-4-31B-it)
-    # For two GPUs with 80 GB each. On one B200, remove
-    # --tensor-parallel-size 2.
-    options=(--tensor-parallel-size 2 --max-model-len 32768
-      --gpu-memory-utilization 0.95) ;;
+    # Split over two GPUs with 80 GB each. EXTRACT_GPUS=1 serves it on one
+    # GPU that holds it alone, such as a B200.
+    options=(--max-model-len 32768 --gpu-memory-utilization 0.95)
+    if [ "${EXTRACT_GPUS:-2}" != 1 ]; then
+      options+=(--tensor-parallel-size "${EXTRACT_GPUS:-2}")
+    fi ;;
   meta-models/Muse-Glimmer-30B)
     # The model that writes the benchmark reports. The parser keeps its
     # reasoning out of the answer, and needs vLLM 0.28 or newer.
