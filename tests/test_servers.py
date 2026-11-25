@@ -87,7 +87,7 @@ def test_gentrex_run_reuses_server_for_consecutive_steps_with_same_model(
 
         return _run
 
-    monkeypatch.setattr(cli.servers, "served", fake_served)
+    monkeypatch.setattr(servers, "served", fake_served)
     monkeypatch.setattr(cli, "_run_transcribe", fake_cmd("transcribe"))
     monkeypatch.setattr(cli, "_run_select", fake_cmd("select"))
     monkeypatch.setattr(cli, "_run_extract", fake_cmd("extract"))
