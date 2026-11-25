@@ -166,33 +166,27 @@ every run, and scores compare only on the same reports.
 ## Step 5: Run Gentrex on the benchmark reports
 
 ```bash
-evaluation/minerva/submit_pipeline.sh
+bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
-The script submits seven jobs, one for each run of the 300 benchmark reports
-that the results compare:
+The job makes seven runs of the 300 benchmark reports, one after another:
 
-| Job | Reads | Time asked for | Shows |
-| --- | --- | --- | --- |
-| 1 | The native PDFs, also choosing pages in two other ways | 3 hours | The pipeline on PDFs with a text layer, and what other ways of choosing pages do |
-| 2 and 3 | The native PDFs again | 2 hours each | How much the results vary between identical runs |
-| 4 and 5 | The scan and fax copies | 2 hours each | What OCR loses on scanned and faxed pages |
-| 6 | The native PDFs without `gentrex select` | 2 hours | What selecting pages is worth |
-| 7 | The native PDFs, with Gemma 4 26B-A4B as the extraction model | 2 hours | What the larger extraction model is worth |
+| Run | Reads | Shows |
+| --- | --- | --- |
+| 1 | The native PDFs, also choosing pages in two other ways | The pipeline on PDFs with a text layer, and what other ways of choosing pages do |
+| 2 and 3 | The native PDFs again | How much the results vary between identical runs |
+| 4 and 5 | The scan and fax copies | What OCR loses on scanned and faxed pages |
+| 6 | The native PDFs without `gentrex select` | What selecting pages is worth |
+| 7 | The native PDFs, with Gemma 4 26B-A4B as the extraction model | What the larger extraction model is worth |
 
-Jobs 1 to 6 ask for two H100 GPUs each. Job 7 asks for one, because its
-extraction model fits on one GPU. Its settings are in
+A run is the four commands and the scoring. The job asks for eight hours
+and one H100 NVL GPU, which has 94 GB of memory and holds each of the
+models. They are served one after another. The settings of run 7 are in
 `evaluation/settings-extract-26b.yaml`, and its run is labelled
-`extract-26B-A4B`. LSF starts short jobs sooner than long ones, and the jobs
-can run at the same time, so all of them usually end long before one job
-with every run would. A run is the four commands and the
-scoring. The three models are served one after another, so a job holds both
-GPUs for its whole time. Options after the script's name go to every `bsub`,
-such as `-P acc_xxx`.
+`extract-26B-A4B`.
 
-Follow the jobs with `bjobs` and `tail -f run-pipeline.*.log`, with one log
-for each job. Each run ends with a line that gives its report accuracy and
-the folder with its scores:
+Follow the job with `bjobs` and `tail -f run-pipeline.*.log`. Each run ends
+with a line that gives its report accuracy and the folder with its scores:
 
 ```
 2026-11-10 11:02:11,306 report accuracy 91.0% on 300 reports; wrote results/gentrex-bench/20261110-103752
@@ -207,38 +201,27 @@ Each log ends with every scored run so far, one line each:
 `.venv/bin/python gentrex-bench/scorer/score.py --list` prints the same
 list at any time.
 
-A job that ends in `TERM_RUNLIMIT` ran out of time. Submit that run again
-with more time, as in the next section.
+A job that ends in `TERM_RUNLIMIT` ran out of time. The runs that it
+finished are scored and kept. Submit the missing runs with more time, as in
+the next section.
 
-### Run everything in one job
+### Run as seven short jobs
 
-`run_pipeline.lsf` makes the seven runs one after another in one job of
-eight hours. It waits longer in the queue, but needs only one `bsub`:
-
-```bash
-bsub < evaluation/minerva/run_pipeline.lsf
-```
-
-### Run on a B200 GPU
-
-`run_pipeline_b200.lsf` makes the same runs on one B200 GPU. A B200 has about
-180 GB of memory, so it holds the model of `gentrex extract` alone, and the
-job asks for one GPU instead of two H100s. Use it when the H100 nodes are
-busy and `bhosts -gpu` shows free B200s:
+To wait less in the queue and run the seven benchmark runs concurrently on
+separate H100 NVL GPUs, submit them as seven short 1-GPU jobs (three hours
+for the first run with `--select-methods`, two hours for the others):
 
 ```bash
-bsub < evaluation/minerva/run_pipeline_b200.lsf
+evaluation/minerva/submit_pipeline.sh
 ```
 
-It reads the same variables as `run_pipeline.lsf`. Its `-R` line names the
-B200 nodes with the tag `b200`. If `lshosts lg01e03` lists another tag under
-`RESOURCES`, change the line. Speed and GPU-hours of runs on different GPU
-models don't compare, so make all runs of one comparison on one model.
+Options after the script's name go to every `bsub`, such as `-P acc_xxx`.
 
 ### Make a single run
 
-The same job makes a single run when it gets fewer copies. Name the copies in `COPIES`, and in `NO_SELECT` the
-copies to read once more without `gentrex select`. The run of each copy in
+The same job makes fewer runs when it gets fewer copies. Name the copies in
+`COPIES`, and in `NO_SELECT` the copies to read once more without
+`gentrex select`. The run of each copy in
 `SELECT_METHODS` also chooses the pages in two other ways, to compare
 `gentrex select` with them
 ([Compare ways to choose pages](../development/run-benchmark.md#compare-ways-to-choose-pages)).
@@ -326,7 +309,7 @@ to compare it with later ones under the same rules. Name the run folder of
 `runs`:
 
 ```bash
-.venv/bin/python gentrex-bench/scorer/score.py --gpus 1 1 2 \
+.venv/bin/python gentrex-bench/scorer/score.py --gpus 1 1 1 \
   --run results/normalize/20261117-203542
 ```
 
@@ -360,7 +343,8 @@ Both jobs take their settings from environment variables:
 | `SELECT_METHODS` | `native` | `run_pipeline.lsf` | The copies whose pages are also chosen in two other ways. `SELECT_METHODS=` compares none. |
 | `REPEATS` | `3` | `run_pipeline.lsf` | Total runs of `REPEAT_COPY` (`native` by default) to measure repeatability. Set `REPEATS=1` to skip repeats. |
 | `EXTRACT_26B` | `native` | `run_pipeline.lsf` | The copies to read once more with Gemma 4 26B-A4B as the extraction model. `EXTRACT_26B=` reads none. |
-| `EXTRACT_GPUS` | `2` | `run_pipeline.lsf`, `serve.sh` | The GPUs that serve the model of `gentrex extract`. `run_pipeline_b200.lsf` sets it to `1`. |
+| `EXTRACT_GPUS` | `1` | `run_pipeline.lsf`, `serve.sh` | The GPUs that serve the model of `gentrex extract`. With `2`, also pass `-gpu num=2` to `bsub`. |
+| `EXTRACT_CONTEXT` | `32768` | `serve.sh` | The longest request of the model of `gentrex extract`, in tokens. A shorter one needs less GPU memory. Set `16384` if vLLM reports too little memory for this model. |
 | `OPTIONS` | none | `run_pipeline.lsf` | More options of `run.py`, for every run |
 
 Options of `bsub` on the command line replace the `#BSUB` lines of a job
@@ -368,9 +352,7 @@ script, as `-W 10:00` does above. The scripts have no `-P` line, so `bsub`
 takes the allocation from `LSB_DEFAULTPROJECT`, or from `-P acc_xxx` on the
 command line.
 
-The GPU-hours in the scores count one GPU for the models of
-`gentrex transcribe` and `gentrex select` and two for the model of
-`gentrex extract`. They leave out the time that each server takes to load
+The GPU-hours in the scores count one GPU for each model. They leave out the time that each server takes to load
 its model, which `scores.json` gives as `server_start_seconds`.
 
 ## When something goes wrong

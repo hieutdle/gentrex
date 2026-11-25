@@ -97,13 +97,12 @@ The first release.
   date and commit of the sampling in `manifest.json`.
 - The benchmark reports get up to five appendix pages after the report, so
   that they are about as long as the public sample reports.
-- `evaluation/minerva/submit_pipeline.sh` also makes a run with Gemma 4
-  26B-A4B as the extraction model, to compare it with the default.
-- `evaluation/minerva/submit_pipeline.sh` submits the benchmark runs as six
-  jobs of two or three hours instead of one job of eight hours, so they wait
-  less in the queue and run at the same time. `gentrex-bench/run.py` finds
-  each command's run by the folder it read, so that jobs in the same Gentrex
-  folder don't mix up their runs.
+- `evaluation/minerva/run_pipeline.lsf` also makes a run with Gemma 4
+  26B-A4B as the extraction model, to compare it with the default. The job
+  asks for one H100 NVL GPU instead of two, and serves the extraction model
+  on it.
+- `gentrex-bench/run.py` finds each command's run by the folder it read, so
+  that jobs in the same Gentrex folder don't mix up their runs.
 - `presentation.ipynb` holds the text, numbered tables and figures of the
   paper in the order of the paper, with an abstract written from the scores
   and a supplement that follows one report through every command. It writes

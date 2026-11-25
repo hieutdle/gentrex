@@ -4,13 +4,13 @@
 #
 #   SERVING=/path/to/serving bsub -P acc_xxx < evaluation/minerva/run_pipeline.lsf
 #
-# submit_pipeline.sh submits the same runs as seven short jobs instead, which
-# wait less in the queue. run_pipeline_b200.lsf makes them on one B200 GPU.
+# submit_pipeline.sh submits the same seven runs as short 1-GPU jobs instead,
+# which wait less in the queue and can run concurrently on separate GPUs.
 #
 # gentrex-bench/run.py runs gentrex transcribe, select, extract and normalize
 # on each copy of the reports and scores the records. It serves the model of
-# each command with serve.sh, one after another, so the job holds the two
-# GPUs of gentrex extract for its whole time. The scores go to
+# each command with serve.sh, one after another, on one H100 NVL GPU. The
+# scores go to
 # results/gentrex-bench/, one folder for each run.
 #
 # By default the job makes seven runs of the benchmark reports: native (3 runs
@@ -28,7 +28,7 @@
 #BSUB -q gpu
 #BSUB -n 4
 #BSUB -W 8:00
-#BSUB -gpu num=2
+#BSUB -gpu num=1
 #BSUB -R "select[h100nvl] rusage[mem=8000] span[hosts=1]"
 #BSUB -oo run-pipeline.%J.log
 : "${SERVING:?set SERVING to the serving folder}"
@@ -38,10 +38,10 @@ module load apptainer
 status=0
 run() {
   # --gpus names the GPUs that serve.sh gives each model. EXTRACT_GPUS is the
-  # number for the model of gentrex extract, 2 unless the job sets it.
+  # number for the model of gentrex extract. With 2, ask bsub for -gpu num=2.
   .venv/bin/python gentrex-bench/run.py \
     --version "${VERSION:-v1}" \
-    --gpus 1 1 "${EXTRACT_GPUS:-2}" --serve evaluation/minerva/serve.sh \
+    --gpus 1 1 "${EXTRACT_GPUS:-1}" --serve evaluation/minerva/serve.sh \
     --settings evaluation/settings.yaml $OPTIONS "$@" || status=1
 }
 for copy in ${COPIES:-native scan fax}; do

@@ -418,10 +418,12 @@ It works like `select.lsf`, with these differences:
 ### Choose the GPU and time limit
 
 The model's weights take about 62 GB. On one 80 GB GPU, that leaves too little
-memory for a 32,768-token request, and vLLM stops at startup. Use two H100s or
-one B200:
+memory for a 32,768-token request, and vLLM stops at startup. Use one H100 NVL,
+two 80 GB GPUs or one B200:
 
-- **Two H100s**, as in the script. `a10080g` and `h10080g` from the
+- **One H100 NVL**, with 94 GB. Change `-gpu num=2` to `-gpu num=1` and
+  remove `--tensor-parallel-size 2`. This is what `run_pipeline.lsf` uses.
+- **Two GPUs**, as in the script above. `a10080g` and `h10080g` from the
   [table for `gentrex transcribe`](#choose-the-gpu-and-time-limit) also work
   in place of `h100nvl`.
 - **One B200**, with 192 GB. Change `-gpu num=2` to `-gpu num=1` and
@@ -764,9 +766,8 @@ that already has a truth file is skipped. If the job ends in
 
 [Run the benchmark](../development/run-benchmark.md) runs Gentrex on
 benchmark reports and scores its records against their truth files. On
-Minerva, one batch job does all of it. The job serves the three models one
-after another, so it needs the two GPUs of `gentrex extract` for its whole
-time.
+Minerva, one batch job does all of it on a single H100 NVL GPU (94 GB),
+serving each model in turn and stopping it before starting the next.
 
 The job needs what
 [`prepare.sh`](#prepare-in-an-interactive-session) downloads, and a
@@ -780,13 +781,13 @@ cd /path/to/gentrex
 bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
-`evaluation/minerva/submit_pipeline.sh` submits the same runs as short jobs
-instead, which wait less in the queue and can run at the same time
+`evaluation/minerva/submit_pipeline.sh` submits the same seven runs as short
+1-GPU jobs (2 to 3 hours each), which wait less in the queue and can run
+concurrently on separate GPUs
 ([Evaluate Gentrex on Minerva](evaluate.md#step-5-run-gentrex-on-the-benchmark-reports)).
 
-The `#BSUB` lines of `run_pipeline.lsf` ask for what
-[`extract.lsf`](#write-the-job-script-2) asks for, with eight hours instead of
-30 minutes. The script then runs `gentrex-bench/run.py`, which does the work
+The `#BSUB` lines of `run_pipeline.lsf` ask for eight hours and one H100
+NVL GPU, which has 94 GB of memory and holds each of the models. The script then runs `gentrex-bench/run.py`, which does the work
 of the three job scripts. It picks a free port, starts
 `evaluation/minerva/serve.sh` for the model of `gentrex transcribe`, waits
 until vLLM answers, runs the command and stops vLLM. It does the same for
@@ -796,25 +797,24 @@ and the scorer on the CPU.
 `serve.sh` starts vLLM as the three job scripts above do, with the options
 of each model. `run_pipeline.lsf` sets two more things:
 
-- `--gpus 1 1 2` records that the first two servers use one GPU and the
-  third uses two, for the GPU-hours in the scores.
+- `--gpus 1 1 1` records that each of the three servers uses one GPU, for
+  the GPU-hours in the scores.
 - `--settings evaluation/settings.yaml` turns on the lookup of ClinVar IDs,
   so that the scorer scores them.
 
-By default the job makes four runs of the 300 benchmark reports, one after
-another. Three read the native, scan and fax copies, and the fourth reads
-the native copy again without `gentrex select`. The run of the native copy
-also chooses the pages in two other ways, to compare `gentrex select` with
-them
+By default the job makes seven runs of the 300 benchmark reports, one after
+another. It reads the native copy three times, then the scan and fax
+copies, the native copy without `gentrex select`, and the native copy with
+Gemma 4 26B-A4B as the extraction model. The first run also chooses the
+pages in two other ways, to compare `gentrex select` with them
 ([Compare ways to choose pages](../development/run-benchmark.md#compare-ways-to-choose-pages)).
-`COPIES` names the copies to read, `NO_SELECT` the copies to read once more
-without `gentrex select`, and `SELECT_METHODS` the copies with that
-comparison.
+[Evaluate Gentrex on Minerva](evaluate.md#make-a-single-run) lists the
+variables that leave runs out.
 
 `OPTIONS` passes more options to every run of `run.py`
 ([Run another setup](../development/run-benchmark.md#run-another-setup)).
-Run one such job at a time in a `gentrex` folder, because `run.py` finds the
-run that a command just made through the command's `latest` link.
+Two such jobs can run in the same `gentrex` folder, because `run.py` finds
+the run that a command just made by the folder that the command read.
 
 Follow the job with `bjobs` and `tail -f run-pipeline.*.log`. Its last line
 gives the report accuracy and the folder with the scores, such as

@@ -19,7 +19,7 @@ evaluation can run on any computer that can serve Gentrex's models.
 | `minerva/prepare.sh` | Downloads what the two Minerva jobs need |
 | `minerva/generate_reports.lsf` | The Minerva job that makes the benchmark reports |
 | `minerva/run_pipeline.lsf` | The Minerva job that runs Gentrex on the reports and scores it |
-| `minerva/submit_pipeline.sh` | Submits the runs of `run_pipeline.lsf` as short jobs, and one run with a smaller extraction model |
+| `minerva/submit_pipeline.sh` | Submits the seven runs of `run_pipeline.lsf` as short 1-GPU jobs |
 | `minerva/serve.sh` | Starts vLLM with one model in a Minerva job. The two jobs call it. |
 | `download_reference_files.sh` | Downloads ClinVar, HPO, MONDO and HGNC. The other scripts call it. |
 | `settings.yaml` | The settings of the evaluation that differ from Gentrex's defaults |
@@ -202,21 +202,19 @@ can be submitted again and goes on where it stopped.
 ### Step 3: Run the pipeline
 
 ```bash
-evaluation/minerva/submit_pipeline.sh
+bsub < evaluation/minerva/run_pipeline.lsf
 ```
 
-The script submits seven jobs of two hours each, and three hours for the
-first. Six make the runs of the 300 reports on `native` three times, the
-first also with `--select-methods`, then `scan`, `fax`, and `native` with
-`--no-select`. The seventh reads `native` with Gemma 4 26B-A4B as the
-extraction model, on one GPU. Short jobs wait less in the queue, and they
-can run at the same time. Each job serves the three models one after another, so it holds
-two GPUs for its whole time. Follow them with `bjobs` and
+The job makes seven runs of the 300 reports in eight hours, on one H100 NVL
+GPU. It reads `native` three times, the first also with `--select-methods`,
+then `scan`, `fax`, `native` with `--no-select`, and `native` with Gemma 4
+26B-A4B as the extraction model. The three models of a run are served one
+after another, each stopped before the next starts. To wait less in the
+queue and run them concurrently on separate GPUs, run
+`evaluation/minerva/submit_pipeline.sh` to submit seven short 1-GPU jobs
+(2 to 3 hours each). Follow jobs with `bjobs` and
 `tail -f run-pipeline.*.log`. Each run ends with a line that gives its
 report accuracy and the folder with its scores.
-
-`bsub < evaluation/minerva/run_pipeline.lsf` makes the seven runs in one
-job of eight hours.
 
 `COPIES`, `NO_SELECT`, `SELECT_METHODS`, and `REPEATS` work as they do on your own
 machine (`REPEATS` defaults to `3` on Minerva and `1` locally). To give a job more time, pass `-W` to `bsub`, as in
@@ -299,8 +297,9 @@ On Minerva, options of `bsub` on the command line replace the `#BSUB` lines
 of a job script, as `-W 10:00` does above.
 
 The two `serve.sh` scripts hold vLLM's options for each model, which are
-those of the commands' own pages. They give the model of `gentrex extract`
-two GPUs. If yours differ, change the model's line in `serve.sh`, and tell
+those of the commands' own pages. The local one gives the model of
+`gentrex extract` two GPUs, and Minerva's gives it one H100 NVL. If yours
+differ, change the model's line in `serve.sh`, and tell
 the scorer with `--gpus`, as in
 `evaluation/local/run_pipeline.sh --gpus 1 1 1`. The three numbers are the
 GPUs of the models of `gentrex transcribe`, `gentrex select` and

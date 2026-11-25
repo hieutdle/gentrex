@@ -18,11 +18,13 @@ case "$1" in
   google/gemma-4-26B-A4B-it)
     options=(--max-model-len 16384) ;;
   google/gemma-4-31B-it)
-    # Split over two GPUs with 80 GB each. EXTRACT_GPUS=1 serves it on one
-    # GPU that holds it alone, such as a B200.
-    options=(--max-model-len 32768 --gpu-memory-utilization 0.95)
-    if [ "${EXTRACT_GPUS:-2}" != 1 ]; then
-      options+=(--tensor-parallel-size "${EXTRACT_GPUS:-2}")
+    # On one H100 NVL, which the jobs ask for and which has 94 GB.
+    # EXTRACT_CONTEXT is the longest request in tokens, and a shorter one
+    # needs less memory. EXTRACT_GPUS=2 splits the model over two GPUs.
+    options=(--max-model-len "${EXTRACT_CONTEXT:-32768}"
+      --gpu-memory-utilization 0.95)
+    if [ "${EXTRACT_GPUS:-1}" != 1 ]; then
+      options+=(--tensor-parallel-size "$EXTRACT_GPUS")
     fi ;;
   meta-models/Muse-Glimmer-30B)
     # The model that writes the benchmark reports. The parser keeps its
